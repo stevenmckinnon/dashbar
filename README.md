@@ -5,17 +5,21 @@ A native macOS menu bar dashboard for agent usage, local dev servers, and system
 - **Agents**: live Claude Code sessions (`~/.claude/sessions`), working/idle status, plus other agent processes it spots (Codex, Cursor, Gemini, Aider, Ollama…). Click a session to open its folder.
 - **Claude Code usage**: today's tokens (in / out / cache read / cache write), a 14-day chart, and top projects and models, read incrementally from `~/.claude/projects/**/*.jsonl`.
 - **Codex usage**: the same, plus 5h/weekly rate-limit gauges, from `~/.codex/sessions`. Shown once Codex has session logs.
-- **Local servers**: listening TCP ports with their project name and command. Hover a row to open it in the browser or stop the process.
+- **Local servers**: listening TCP ports with their project name, command and uptime. Hover a row to open it in the browser or stop the process.
+  Servers up over an hour that use almost no CPU are marked "barely used", and servers started from a Claude Code
+  session say so (the session shows what it runs).
 - **System tab**: CPU (user/system split, load average), memory (app/wired/compressed, swap, and macOS memory
   pressure), network up/down, GPU utilisation, disk, battery with time remaining, and the busiest apps right
   now with their icons. Recent samples show as small bar charts.
 - **Tabs**: Overview · Agents · Servers · System · Clean-up (⌘1–⌘5). Overview tiles jump to their tab.
-- **Menu bar stats** (optional, in Settings): CPU, memory and download speed beside the icon.
+- **Menu bar stats** (optional, in Settings): CPU, memory, download speed and, with the Labs setting on, what's left of
+  your Claude 5-hour or weekly limit, beside the icon.
 - **Plan limits**: Codex's 5-hour and weekly limits from its own logs. Claude's are behind an experimental,
   off-by-default setting that reads Claude Code's sign-in from the Keychain (macOS asks first) and calls the
-  same undocumented endpoint as Claude Code's `/usage`. It never refreshes or stores the sign-in.
+  same undocumented endpoint as Claude Code's `/usage`. It never refreshes or stores the sign-in. Each limit
+  shows a tick for an even pace and a projection of when it would run out at the current rate.
 
-The menu bar icon turns into ✨N while N Claude sessions are working.
+The menu bar shows the number of working Claude sessions beside the icon, and the icon's bar fills while any are working.
 
 ## Settings
 
@@ -57,3 +61,13 @@ swift test              # parser, grouping and clean-up tests against throwaway 
 ```
 
 Needs macOS 14+ and Xcode / Swift 6.
+
+## Privacy
+
+Everything stays on your Mac. Dashbar reads local agent logs, lists listening ports and measures cache
+folders. The only network request is the optional Claude plan-limits setting, which sends Claude Code's own
+sign-in to Anthropic's usage endpoint, the same call Claude Code makes.
+
+## Licence
+
+MIT. See `LICENSE`. Not affiliated with Anthropic or OpenAI.
