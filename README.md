@@ -62,6 +62,16 @@ swift test              # parser, grouping and clean-up tests against throwaway 
 
 Needs macOS 14+ and Xcode / Swift 6.
 
+## Releasing
+
+`scripts/release.sh <version>` builds a universal (Apple silicon and Intel) app signed with a Developer ID
+certificate and the hardened runtime, wraps it in a DMG, notarises it with Apple and staples the ticket.
+`scripts/release.sh <version> --dry-run` does everything except notarise, with any signing identity.
+
+One-time setup needs a paid Apple Developer membership: create a "Developer ID Application" certificate in
+Xcode, then store notary credentials with `xcrun notarytool store-credentials dashbar-notary` (the script's
+header has the full command). The result is `build/Dashbar-<version>.dmg`, ready to attach to a GitHub release.
+
 ## Privacy
 
 Everything stays on your Mac. Dashbar reads local agent logs, lists listening ports and measures cache

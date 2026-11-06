@@ -1,5 +1,7 @@
 #!/bin/zsh
 # Builds Dashbar.app into ./build. Usage: ./build.sh [--run] [--install]
+# Release options (set by scripts/release.sh): DASHBAR_VERSION, DASHBAR_BUILD, DASHBAR_UNIVERSAL=1
+# (arm64 + x86_64), DASHBAR_HARDENED=1 (hardened runtime and a secure timestamp, required to notarise).
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -21,11 +23,19 @@ if [[ ! -f "$ICON_ICNS" || "$ICON_SVG" -nt "$ICON_ICNS" ]]; then
   rm -rf "$TMP"
 fi
 
-swift build -c release
+VERSION="${DASHBAR_VERSION:-0.1.0}"
+BUILD_NUMBER="${DASHBAR_BUILD:-1}"
+if [[ "${DASHBAR_UNIVERSAL:-}" == "1" ]]; then
+  ARCHS=(--arch arm64 --arch x86_64)
+else
+  ARCHS=()
+fi
+swift build -c release "${ARCHS[@]}"
+BINARY="$(swift build -c release "${ARCHS[@]}" --show-bin-path)/Dashbar"
 APP=build/Dashbar.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp .build/release/Dashbar "$APP/Contents/MacOS/Dashbar"
+cp "$BINARY" "$APP/Contents/MacOS/Dashbar"
 cp "$ICON_ICNS" "$APP/Contents/Resources/AppIcon.icns"
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
@@ -39,14 +49,15 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleExecutable</key><string>Dashbar</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>0.1.0</string>
-  <key>CFBundleVersion</key><string>1</string>
+  <key>CFBundleShortVersionString</key><string>__VERSION__</string>
+  <key>CFBundleVersion</key><string>__BUILD__</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
 </dict>
 </plist>
 PLIST
+sed -i '' -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD_NUMBER/" "$APP/Contents/Info.plist"
 
 # Sign with a stable identity when one exists, so macOS recognises rebuilds as the same app
 # (Keychain "Always Allow" and other permissions persist). Override with DASHBAR_SIGN_IDENTITY;
@@ -54,7 +65,11 @@ PLIST
 IDENTITY="${DASHBAR_SIGN_IDENTITY:-$(security find-identity -v -p codesigning 2>/dev/null \
   | grep -E '"(Developer ID Application|Apple Development):' | head -1 | sed -E 's/.*"(.*)".*/\1/')}"
 if [[ -n "$IDENTITY" ]]; then
-  codesign --force --sign "$IDENTITY" --timestamp=none "$APP" >/dev/null
+  if [[ "${DASHBAR_HARDENED:-}" == "1" ]]; then
+    codesign --force --sign "$IDENTITY" --options runtime --timestamp "$APP" >/dev/null
+  else
+    codesign --force --sign "$IDENTITY" --timestamp=none "$APP" >/dev/null
+  fi
   echo "Signed with: $IDENTITY"
 else
   codesign --force --sign - "$APP" >/dev/null
