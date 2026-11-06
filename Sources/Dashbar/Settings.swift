@@ -19,6 +19,7 @@ final class AppSettings: ObservableObject {
         static let menuCPU = "menuCPU"
         static let menuMemory = "menuMemory"
         static let menuNetwork = "menuNetwork"
+        static let menuLimit = "menuClaudeLimit"
         static let claudeLimits = "claudeLimitsExperimental"
     }
 
@@ -38,6 +39,8 @@ final class AppSettings: ObservableObject {
     @Published var menuCPU: Bool { didSet { defaults.set(menuCPU, forKey: Key.menuCPU) } }
     @Published var menuMemory: Bool { didSet { defaults.set(menuMemory, forKey: Key.menuMemory) } }
     @Published var menuNetwork: Bool { didSet { defaults.set(menuNetwork, forKey: Key.menuNetwork) } }
+    /// What's left of the Claude plan limit, beside the icon. Needs the Labs plan-limits setting.
+    @Published var menuLimit: Bool { didSet { defaults.set(menuLimit, forKey: Key.menuLimit) } }
     /// Experimental: read Claude Code's sign-in to show plan limits. Off by default.
     @Published var claudeLimits: Bool { didSet { defaults.set(claudeLimits, forKey: Key.claudeLimits) } }
 
@@ -58,6 +61,7 @@ final class AppSettings: ObservableObject {
         menuCPU = defaults.bool(forKey: Key.menuCPU)
         menuMemory = defaults.bool(forKey: Key.menuMemory)
         menuNetwork = defaults.bool(forKey: Key.menuNetwork)
+        menuLimit = defaults.bool(forKey: Key.menuLimit)
         claudeLimits = defaults.bool(forKey: Key.claudeLimits)
     }
 }
@@ -126,10 +130,15 @@ private struct MenuBarSettings: View {
                 Toggle("CPU", isOn: $settings.menuCPU)
                 Toggle("Memory", isOn: $settings.menuMemory)
                 Toggle("Download speed", isOn: $settings.menuNetwork)
+                Toggle("Claude plan left", isOn: $settings.menuLimit)
+                    .disabled(!settings.claudeLimits)
             } header: {
                 Text("Show beside the icon")
             } footer: {
-                Text("The count of working agents always shows.").foregroundStyle(.secondary)
+                Text("The count of working agents always shows."
+                     + (settings.claudeLimits ? " Claude plan left shows a warning symbol when you're nearly out or on course to run out."
+                                              : " Claude plan left needs “Show Claude plan limits” in Labs."))
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

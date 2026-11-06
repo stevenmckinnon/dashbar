@@ -196,6 +196,27 @@ enum ClaudePlanLimits {
         return nil
     }
 
+    /// What the menu bar shows: the most-used 5-hour or weekly window, as what is left of it.
+    struct MenuBarReading: Equatable {
+        let name: String        // "5h" or "week"
+        let leftPercent: Int
+        /// Nearly used up, or on course to run out before it resets.
+        let atRisk: Bool
+    }
+
+    static func menuBarReading(_ limits: [RateLimit], now: Date = Date()) -> MenuBarReading? {
+        let candidates = limits.filter { $0.label == "5-hour" || $0.label == "Weekly" }
+        guard let top = candidates.max(by: { $0.usedPercent < $1.usedPercent }) else { return nil }
+        let used = min(max(top.usedPercent, 0), 100)
+        let risky: Bool
+        switch top.pace(now: now) {
+        case .runsOut?, .usedUp?: risky = true
+        default: risky = used >= 90
+        }
+        return MenuBarReading(name: top.label == "5-hour" ? "5h" : "week",
+                              leftPercent: Int((100 - used).rounded()), atRisk: risky)
+    }
+
     static func label(for key: String) -> String {
         switch key {
         case "five_hour": return "5-hour"

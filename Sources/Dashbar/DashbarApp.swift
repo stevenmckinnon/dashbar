@@ -58,6 +58,10 @@ struct MenuBarLabel: View {
         if settings.menuNetwork {
             parts.append(Text("\(Image(systemName: "arrow.down")) \(Fmt.shortRate(s.netDown))"))
         }
+        if settings.menuLimit, settings.claudeLimits, store.claudePlan?.problem == nil,
+           let r = ClaudePlanLimits.menuBarReading(store.claudePlan?.limits ?? []) {
+            parts.append(Text("\(Image(systemName: r.atRisk ? "exclamationmark.triangle.fill" : "gauge.with.needle")) \(r.name) \(r.leftPercent)% left"))
+        }
         guard var text = parts.first else { return nil }
         for part in parts.dropFirst() { text = text + Text("  ") + part }
         return text

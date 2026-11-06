@@ -562,3 +562,35 @@ struct ProcessTreeTests {
         #expect(listeners[1].startedBy == nil)
     }
 }
+
+@Suite("Menu bar plan reading")
+struct MenuBarReadingTests {
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+
+    func limit(_ label: String, used: Double, hoursLeft: Double, window: Double) -> RateLimit {
+        RateLimit(label: label, usedPercent: used, resetsAt: now.addingTimeInterval(hoursLeft * 3600), window: window * 3600)
+    }
+
+    @Test func showsWhatIsLeftOfTheMostUsedWindow() {
+        let r = ClaudePlanLimits.menuBarReading([
+            limit("5-hour", used: 30, hoursLeft: 2.5, window: 5),
+            limit("Weekly", used: 45, hoursLeft: 84, window: 168),
+        ], now: now)
+        #expect(r == .init(name: "week", leftPercent: 55, atRisk: false))
+    }
+
+    @Test func warnsWhenOnCourseToRunOut() {
+        let r = ClaudePlanLimits.menuBarReading([limit("5-hour", used: 80, hoursLeft: 2.5, window: 5)], now: now)
+        #expect(r == .init(name: "5h", leftPercent: 20, atRisk: true))
+    }
+
+    @Test func warnsWhenNearlyUsedUpEvenWithoutPace() {
+        let unknown = RateLimit(label: "Weekly", usedPercent: 93, resetsAt: nil)
+        #expect(ClaudePlanLimits.menuBarReading([unknown], now: now)?.atRisk == true)
+    }
+
+    @Test func ignoresOtherWindowsAndEmptyInput() {
+        #expect(ClaudePlanLimits.menuBarReading([], now: now) == nil)
+        #expect(ClaudePlanLimits.menuBarReading([RateLimit(label: "Extra usage", usedPercent: 50, resetsAt: nil)], now: now) == nil)
+    }
+}
