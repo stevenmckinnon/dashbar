@@ -53,6 +53,29 @@ enum Fmt {
         return family.capitalized + (version.isEmpty ? "" : " " + version)
     }
 
+    /// Repo root for a cwd: collapses Claude worktrees, then walks up to the nearest `.git`.
+    static func root(fromCwd cwd: String) -> String {
+        if let r = cwd.range(of: "/.claude/worktrees/") { return String(cwd[..<r.lowerBound]) }
+        let fm = FileManager.default
+        let home = homeDir.path
+        var url = URL(fileURLWithPath: cwd)
+        while url.path != "/" && url.path != home && url.path.count > 1 {
+            if fm.fileExists(atPath: url.appendingPathComponent(".git").path) { return url.path }
+            url.deleteLastPathComponent()
+        }
+        return cwd
+    }
+
+    static func tilde(_ path: String) -> String {
+        path.hasPrefix(homeDir.path) ? "~" + path.dropFirst(homeDir.path.count) : path
+    }
+
+    /// "16.6 GB" -> ("16.6", "GB")
+    static func bytesSplit(_ n: UInt64) -> (String, String) {
+        let parts = ByteCountFormatter.string(fromByteCount: Int64(n), countStyle: .file).split(separator: " ")
+        return (String(parts.first ?? "0"), parts.count > 1 ? String(parts[1]) : "")
+    }
+
     /// Project name from a cwd, collapsing Claude worktrees back to their repo.
     static func project(fromCwd cwd: String) -> String {
         if let r = cwd.range(of: "/.claude/worktrees/") {

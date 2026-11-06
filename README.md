@@ -6,9 +6,42 @@ A native macOS menu bar dashboard for agent usage, local dev servers, and system
 - **Claude Code usage**: today's tokens (in / out / cache read / cache write), a 14-day chart, and top projects and models, read incrementally from `~/.claude/projects/**/*.jsonl`.
 - **Codex usage**: the same, plus 5h/weekly rate-limit gauges, from `~/.codex/sessions`. Shown once Codex has session logs.
 - **Local servers**: listening TCP ports with their project name and command. Hover a row to open it in the browser or stop the process.
-- **System**: CPU with sparkline, memory, disk, battery, uptime.
+- **System tab**: CPU (user/system split, load average), memory (app/wired/compressed, swap, and macOS memory
+  pressure), network up/down, GPU utilisation, disk, battery with time remaining, and the busiest apps right
+  now with their icons. Recent samples show as small bar charts.
+- **Tabs**: Overview · Agents · Servers · System · Clean-up (⌘1–⌘5). Overview tiles jump to their tab.
+- **Menu bar stats** (optional, in Settings): CPU, memory and download speed beside the icon.
+- **Plan limits**: Codex's 5-hour and weekly limits from its own logs. Claude's are behind an experimental,
+  off-by-default setting that reads Claude Code's sign-in from the Keychain (macOS asks first) and calls the
+  same undocumented endpoint as Claude Code's `/usage`. It never refreshes or stores the sign-in.
 
 The menu bar icon turns into ✨N while N Claude sessions are working.
+
+## Settings
+
+Open from the gear menu or ⌘, : which panel sections show, refresh interval, which editor and
+terminal the quick actions open, notifications, launch at login, and the folders clean-up scans
+(defaults to whichever of `~/Development`, `~/Developer`, `~/Projects`, `~/Code`, `~/src` exist).
+
+If Claude Code or Codex change their log format, Dashbar shows a warning rather than silently
+reporting zero.
+
+## Performance
+
+- Scan progress is saved to `~/Library/Application Support/Dashbar/`, so a relaunch reads only new
+  transcript lines (about 30 ms instead of about 5 s for ~1 GB of logs).
+- Agent log folders are watched with FSEvents rather than polled. With the panel closed, Dashbar only
+  reacts to those changes plus a once-a-minute safety refresh.
+- Ports, working folders, memory and command lines come from libproc, so nothing spawns `lsof` or `ps`.
+- `Dashbar --bench` prints timings for each collector.
+
+## Icon
+
+`Resources/AppIcon.svg` is the source. `build.sh` renders it with WebKit (`scripts/render-svg.swift`,
+which keeps the SVG's glow and shadow filters that macOS's own SVG renderer drops) and packages
+`Resources/AppIcon.icns` whenever the SVG changes. The menu bar glyph is drawn in code from the same
+proportions (`Sources/Dashbar/Brand.swift`) as a template image; its bar fills up while agents are working.
+`Dashbar --snapshot glyphs.png --glyphs` previews it on light and dark menu bars.
 
 ## Build
 
@@ -16,6 +49,11 @@ The menu bar icon turns into ✨N while N Claude sessions are working.
 ./build.sh --run        # build build/Dashbar.app and launch it
 ./build.sh --install    # copy to /Applications (needed for "Launch at login")
 .build/release/Dashbar --snapshot out.png --dark   # render the panel to a PNG
+```
+
+```bash
+swift test              # parser, grouping and clean-up tests against throwaway log folders
+.build/release/Dashbar --snapshot settings.png --settings   # render the Settings window
 ```
 
 Needs macOS 14+ and Xcode / Swift 6.

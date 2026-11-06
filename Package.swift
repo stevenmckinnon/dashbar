@@ -9,6 +9,12 @@ let package = Package(
             name: "Dashbar",
             path: "Sources/Dashbar",
             swiftSettings: [.swiftLanguageMode(.v5)]
-        )
+        ),
+        .testTarget(
+            name: "DashbarTests",
+            dependencies: ["Dashbar"],
+            path: "Tests/DashbarTests",
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
     ]
 )

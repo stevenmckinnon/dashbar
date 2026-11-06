@@ -1,6 +1,5 @@
 import Foundation
 import Darwin
-import IOKit.ps
 
 // MARK: - Live Claude Code sessions (~/.claude/sessions/<pid>.json)
 
@@ -12,8 +11,9 @@ struct LiveSession: Identifiable {
     let status: String
     let since: Date
     let entrypoint: String
+    let root: String
 
-    var project: String { Fmt.project(fromCwd: cwd) }
+    var project: String { URL(fileURLWithPath: root).lastPathComponent }
     var isBusy: Bool { status == "busy" }
     var surface: String {
         switch entrypoint {
@@ -27,8 +27,9 @@ struct LiveSession: Identifiable {
 }
 
 enum ClaudeSessions {
-    static func read() -> [LiveSession] {
-        let dir = homeDir.appendingPathComponent(".claude/sessions")
+    static let defaultDir = homeDir.appendingPathComponent(".claude/sessions")
+
+    static func read(dir: URL = ClaudeSessions.defaultDir) -> [LiveSession] {
         guard let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else { return [] }
         let sessions: [LiveSession] = files.filter { $0.pathExtension == "json" }.compactMap { url in
             guard let data = try? Data(contentsOf: url),
@@ -43,7 +44,8 @@ enum ClaudeSessions {
                 cwd: cwd,
                 status: o["status"] as? String ?? "unknown",
                 since: Date(timeIntervalSince1970: ms / 1000),
-                entrypoint: o["entrypoint"] as? String ?? "")
+                entrypoint: o["entrypoint"] as? String ?? "",
+                root: cwd.isEmpty ? homeDir.path : Fmt.root(fromCwd: cwd))
         }
         return sessions.sorted { ($0.isBusy ? 0 : 1, $1.since) < ($1.isBusy ? 0 : 1, $0.since) }
     }
@@ -71,13 +73,15 @@ enum AgentProcesses {
         "ollama": "Ollama", "LM Studio": "LM Studio",
     ]
 
-    static func read(psOutput: String) -> [AgentProcess] {
+    static func read() -> [AgentProcess] {
+        read(executables: Proc.allPIDs().compactMap(Proc.path))
+    }
+
+    /// Counts known agent tools among executable paths.
+    static func read(executables: [String]) -> [AgentProcess] {
         var counts: [String: Int] = [:]
-        for line in psOutput.split(separator: "\n") {
-            let parts = line.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
-            guard parts.count == 2 else { continue }
-            let exe = URL(fileURLWithPath: String(parts[1]).trimmingCharacters(in: .whitespaces)).lastPathComponent
-            if let name = known[exe] { counts[name, default: 0] += 1 }
+        for path in executables {
+            if let name = known[URL(fileURLWithPath: path).lastPathComponent] { counts[name, default: 0] += 1 }
         }
         return counts.map { AgentProcess(name: $0.key, count: $0.value) }.sorted { $0.name < $1.name }
     }
@@ -94,15 +98,21 @@ struct Listener: Identifiable {
     var cwd: String = ""
     var cmdline: String = ""
     var isDev = false
+    var memory: UInt64 = 0
+    var root: String?
+    var started: Date?
+    /// CPU time used since the process started, in seconds.
+    var cpuSeconds: Double = 0
+    /// True when a dev server has been up a while and is doing almost nothing (see `ServerActivity`).
+    var isIdle = false
+    /// The agent session (its process ID) whose process tree this server runs in.
+    var startedBy: Int32?
 
     var isDocker: Bool { command.hasPrefix("com.docke") || cmdline.contains("com.docker.backend") }
     var title: String { isDocker ? "Docker container" : (project ?? command) }
 
     var isLoopbackOnly: Bool { address.hasPrefix("127.") || address.hasPrefix("[::1]") }
-    var project: String? {
-        guard !cwd.isEmpty, cwd != "/", cwd != homeDir.path else { return nil }
-        return Fmt.project(fromCwd: cwd)
-    }
+    var project: String? { root.map { URL(fileURLWithPath: $0).lastPathComponent } }
     /// Short human hint like "next dev" or "vite".
     var hint: String {
         let tokens = cmdline.split(separator: " ").map { String($0) }
@@ -124,124 +134,157 @@ enum Listeners {
     ]
 
     static func read() -> [Listener] {
-        let out = Shell.run("/usr/sbin/lsof", ["-nP", "-iTCP", "-sTCP:LISTEN", "-F", "pcn"])
         var result: [String: Listener] = [:]
-        var pid: Int32 = 0, cmd = ""
-        for raw in out.split(separator: "\n") {
-            guard let tag = raw.first else { continue }
-            let value = String(raw.dropFirst())
-            switch tag {
-            case "p": pid = Int32(value) ?? 0
-            case "c": cmd = value
-            case "n":
-                guard let colon = value.lastIndex(of: ":"), let port = Int(value[value.index(after: colon)...]) else { continue }
-                let l = Listener(pid: pid, port: port, command: cmd, address: String(value[..<colon]))
+        var cwds: [Int32: String] = [:]
+        var cmdlines: [Int32: String] = [:]
+        var rss: [Int32: UInt64] = [:]
+        var info: [Int32: (started: Date?, cpu: Double)] = [:]
+        for pid in Proc.allPIDs() {
+            let sockets = Proc.listeningSockets(pid)
+            guard !sockets.isEmpty else { continue }
+            let command = Proc.name(pid)
+            for socket in sockets {
+                let l = Listener(pid: pid, port: socket.port, command: command, address: socket.address)
+                // A process bound on both loopback and any-address keeps the wider binding.
                 if result[l.id] == nil || l.isLoopbackOnly == false { result[l.id] = l }
-            default: break
             }
+            cwds[pid] = Proc.cwd(pid)
+            cmdlines[pid] = Proc.commandLine(pid)
+            rss[pid] = Proc.residentBytes(pid)
+            info[pid] = (Proc.bsdInfo(pid)?.started, Proc.cpuSeconds(pid) ?? 0)
         }
         var listeners = Array(result.values)
-        let pids = Set(listeners.map(\.pid))
-        guard !pids.isEmpty else { return [] }
-        let pidList = pids.map(String.init).joined(separator: ",")
-
-        // Working directory per pid -> project name.
-        var cwds: [Int32: String] = [:]
-        var cur: Int32 = 0
-        for raw in Shell.run("/usr/sbin/lsof", ["-a", "-p", pidList, "-d", "cwd", "-F", "pn"]).split(separator: "\n") {
-            if raw.first == "p" { cur = Int32(raw.dropFirst()) ?? 0 }
-            else if raw.first == "n" { cwds[cur] = String(raw.dropFirst()) }
-        }
-        // Full command line per pid.
-        var cmdlines: [Int32: String] = [:]
-        for raw in Shell.run("/bin/ps", ["-o", "pid=,command=", "-p", pidList]).split(separator: "\n") {
-            let parts = raw.trimmingCharacters(in: .whitespaces).split(separator: " ", maxSplits: 1)
-            if parts.count == 2, let p = Int32(parts[0]) { cmdlines[p] = String(parts[1]) }
-        }
+        guard !listeners.isEmpty else { return [] }
 
         for i in listeners.indices {
             let l = listeners[i]
-            listeners[i].cwd = cwds[l.pid] ?? ""
+            let cwd = cwds[l.pid] ?? ""
+            listeners[i].cwd = cwd
             listeners[i].cmdline = cmdlines[l.pid] ?? l.command
-            let exe = URL(fileURLWithPath: listeners[i].cmdline.split(separator: " ").first.map(String.init) ?? l.command).lastPathComponent
+            listeners[i].memory = rss[l.pid] ?? 0
+            listeners[i].started = info[l.pid]?.started
+            listeners[i].cpuSeconds = info[l.pid]?.cpu ?? 0
+            if !cwd.isEmpty, cwd != "/", cwd != homeDir.path, !cwd.contains("/Library/") {
+                listeners[i].root = Fmt.root(fromCwd: cwd)
+            }
+            let exe = URL(fileURLWithPath: listeners[i].cmdline.split(separator: " ").first.map(String.init) ?? l.command).lastPathComponent.lowercased()
             // Helpers bundled inside Mac apps (Raycast's node, sync clients…) aren't dev servers.
-            let insideApp = listeners[i].cmdline.contains(".app/Contents/")
+            // Developer toolchains also live inside bundles (Xcode's Python, Python.org's framework build).
+            let toolchain = listeners[i].cmdline.contains("/Contents/Developer/") || listeners[i].cmdline.contains("Python.framework/")
+                || listeners[i].cmdline.contains("Python3.framework/")
+            let insideApp = !toolchain && listeners[i].cmdline.contains(".app/Contents/")
+                || listeners[i].cmdline.contains("/Library/Application Support/")
+                || cwd.contains("/Library/Application Support/")
             listeners[i].isDev = listeners[i].isDocker || !insideApp && (
-                devExecutables.contains(exe) || devExecutables.contains(l.command) || exe.hasPrefix("python"))
+                devExecutables.contains(exe) || exe.hasPrefix("python")
+                    // lsof says "node" but the process renamed itself (e.g. "Raycast Backend"): an app helper.
+                    || devExecutables.contains(l.command) && listeners[i].cmdline.contains(l.command))
         }
         return listeners.sorted { ($0.isDev ? 0 : 1, $0.port) < ($1.isDev ? 0 : 1, $1.port) }
     }
 }
 
-// MARK: - System
+// MARK: - Idle dev servers
 
-struct SystemSnapshot {
-    var cpu: Double = 0              // 0...1
-    var memUsed: UInt64 = 0
-    var memTotal: UInt64 = ProcessInfo.processInfo.physicalMemory
-    var diskFree: UInt64 = 0
-    var diskTotal: UInt64 = 0
-    var battery: Int?                // percent
-    var charging = false
-    var uptime: TimeInterval = ProcessInfo.processInfo.systemUptime
+/// Spots dev servers that have been up for a while and are barely doing anything, so they can be stopped.
+/// It watches each server's CPU time over the last hour; until it has watched for 15 minutes it falls back
+/// to the average since the server started.
+final class ServerActivity {
+    static let minimumUptime: TimeInterval = 60 * 60
+    /// Average share of one core below which a server counts as idle. File watchers alone stay under this.
+    static let idleRate = 0.003
+    private static let window: TimeInterval = 60 * 60
+    private static let minimumWatch: TimeInterval = 15 * 60
+
+    private var samples: [Int32: [(at: Date, cpu: Double)]] = [:]
+
+    func annotate(_ listeners: inout [Listener], now: Date = Date()) {
+        var seen = Set<Int32>()
+        for i in listeners.indices where listeners[i].isDev && !listeners[i].isDocker {
+            let l = listeners[i]
+            if seen.insert(l.pid).inserted {
+                var list = samples[l.pid] ?? []
+                list.append((now, l.cpuSeconds))
+                list.removeAll { now.timeIntervalSince($0.at) > Self.window }
+                samples[l.pid] = list
+            }
+            listeners[i].isIdle = Self.isIdle(uptime: l.started.map { now.timeIntervalSince($0) },
+                                              cpu: l.cpuSeconds, watched: samples[l.pid] ?? [], now: now)
+        }
+        samples = samples.filter { seen.contains($0.key) }
+    }
+
+    static func isIdle(uptime: TimeInterval?, cpu: Double, watched: [(at: Date, cpu: Double)], now: Date) -> Bool {
+        guard let uptime, uptime >= minimumUptime else { return false }
+        if let first = watched.first, now.timeIntervalSince(first.at) >= minimumWatch {
+            return (cpu - first.cpu) / now.timeIntervalSince(first.at) < idleRate
+        }
+        return cpu / uptime < idleRate
+    }
 }
 
-final class SystemSampler {
-    private var prevTicks: (UInt32, UInt32, UInt32, UInt32)?
+// MARK: - What each agent started
 
-    func sample() -> SystemSnapshot {
-        var s = SystemSnapshot()
-        s.cpu = cpu()
-        s.memUsed = memoryUsed()
-        if let v = try? URL(fileURLWithPath: "/").resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey, .volumeTotalCapacityKey]) {
-            s.diskFree = UInt64(max(0, v.volumeAvailableCapacityForImportantUsage ?? 0))
-            s.diskTotal = UInt64(max(0, v.volumeTotalCapacity ?? 0))
-        }
-        (s.battery, s.charging) = battery()
-        return s
+/// The processes running under an agent session: its dev servers, browsers and tool servers.
+struct SpawnedProcesses: Equatable {
+    var count = 0
+    var memory: UInt64 = 0
+    var ports: [Int] = []
+    /// A few process names, most memory first, for the tooltip.
+    var names: [String] = []
+}
+
+enum ProcessTree {
+    /// Descendants of each session process. Servers that were started under a session get `startedBy` set.
+    static func spawned(sessions: [LiveSession], listeners: inout [Listener]) -> [Int32: SpawnedProcesses] {
+        let roots = Set(sessions.map(\.pid))
+        guard !roots.isEmpty else { return [:] }
+        let parents = Proc.parents(of: Proc.allPIDs())
+        return spawned(roots: roots, parents: parents, listeners: &listeners,
+                       memory: Proc.residentBytes, name: Proc.name)
     }
 
-    private func cpu() -> Double {
-        var info = host_cpu_load_info()
-        var count = mach_msg_type_number_t(MemoryLayout<host_cpu_load_info_data_t>.size / MemoryLayout<integer_t>.size)
-        let r = withUnsafeMutablePointer(to: &info) {
-            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                host_statistics(mach_host_self(), HOST_CPU_LOAD_INFO, $0, &count)
+    static func spawned(roots: Set<Int32>, parents: [Int32: Int32], listeners: inout [Listener],
+                        memory: (Int32) -> UInt64, name: (Int32) -> String) -> [Int32: SpawnedProcesses] {
+        // Which session, if any, each process descends from.
+        var owner: [Int32: Int32] = [:]
+        func session(of pid: Int32) -> Int32? {
+            var chain: [Int32] = []
+            var current = pid
+            var found: Int32?
+            while let parent = parents[current], parent > 1, chain.count < 64 {
+                if let known = owner[parent] { found = known; break }
+                if roots.contains(parent) { found = parent; break }
+                chain.append(current)
+                current = parent
             }
+            if let found { for p in chain + [pid] { owner[p] = found } }
+            return found
         }
-        guard r == KERN_SUCCESS else { return 0 }
-        let t = info.cpu_ticks // (user, system, idle, nice)
-        defer { prevTicks = t }
-        guard let p = prevTicks else { return 0 }
-        let user = Double(t.0 &- p.0), sys = Double(t.1 &- p.1), idle = Double(t.2 &- p.2), nice = Double(t.3 &- p.3)
-        let total = user + sys + idle + nice
-        return total > 0 ? (user + sys + nice) / total : 0
-    }
 
-    private func memoryUsed() -> UInt64 {
-        var stats = vm_statistics64()
-        var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64_data_t>.size / MemoryLayout<integer_t>.size)
-        let r = withUnsafeMutablePointer(to: &stats) {
-            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count)
+        var result: [Int32: SpawnedProcesses] = [:]
+        var named: [Int32: [(String, UInt64)]] = [:]
+        for pid in parents.keys where !roots.contains(pid) {
+            guard let root = session(of: pid) else { continue }
+            let bytes = memory(pid)
+            result[root, default: SpawnedProcesses()].count += 1
+            result[root]!.memory += bytes
+            named[root, default: []].append((name(pid), bytes))
+        }
+        for (root, list) in named {
+            var names: [String] = []
+            for (n, _) in list.sorted(by: { $0.1 > $1.1 }) where !n.isEmpty && !names.contains(n) {
+                names.append(n)
+                if names.count == 4 { break }
             }
+            result[root]?.names = names
         }
-        guard r == KERN_SUCCESS else { return 0 }
-        let page = UInt64(vm_kernel_page_size)
-        // Matches Activity Monitor's "Memory Used": app (internal - purgeable) + wired + compressed.
-        let app = UInt64(stats.internal_page_count) - min(UInt64(stats.internal_page_count), UInt64(stats.purgeable_count))
-        return (app + UInt64(stats.wire_count) + UInt64(stats.compressor_page_count)) * page
-    }
-
-    private func battery() -> (Int?, Bool) {
-        guard let blob = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
-              let list = IOPSCopyPowerSourcesList(blob)?.takeRetainedValue() as? [CFTypeRef] else { return (nil, false) }
-        for ps in list {
-            guard let d = IOPSGetPowerSourceDescription(blob, ps)?.takeUnretainedValue() as? [String: Any],
-                  let cap = d[kIOPSCurrentCapacityKey] as? Int, let max = d[kIOPSMaxCapacityKey] as? Int, max > 0 else { continue }
-            let charging = (d[kIOPSIsChargingKey] as? Bool) ?? false
-            return (cap * 100 / max, charging)
+        for i in listeners.indices {
+            guard let root = roots.contains(listeners[i].pid) ? nil : session(of: listeners[i].pid) else { continue }
+            listeners[i].startedBy = root
+            if !(result[root]?.ports.contains(listeners[i].port) ?? true) { result[root]?.ports.append(listeners[i].port) }
         }
-        return (nil, false)
+        for key in result.keys { result[key]?.ports.sort() }
+        return result
     }
 }

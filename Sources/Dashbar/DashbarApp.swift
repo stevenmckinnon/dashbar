@@ -8,6 +8,7 @@ struct DashbarApp: App {
     init() {
         // Belt-and-braces: hide the Dock icon even when run outside the .app bundle.
         NSApplication.shared.setActivationPolicy(.accessory)
+        if CommandLine.arguments.contains("--bench") { Bench.run() }
         if let i = CommandLine.arguments.firstIndex(of: "--snapshot"), i + 1 < CommandLine.arguments.count {
             Snapshot.schedule(to: CommandLine.arguments[i + 1])
         }
@@ -21,21 +22,44 @@ struct DashbarApp: App {
             MenuBarLabel(store: store)
         }
         .menuBarExtraStyle(.window)
+
+        Settings {
+            SettingsView()
+        }
     }
 }
 
 struct MenuBarLabel: View {
     @ObservedObject var store: Store
+    @ObservedObject private var settings = AppSettings.shared
 
     var body: some View {
         let busy = store.busyCount
-        if busy > 0 {
-            HStack(spacing: 3) {
-                Image(systemName: "sparkles")
-                Text("\(busy)")
+        HStack(spacing: 4) {
+            Image(nsImage: BrandMark.menuBarImage(working: busy > 0))
+            if let text = stats(busy: busy) {
+                text.monospacedDigit()
             }
-        } else {
-            Image(systemName: "gauge.with.dots.needle.33percent")
         }
+    }
+
+    /// Working agents first, then whichever stats the user turned on, each led by its symbol.
+    private func stats(busy: Int) -> Text? {
+        let s = store.system
+        var parts: [Text] = []
+        if busy > 0 { parts.append(Text("\(busy)")) }
+        if settings.menuCPU {
+            parts.append(Text("\(Image(systemName: "cpu")) \(Int((s.cpu * 100).rounded()))%"))
+        }
+        if settings.menuMemory {
+            let used = Int((Double(s.memUsed) / Double(max(s.memTotal, 1)) * 100).rounded())
+            parts.append(Text("\(Image(systemName: "memorychip")) \(used)%"))
+        }
+        if settings.menuNetwork {
+            parts.append(Text("\(Image(systemName: "arrow.down")) \(Fmt.shortRate(s.netDown))"))
+        }
+        guard var text = parts.first else { return nil }
+        for part in parts.dropFirst() { text = text + Text("  ") + part }
+        return text
     }
 }
