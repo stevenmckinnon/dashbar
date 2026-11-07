@@ -3,6 +3,18 @@
     <channel>
         <title>Dashbar</title>
         <item>
+            <title>0.5.2</title>
+            <pubDate>Sat, 07 Nov 2026 14:07:34 +0000</pubDate>
+            <sparkle:version>43</sparkle:version>
+            <sparkle:shortVersionString>0.5.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[- "At this rate, runs out at…" is now amber, a heads-up rather than an error, and waits until a quarter of the window has passed so an early burst doesn't raise a false alarm
+- When Claude rate-limits plan usage, the panel says "Updated 2m ago · trying again in 3m" and keeps counting
+- Copies of Dashbar on the same Mac share their last Claude reading, so only one of them asks
+]]></description>
+            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.5.2/Dashbar-0.5.2.dmg" length="4717195" type="application/octet-stream" sparkle:edSignature="/864DK+lcxeR3Tsoucr9Tk1fcnKSUDKN/QIN75VsKOx6QGGVtFHm9zJN3FGu2W2kZL6iWsgoPhFP1/gVlbF5Dw=="/>
+        </item>
+        <item>
             <title>0.5.1</title>
             <pubDate>Sat, 07 Nov 2026 13:57:19 +0000</pubDate>
             <sparkle:version>39</sparkle:version>
@@ -26,16 +38,6 @@
 - Superset is recognised among running agent apps, and card titles line up with their contents
 ]]></description>
             <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.5.0/Dashbar-0.5.0.dmg" length="4681605" type="application/octet-stream" sparkle:edSignature="xzR90v7gUx7Ye0fHZDZM8Vs7nxy5mTMfdm4/j6AzncMwcsXiPdfJhwuEUC3gP1+cNPYrVnT2a4zNJLvao6yVDA=="/>
-        </item>
-        <item>
-            <title>0.4.1</title>
-            <pubDate>Sat, 07 Nov 2026 12:11:40 +0000</pubDate>
-            <sparkle:version>26</sparkle:version>
-            <sparkle:shortVersionString>0.4.1</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[- A new installer window: the download now opens with an arrow from Dashbar to Applications, so it is clear where to drag it
-]]></description>
-            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.4.1/Dashbar-0.4.1.dmg" length="4609310" type="application/octet-stream" sparkle:edSignature="XiZK1eqy+C1rFMzONPeTy8aSX4fn1U3ombMLn89I9iFrofW7pVv0Bz2GqEN28L5+Aee6lAnHH5MawTRbKQ2PAQ=="/>
         </item>
     </channel>
 </rss>
