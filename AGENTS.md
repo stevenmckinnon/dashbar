@@ -11,7 +11,7 @@ GitHub Pages. Read `README.md` for what the app does; this file is how to work o
 |---|---|
 | `Sources/Dashbar/` | The app. `DashboardView.swift` is the whole panel UI, `Store.swift` the state, `Collectors.swift`, `Usage.swift`, `PlanLimits.swift`, `SystemStats.swift` and `Proc.swift` read data, `Demo.swift` invents data for screenshots, `Snapshot.swift` renders PNGs, `Updater.swift` wraps Sparkle |
 | `Tests/DashbarTests/` | Swift Testing suites that run against throwaway log folders (`Fixtures.swift`) |
-| `build.sh` | Builds `build/Dashbar.app` (signs it, embeds Sparkle). Flags: `--run`, `--install` |
+| `build.sh` | Builds the app into `build/`, signs it, embeds Sparkle. A local build is `Dashbar Local.app`; `scripts/release.sh` (via `DASHBAR_HARDENED=1`) makes the real `Dashbar.app`. Flags: `--run`, `--install` |
 | `scripts/release.sh` | Signed, notarised, stapled DMG plus the Sparkle `appcast.xml` entry |
 | `packaging/homebrew/dashbar.rb` | The cask. The live copy is in the separate `stevenmckinnon/homebrew-tap` repo |
 | `site/` | Vite and React product site. `src/demos/` holds the Stageshow demos, `src/stageshow/` the vendored kit (MIT, see its `NOTICE.md`), `src/faq.js` the FAQ (also written into `index.html` as structured data at build time) |
@@ -24,14 +24,14 @@ GitHub Pages. Read `README.md` for what the app does; this file is how to work o
 ```bash
 swift build                  # debug build
 swift test                   # all tests; run before any commit
-./build.sh --install         # release build into /Applications (stable signing keeps Keychain and permissions)
-open /Applications/Dashbar.app
+./build.sh --install         # local build into /Applications/Dashbar Local.app, beside the installed release
+open "/Applications/Dashbar Local.app"
 
 cd site && npm install && npm run dev   # the site, with hot reload
 cd site && npm run build                # must pass before committing site changes
 ```
 
-Useful flags on the binary (run it from `build/Dashbar.app/Contents/MacOS/Dashbar`, since the bare `.build`
+Useful flags on the binary (run it from `build/Dashbar Local.app/Contents/MacOS/Dashbar Local`, since the bare `.build`
 binary cannot find `Sparkle.framework`):
 
 ```bash
@@ -44,12 +44,23 @@ Offline snapshots cannot draw native AppKit controls (segmented pickers, the sea
 yellow "no entry" placeholders. Crop them out or use `--hosted`. A snapshot run also writes `panelTab` into
 the real app's preferences, so reset it afterwards (`defaults write fun.dashbar.app panelTab overview`).
 
+## Local builds and the release
+
+`build.sh` makes a local build unless `DASHBAR_HARDENED=1` (only `scripts/release.sh` sets it). A local build is a
+separate app so it can sit beside the installed release: `Dashbar Local.app`, bundle id `fun.dashbar.app.local`,
+process name `Dashbar Local`, its own settings and cache folder, no Sparkle feed (it never offers to update), and a
+version from `git describe` (like `0.4.0-3-gabc1234-dirty`). It is marked as local in the UI: a "Local" pill in the
+panel header, a dot on the menu bar icon, a "LOCAL" band on the Dock icon, the popout title and Settings → About.
+`BuildInfo.isLocal` (`Brand.swift`) drives all of it; offline snapshots never show the marker, so README and site
+images stay clean.
+
 ## Verify what you ship
 
 - After `./build.sh --install`, check the installed binary is the new build: compare its modified time and run
-  `strings /Applications/Dashbar.app/Contents/MacOS/Dashbar | grep "<a string you just added>"`. Once an install
+  `strings "/Applications/Dashbar Local.app/Contents/MacOS/Dashbar Local" | grep "<a string you just added>"`. Once an install
   silently kept the old build. Swift strings of 15 bytes or fewer are inline and will not appear in `strings`.
-- Quit the running app before judging a change: `pkill -x Dashbar`, then open it again.
+- Quit the running app before judging a change: `pkill -x "Dashbar Local"`, then open it again. Never `pkill -x Dashbar`:
+  that quits the installed release, which may be the copy the user is relying on.
 - UI changes: look at a render or the running app before saying it works. Tests do not cover appearance.
 - Site changes: check the page in a browser at about 390, 905 and 1280 px wide, light and dark, with no
   horizontal overflow. The 12-column sections break between roughly 900 and 1180 px, so test that range.

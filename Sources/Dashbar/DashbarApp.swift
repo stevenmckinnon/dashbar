@@ -9,6 +9,7 @@ struct DashbarApp: App {
         _ = Updater.shared   // starts Sparkle's scheduled checks in a built app
         // Belt-and-braces: hide the Dock icon even when run outside the .app bundle.
         NSApplication.shared.setActivationPolicy(.accessory)
+        BuildInfo.applyLocalIcon()
         if CommandLine.arguments.contains("--bench") { Bench.run() }
         if let i = CommandLine.arguments.firstIndex(of: "--snapshot"), i + 1 < CommandLine.arguments.count {
             Snapshot.schedule(to: CommandLine.arguments[i + 1])

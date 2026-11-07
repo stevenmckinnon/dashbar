@@ -16,6 +16,7 @@ final class Popout: NSObject, NSWindowDelegate {
         guard let window else { return }
         // Dashbar has no Dock icon by default; a visible window needs one to be focusable and to show the app menu.
         NSApp.setActivationPolicy(.regular)
+        BuildInfo.applyLocalIcon()
         applyLevel()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate()
@@ -31,7 +32,7 @@ final class Popout: NSObject, NSWindowDelegate {
         host.sizingOptions = []   // the window sets the height, not the content
         let window = NSWindow(contentViewController: host)
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
-        window.title = "Dashbar"
+        window.title = BuildInfo.appName
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.backgroundColor = .windowBackgroundColor

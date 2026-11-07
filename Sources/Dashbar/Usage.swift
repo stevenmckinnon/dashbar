@@ -528,10 +528,10 @@ struct ScanCache<State: Codable> {
         try? data.write(to: url, options: .atomic)
     }
 
-    /// ~/Library/Application Support/Dashbar/<name>
+    /// ~/Library/Application Support/Dashbar/<name> (Dashbar Local for a local build, so the two never share files)
     static func defaultURL(_ name: String) -> URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? homeDir.appendingPathComponent("Library/Application Support")
-        return base.appendingPathComponent("Dashbar", isDirectory: true).appendingPathComponent(name)
+        return base.appendingPathComponent(BuildInfo.appName, isDirectory: true).appendingPathComponent(name)
     }
 }

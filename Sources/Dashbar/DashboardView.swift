@@ -284,6 +284,12 @@ private struct Header: View {
         HStack(spacing: 7) {
             BrandMarkView(size: 18)
             Text("Dashbar").font(.system(size: UI.Size.title, weight: .semibold))
+            if BuildInfo.isLocal {
+                Text("Local").font(.system(size: UI.Size.caption, weight: .medium)).foregroundStyle(UI.textSecondary)
+                    .padding(.horizontal, 7).padding(.vertical, 2)
+                    .background(Capsule().fill(Color.primary.opacity(0.1)))
+                    .help("A local build, not the installed release")
+            }
             Spacer()
             if store.paused {
                 Text("Paused").font(.system(size: UI.Size.caption, weight: .medium)).foregroundStyle(UI.textSecondary)

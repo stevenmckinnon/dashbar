@@ -1,6 +1,38 @@
 import SwiftUI
 import AppKit
 
+/// What kind of build this is. `build.sh` marks everything except a release as local ("Dashbar Local.app"),
+/// so it can be told apart from the installed release. Offline snapshots never show the marker.
+enum BuildInfo {
+    static let isLocal = Bundle.main.object(forInfoDictionaryKey: "DashbarLocalBuild") as? Bool == true
+        && !CommandLine.arguments.contains("--snapshot")
+    static var appName: String { isLocal ? "Dashbar Local" : "Dashbar" }
+    static var version: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev" }
+
+    /// Puts the "LOCAL" icon on the Dock tile of a local build. Call again after the activation policy changes,
+    /// which resets it.
+    @MainActor static func applyLocalIcon() {
+        if isLocal { NSApp.applicationIconImage = localIcon }
+    }
+
+    /// The bundle's icon with a "LOCAL" band, for the Dock and the About pane.
+    @MainActor private static let localIcon: NSImage = {
+        let base = NSImage(named: NSImage.applicationIconName) ?? NSImage()
+        return NSImage(size: NSSize(width: 512, height: 512), flipped: false) { rect in
+            base.draw(in: rect)
+            let band = NSRect(x: 96, y: 56, width: 320, height: 88)
+            NSColor.black.withAlphaComponent(0.8).setFill()
+            NSBezierPath(roundedRect: band, xRadius: 44, yRadius: 44).fill()
+            let text = NSAttributedString(string: "LOCAL", attributes: [
+                .font: NSFont.systemFont(ofSize: 56, weight: .bold), .foregroundColor: NSColor.white, .kern: 4,
+            ])
+            let size = text.size()
+            text.draw(at: NSPoint(x: band.midX - size.width / 2, y: band.midY - size.height / 2))
+            return true
+        }
+    }()
+}
+
 /// The Dashbar mark: a gauge arc over a progress bar, taken from the app icon.
 /// The geometry is shared by the menu bar template image and the in-app coloured mark.
 enum BrandMark {
@@ -41,10 +73,12 @@ enum BrandMark {
             NSColor.black.setFill()
             let fillRect = g.fill(working ? 1 : 0.45)
             NSBezierPath(roundedRect: fillRect, xRadius: fillRect.height / 2, yRadius: fillRect.height / 2).fill()
+            // A local build carries a dot in the top corner, so it reads differently from the release's icon.
+            if BuildInfo.isLocal { NSBezierPath(ovalIn: NSRect(x: pt - 5.5, y: 0.5, width: 5, height: 5)).fill() }
             return true
         }
         image.isTemplate = true
-        image.accessibilityDescription = working ? "Dashbar, agents working" : "Dashbar"
+        image.accessibilityDescription = working ? "\(BuildInfo.appName), agents working" : BuildInfo.appName
         return image
     }
 }

@@ -82,8 +82,8 @@ proportions (`Sources/Dashbar/Brand.swift`) as a template image; its bar fills u
 ## Build
 
 ```bash
-./build.sh --run        # build build/Dashbar.app and launch it
-./build.sh --install    # copy to /Applications (needed for "Launch at login")
+./build.sh --run        # build build/"Dashbar Local.app" and launch it
+./build.sh --install    # copy to /Applications as "Dashbar Local" (needed for "Launch at login"), beside any installed release
 .build/release/Dashbar --snapshot out.png --dark   # render the panel to a PNG
 ```
 

@@ -242,8 +242,8 @@ private struct AboutSettings: View {
                 .resizable()
                 .frame(width: 80, height: 80)
                 .accessibilityHidden(true)
-            Text("Dashbar").font(.title2.weight(.semibold))
-            Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev")")
+            Text(BuildInfo.appName).font(.title2.weight(.semibold))
+            Text("Version \(BuildInfo.version)" + (BuildInfo.isLocal ? " (local build)" : ""))
                 .foregroundStyle(.secondary)
             if updater.isAvailable {
                 Button("Check for Updates…") { updater.checkForUpdates() }.disabled(!updater.canCheck)
