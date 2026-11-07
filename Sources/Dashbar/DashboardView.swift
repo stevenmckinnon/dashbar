@@ -101,6 +101,8 @@ struct DashboardView: View {
     @ObservedObject private var settings = AppSettings.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var scrolls = true
+    /// The detached window: same width, but its height follows the window.
+    var popout = false
     @State private var query = ""
     @AppStorage("panelTab") private var tab: PanelTab = debugConfirm ? .cleanup : .overview
     /// Snapshots pass the tab to render directly.
@@ -116,7 +118,7 @@ struct DashboardView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Header()
+            Header(popout: popout)
             TabBar(selection: Binding(get: { forcedTab ?? tab }, set: { tab = $0 }))
             if scrolls {
                 ScrollView {
@@ -124,7 +126,8 @@ struct DashboardView: View {
                         .frame(maxWidth: .infinity, alignment: .top)
                         .id(forcedTab ?? tab)   // each tab opens scrolled to the top
                 }
-                .frame(height: panelHeight)
+                .frame(height: popout ? nil : panelHeight)
+                .frame(maxHeight: popout ? .infinity : nil)
                 .mask {
                     // Content fades out as it scrolls under the filter bar.
                     VStack(spacing: 0) {
@@ -138,6 +141,8 @@ struct DashboardView: View {
             BottomBar(query: $query, prompt: tab.filterPrompt, focused: $searchFocused)
         }
         .frame(width: UI.panelWidth)
+        .frame(maxHeight: popout ? .infinity : nil, alignment: .top)
+        .ignoresSafeArea(.container, edges: popout ? .top : [])   // popout content runs under its transparent title bar
         .background {
             Button("") { searchFocused = true }.keyboardShortcut("k").opacity(0)
             // ⌘1…⌘5 switch tabs.
@@ -147,10 +152,16 @@ struct DashboardView: View {
         }
         // The window's see-through material turns muddy grey over a white page; a mostly opaque base keeps the panel legible on any backdrop.
         .background { if scrolls { Color(nsColor: .windowBackgroundColor).opacity(0.86) } }
-        .background { if scrolls { WindowVisibilityReader { store.setPanelVisible($0) } } } // not in offline snapshots
-        .onAppear { store.setPanelVisible(true) }
-        .onDisappear { store.setPanelVisible(false) }
+        .background { if popout { Color(nsColor: .windowBackgroundColor).ignoresSafeArea() } }
+        .background { if scrolls { WindowVisibilityReader { store.setPanelVisible($0, surface: surface) } } } // not in offline snapshots
+        .onAppear { store.setPanelVisible(true, surface: surface) }
+        .onDisappear { store.setPanelVisible(false, surface: surface) }
     }
+
+    private var surface: String { popout ? "popout" : "panel" }
+
+    /// The panel's width, for the popout window to match.
+    static let width = UI.panelWidth
 
     private var cards: some View {
         VStack(spacing: UI.gap) {
@@ -267,6 +278,8 @@ private struct WindowVisibilityReader: NSViewRepresentable {
 
 private struct Header: View {
     @EnvironmentObject var store: Store
+    var popout = false
+    @AppStorage(Popout.floatKey) private var floating = false
     var body: some View {
         HStack(spacing: 7) {
             BrandMarkView(size: 18)
@@ -290,9 +303,21 @@ private struct Header: View {
                 if !store.paused { store.refreshNow() }
             }
             IconButton(symbol: "arrow.clockwise", help: "Refresh now") { store.refreshNow() }
+            if popout {
+                IconButton(symbol: floating ? "pin.fill" : "pin", help: floating ? "Stop keeping on top" : "Keep on top of other windows") {
+                    floating.toggle()
+                    Popout.shared.applyLevel()
+                }
+            } else {
+                IconButton(symbol: "arrow.up.forward.app", help: "Open in a window") {
+                    let panel = NSApp.keyWindow   // the menu bar panel this button was clicked in
+                    Popout.shared.show(store: store)
+                    panel?.orderOut(nil)          // the popout replaces it
+                }
+            }
         }
         .padding(.horizontal, 14)
-        .padding(.top, 12)
+        .padding(.top, popout ? 30 : 12)   // the popout's content runs under its title bar; clear the window buttons
         .padding(.bottom, 10)
     }
 }

@@ -61,8 +61,9 @@ final class Store: ObservableObject {
     private var timer: Timer?
     private var subscriptions = Set<AnyCancellable>()
     private var watcher: FileWatcher?
-    /// Whether the panel is on screen, reported by the panel's window. Closed until it first opens.
-    private var panelVisible = false
+    /// Which windows (the menu bar panel, the popout) are on screen, as reported by their views. Closed until one opens.
+    private var visibleSurfaces = Set<String>()
+    private var panelVisible: Bool { !visibleSurfaces.isEmpty }
     /// Demo stores hold invented data and never collect anything.
     private var isDemo = false
 
@@ -137,10 +138,12 @@ final class Store: ObservableObject {
         refresh(usage: true, servers: false, panel: panelVisible)
     }
 
-    func setPanelVisible(_ visible: Bool) {
+    /// Each window reports on its own, so closing one doesn't pause updates for the other.
+    func setPanelVisible(_ visible: Bool, surface: String = "panel") {
         guard !isDemo else { return }
-        guard visible != panelVisible else { return }
-        panelVisible = visible
+        let wasVisible = panelVisible
+        if visible { visibleSurfaces.insert(surface) } else { visibleSurfaces.remove(surface) }
+        guard panelVisible != wasVisible else { return }
         if visible && !paused {
             refresh(usage: false, servers: true, panel: true)   // fresh on open
             if let fetched = claudePlan?.fetchedAt, Date().timeIntervalSince(fetched) > 120 { refreshClaudePlan() }
