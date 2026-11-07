@@ -2,6 +2,8 @@
 
 A native macOS menu bar dashboard for agent usage, local dev servers, and system stats.
 
+**[Website](https://stevenmckinnon.github.io/dashbar/)** · [Download](https://github.com/stevenmckinnon/dashbar/releases/latest) · [Homebrew](#install)
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/overview-dark.png">

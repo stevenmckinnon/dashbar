@@ -25,6 +25,8 @@ final class Store: ObservableObject {
     @Published var history = SystemHistory()
     @Published var claudePlan: ClaudePlanLimits.Result?
     @Published var claudePlanLoading = false
+    /// Claude Code is running to refresh its own sign-in.
+    @Published var claudeSigningIn = false
     /// A failed user action, phrased with what to do next. Shown until dismissed.
     @Published var notice: String?
 
@@ -152,6 +154,20 @@ final class Store: ObservableObject {
     }
 
     /// Experimental Claude plan limits, only while the user has opted in.
+    /// Has Claude Code refresh its sign-in, then loads the plan limits again.
+    func refreshClaudeSignIn() {
+        guard !isDemo, settings.claudeLimits, !claudeSigningIn else { return }
+        claudeSigningIn = true
+        Task.detached(priority: .utility) {
+            let problem = await ClaudePlanLimits.refreshSignIn()
+            await MainActor.run {
+                self.claudeSigningIn = false
+                if let problem { self.claudePlan = ClaudePlanLimits.Result(plan: self.claudePlan?.plan, problem: problem) }
+                else { self.refreshClaudePlan(force: true) }
+            }
+        }
+    }
+
     func refreshClaudePlan(force: Bool = false) {
         guard !isDemo else { return }
         guard settings.claudeLimits, !claudePlanLoading else { return }

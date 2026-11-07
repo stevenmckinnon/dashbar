@@ -79,6 +79,13 @@ enum DemoData {
         claude.topProjects = [Ranked(name: "storefront-web", value: 92_000_000), Ranked(name: "billing-api", value: 38_000_000),
                               Ranked(name: "docs-site", value: 12_000_000), Ranked(name: "notes-ios", value: 6_000_000)]
         claude.topModels = [Ranked(name: "Opus 5.5", value: 112_000_000), Ranked(name: "Sonnet 5.5", value: 36_000_000)]
+        func period(_ t: TokenTotals, _ f: Double) -> PeriodUsage {
+            PeriodUsage(totals: t,
+                        models: claude.topModels.map { Ranked(name: $0.name, value: Int(Double($0.value) * f)) },
+                        projects: claude.topProjects.map { Ranked(name: $0.name, value: Int(Double($0.value) * f)) })
+        }
+        var fortnight = TokenTotals(); fortnight.input = 9_800_000; fortnight.output = 5_400_000; fortnight.cacheRead = 1_240_000_000; fortnight.cacheWrite = 21_000_000; fortnight.messages = 4_700
+        claude.periods = [period(today, 1), period(week, 4.5), period(fortnight, 8.5)]
         store.claude = claude
 
         var codex = UsageSummary()

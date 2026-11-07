@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import Dashbar
@@ -592,5 +593,63 @@ struct MenuBarReadingTests {
     @Test func ignoresOtherWindowsAndEmptyInput() {
         #expect(ClaudePlanLimits.menuBarReading([], now: now) == nil)
         #expect(ClaudePlanLimits.menuBarReading([RateLimit(label: "Extra usage", usedPercent: 50, resetsAt: nil)], now: now) == nil)
+    }
+}
+
+// MARK: - Usage periods
+
+@Suite struct UsagePeriodTests {
+    @Test func eachPeriodSumsItsOwnDays() {
+        var book = UsageBook()
+        let now = Date()
+        func add(_ daysAgo: Int, _ out: Int, project: String) {
+            var t = TokenTotals(); t.output = out; t.messages = 1
+            book.add(t, at: now.addingTimeInterval(-Double(daysAgo) * 86_400), model: "m", project: project)
+        }
+        add(0, 10, project: "a")
+        add(3, 20, project: "b")
+        add(10, 40, project: "b")
+
+        let s = book.summary(found: true)
+        #expect(s.period(.today).totals.output == 10)
+        #expect(s.period(.week).totals.output == 30)
+        #expect(s.period(.fortnight).totals.output == 70)
+        #expect(s.period(.today).projects.map(\.name) == ["a"])
+        #expect(s.period(.week).projects.first?.name == "b")
+        #expect(s.period(.fortnight).projects.first?.value == 60)
+    }
+}
+
+// MARK: - Project icons
+
+@Suite struct ProjectIconTests {
+    private func writePNG(_ url: URL, side: Int) throws {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: side, pixelsHigh: side, bitsPerSample: 8,
+                                   samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                                   bytesPerRow: 0, bitsPerPixel: 0)!
+        try rep.representation(using: .png, properties: [:])!.write(to: url)
+    }
+
+    @Test func findsTheProjectsOwnIconAndIgnoresTinyOnes() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("icon-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try writePNG(root.appendingPathComponent("public/favicon.png"), side: 16)   // too small to show crisply
+        #expect(ProjectIcon.find(in: root.path) == nil)
+
+        let root2 = FileManager.default.temporaryDirectory.appendingPathComponent("icon-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root2) }
+        try writePNG(root2.appendingPathComponent("app/icon.png"), side: 64)
+        #expect(ProjectIcon.find(in: root2.path) != nil)
+    }
+
+    @Test func findsTheLargestXcodeAppIcon() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("icon-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let set = root.appendingPathComponent("MyApp/Assets.xcassets/AppIcon.appiconset")
+        try writePNG(set.appendingPathComponent("small.png"), side: 40)
+        try writePNG(set.appendingPathComponent("big.png"), side: 256)
+        let image = try #require(ProjectIcon.find(in: root.path))
+        #expect((image.representations.map(\.pixelsWide).max() ?? 0) == 256)
     }
 }

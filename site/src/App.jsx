@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { RotateCw } from "lucide-react";
 import { DashbarDemo } from "./demos/DashbarDemo";
 import { AgentsDemo, LimitsDemo, ServersDemo, SystemDemo, CleanupDemo } from "./demos/FeatureDemos";
 
@@ -67,7 +68,10 @@ function Hero() {
           <div role="img" aria-label="A short animation of Dashbar's panel, opened from the menu bar. It shows the dev servers, two of them marked barely used, then the plan limits, where the 5-hour limit is on pace to last until it resets.">
             <div aria-hidden="true"><DashbarDemo key={run} dark={dark} /></div>
           </div>
-          <p className="caption">In your menu bar you see the icon and how many agents are working. Click it to open the panel. <button className="replay" type="button" onClick={() => setRun((n) => n + 1)}>Replay the demo</button></p>
+          <div className="caption-row">
+            <p className="caption">In your menu bar you see the icon and how many agents are working. Click it to open the panel.</p>
+            <button className="replay-pill" type="button" onClick={() => setRun((n) => n + 1)}><RotateCw size={14} strokeWidth={2} aria-hidden="true" />Replay<span className="sr-only"> the demo</span></button>
+          </div>
         </div>
       </div>
     </header>
@@ -97,7 +101,12 @@ function FeatureArt({ Demo, name }) {
       <div className="art" role="img" aria-label={`A short animation of the ${name.toLowerCase()} view.`}>
         <div aria-hidden="true"><Demo key={run} dark={dark} /></div>
       </div>
-      <button className="replay" type="button" onClick={() => setRun((n) => n + 1)}>Replay <span className="sr-only">the {name.toLowerCase()} demo</span></button>
+      <div className="item-head">
+        <h3>{name}</h3>
+        <button className="replay-pill" type="button" onClick={() => setRun((n) => n + 1)}>
+          <RotateCw size={14} strokeWidth={2} aria-hidden="true" />Replay<span className="sr-only"> the {name.toLowerCase()} demo</span>
+        </button>
+      </div>
     </>
   );
 }
@@ -113,7 +122,6 @@ function Features() {
         {ITEMS.map((it) => (
           <article className="item" key={it.name}>
             <FeatureArt Demo={it.Demo} name={it.name} />
-            <h3>{it.name}</h3>
             <p>{it.body}</p>
           </article>
         ))}

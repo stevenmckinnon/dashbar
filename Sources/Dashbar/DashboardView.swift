@@ -502,7 +502,7 @@ private struct NowCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                Monogram(name: workspace.name, active: workspace.isBusy, size: 32)
+                Monogram(name: workspace.name, root: workspace.root, active: workspace.isBusy, size: 32)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(workspace.name).font(.system(size: UI.Size.title, weight: .semibold)).lineLimit(1)
                         .help("\(workspace.name) — \(Fmt.tilde(workspace.root))")
@@ -781,7 +781,7 @@ private struct WorkspaceRow: View {
 
     private var header: some View {
         HStack(spacing: 10) {
-            Monogram(name: workspace.name, active: workspace.isBusy, size: 28)
+            Monogram(name: workspace.name, root: workspace.root, active: workspace.isBusy, size: 28)
             VStack(alignment: .leading, spacing: 2) {
                 Text(workspace.name).font(.system(size: UI.Size.emphasis, weight: .semibold)).lineLimit(1).truncationMode(.middle)
                 WorkspaceStatus(workspace: workspace)
@@ -1250,10 +1250,11 @@ private struct UsageCard: View {
     let summary: UsageSummary
     let loading: Bool
     var limits: [RateLimit] = []
-    @State private var range = 0 // 0 = 24h, 1 = 14d
+    @State private var period = UsagePeriod.today
 
     var body: some View {
-        Card(title: title, icon: icon, tint: tint, count: nil, trailing: "7d \(Fmt.tokens(summary.week.total))") {
+        let usage = summary.period(period)
+        Card(title: title, icon: icon, tint: tint, count: nil, trailing: "\(period.short) \(Fmt.tokens(usage.totals.total))") {
             if loading {
                 HStack { ProgressView().controlSize(.small); Text("Scanning transcripts…").font(.caption).foregroundStyle(UI.textSecondary) }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -1261,32 +1262,31 @@ private struct UsageCard: View {
                 EmptyRow(text: "No transcripts found")
             } else {
                 VStack(alignment: .leading, spacing: 10) {
+                    Picker("Period", selection: $period) {
+                        ForEach(UsagePeriod.allCases) { Text($0.short).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .controlSize(.small)
                     HStack(spacing: 6) {
-                        MiniStat(label: "In", value: summary.today.input)
-                        MiniStat(label: "Out", value: summary.today.output)
-                        MiniStat(label: "Cache read", value: summary.today.cacheRead)
-                        MiniStat(label: "Cache write", value: summary.today.cacheWrite)
+                        MiniStat(label: "In", value: usage.totals.input)
+                        MiniStat(label: "Out", value: usage.totals.output)
+                        MiniStat(label: "Cache read", value: usage.totals.cacheRead)
+                        MiniStat(label: "Cache write", value: usage.totals.cacheWrite)
                     }
                     HStack {
-                        Text(range == 0 ? "Last 24 hours" : "Last 14 days").font(.system(size: UI.Size.caption, weight: .medium)).foregroundStyle(UI.textSecondary)
-                        if range == 0 {
+                        Text(period == .today ? "By hour, last 24 hours" : "By day, last \(period.days) days")
+                            .font(.system(size: UI.Size.caption, weight: .medium)).foregroundStyle(UI.textSecondary)
+                        if period == .today {
                             Text("· \(summary.sessions24) sessions").font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
                         }
                         Spacer()
-                        Picker("", selection: $range) {
-                            Text("24h").tag(0)
-                            Text("14d").tag(1)
-                        }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                        .controlSize(.mini)
-                        .frame(width: 84)
                     }
-                    if range == 0 { hourly } else { daily }
-                    if !summary.topProjects.isEmpty {
+                    if period == .today { hourly } else { daily(Array(summary.last14.suffix(period.days))) }
+                    if !usage.projects.isEmpty {
                         HStack(alignment: .top, spacing: 14) {
-                            RankList(title: "Projects today", items: summary.topProjects, tint: tint)
-                            RankList(title: "Models", items: summary.topModels, tint: tint)
+                            RankList(title: "Projects", items: usage.projects, tint: tint)
+                            RankList(title: "Models", items: usage.models, tint: tint)
                         }
                     }
                     if !limits.isEmpty {
@@ -1316,8 +1316,8 @@ private struct UsageCard: View {
         .frame(height: 64)
     }
 
-    private var daily: some View {
-        Chart(summary.last14) { p in
+    private func daily(_ points: [DayPoint]) -> some View {
+        Chart(points) { p in
             BarMark(x: .value("Day", p.date, unit: .day), y: .value("Tokens", p.tokens))
                 .foregroundStyle(p.isToday ? tint : tint.opacity(0.4))
                 .cornerRadius(2)
@@ -1329,7 +1329,7 @@ private struct UsageCard: View {
             }
         }
         .chartXAxis {
-            AxisMarks(values: .stride(by: .day, count: 3)) { _ in
+            AxisMarks(values: .stride(by: .day, count: points.count > 7 ? 3 : 1)) { _ in
                 AxisValueLabel(format: .dateTime.day().month(.abbreviated)).font(.system(size: UI.Size.micro))
             }
         }
@@ -1487,8 +1487,16 @@ private struct PlanLimitsCard: View {
                     Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(UI.textDanger).accessibilityHidden(true)
                     Text(problem).font(.system(size: UI.Size.caption)).fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 4)
-                    Button("Retry") { store.refreshClaudePlan(force: true) }
-                        .buttonStyle(.link).font(.system(size: UI.Size.caption, weight: .medium))
+                    if store.claudeSigningIn {
+                        HStack(spacing: 4) { ProgressView().controlSize(.mini); Text("Refreshing…").font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary) }
+                    } else if store.claudePlan?.needsSignIn == true {
+                        Button("Refresh") { store.refreshClaudeSignIn() }
+                            .buttonStyle(.link).font(.system(size: UI.Size.caption, weight: .medium))
+                            .help("Runs Claude Code once in the background, which refreshes its sign-in. Uses a few tokens.")
+                    } else {
+                        Button("Retry") { store.refreshClaudePlan(force: true) }
+                            .buttonStyle(.link).font(.system(size: UI.Size.caption, weight: .medium))
+                    }
                 }
             } else if let limits = store.claudePlan?.limits, !limits.isEmpty {
                 ForEach(limits) { LimitBar(limit: $0, tint: UI.claude) }
@@ -1852,36 +1860,45 @@ private struct Card<Content: View>: View {
     }
 }
 
-/// A coloured symbol on a soft tile of the same colour, leading each card's title.
+/// The symbol leading a card's title. Plain, in secondary ink; only Claude's asterisk and Codex's brackets
+/// keep their colour, because there it names the agent.
 private struct IconChip: View {
     let symbol: String
     let tint: Color
+    private var namesAnAgent: Bool { symbol == "asterisk" || symbol.hasPrefix("chevron.left.forwardslash") }
     var body: some View {
         Image(systemName: symbol)
-            .font(.system(size: UI.Size.caption, weight: .semibold))
-            .foregroundStyle(tint)
+            .font(.system(size: UI.Size.body, weight: .semibold))
+            .foregroundStyle(namesAnAgent ? tint : UI.textSecondary)
             .frame(width: 22, height: 22)
-            .background(RoundedRectangle(cornerRadius: UI.innerRadius, style: .continuous).fill(tint.opacity(0.16)))
             .accessibilityHidden(true)
     }
 }
 
+/// A project's tile: its own icon when one is found in the folder, otherwise its first letter on a quiet
+/// neutral tile. Colour is left for state, so the only thing that lights up is a working agent's dot.
 private struct Monogram: View {
     let name: String
+    var root: String? = nil
     let active: Bool
     var size: CGFloat = 28
-    private static let palette: [Color] = [.blue, .orange, .pink, .teal, .purple, .green, .red, .cyan, .brown, .mint]
+    @State private var icon: NSImage?
 
     var body: some View {
-        // FNV-1a so similar names still land on different colours.
-        let hash = name.utf8.reduce(UInt32(2166136261)) { ($0 ^ UInt32($1)) &* 16777619 }
-        let color = Self.palette[Int(hash % UInt32(Self.palette.count))]
         let dot = size * 0.3
+        let radius = size * 0.26
         ZStack(alignment: .bottomTrailing) {
-            RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-                .fill(color.gradient)
-                .overlay(Text(String(name.first.map { String($0).uppercased() } ?? "?"))
-                    .font(.system(size: size * 0.46, weight: .bold, design: .rounded)).foregroundStyle(.white))
+            Group {
+                if let icon {
+                    Image(nsImage: icon).resizable().interpolation(.high).scaledToFill()
+                        .frame(width: size, height: size).clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+                } else {
+                    RoundedRectangle(cornerRadius: radius, style: .continuous).fill(Color.primary.opacity(0.09))
+                        .overlay(Text(String(name.first.map { String($0).uppercased() } ?? "?"))
+                            .font(.system(size: size * 0.46, weight: .semibold, design: .rounded)).foregroundStyle(UI.textSecondary))
+                }
+            }
+            .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
             if active {
                 // Punch a ring out of the tile so the dot reads cleanly on any surface.
                 Circle().frame(width: dot + 3, height: dot + 3).offset(x: 2.5, y: 2.5).blendMode(.destinationOut)
@@ -1893,6 +1910,11 @@ private struct Monogram: View {
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)
+        .task(id: root) {
+            guard let root else { return }
+            if let hit = ProjectIcon.cached(for: root) { icon = hit; return }
+            icon = await Task.detached(priority: .utility) { ProjectIcon.find(in: root) }.value
+        }
     }
 }
 

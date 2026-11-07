@@ -17,6 +17,8 @@ enum ClaudePlanLimits {
         var plan: String?
         /// What went wrong, phrased with what to do next. Nil on success.
         var problem: String?
+        /// The sign-in is expired or rejected, which Claude Code itself can fix by making any request.
+        var needsSignIn = false
         var fetchedAt = Date()
     }
 
@@ -41,6 +43,30 @@ enum ClaudePlanLimits {
         return first.result
     }
 
+    /// Asks Claude Code to refresh its own sign-in by making one tiny request (`claude -p`, on the cheapest
+    /// model, without saving a session), the same thing running `claude` in a terminal does. Dashbar never
+    /// touches the token itself. Returns an error message, or nil when Claude Code ran and exited cleanly.
+    static func refreshSignIn() async -> String? {
+        await withCheckedContinuation { cont in
+            DispatchQueue.global(qos: .utility).async {
+                let p = Process()
+                p.executableURL = URL(fileURLWithPath: "/bin/zsh")
+                // A login shell, so `claude` is found wherever the user installed it.
+                p.arguments = ["-lc", "claude -p ok --model haiku --no-session-persistence"]
+                p.currentDirectoryURL = FileManager.default.temporaryDirectory
+                p.standardOutput = FileHandle.nullDevice
+                p.standardError = FileHandle.nullDevice
+                p.standardInput = FileHandle.nullDevice
+                do { try p.run() } catch { cont.resume(returning: "Couldn't start Claude Code. Run `claude` in a terminal once, then retry."); return }
+                let deadline = Date().addingTimeInterval(60)
+                while p.isRunning, Date() < deadline { Thread.sleep(forTimeInterval: 0.25) }
+                if p.isRunning { p.terminate(); cont.resume(returning: "Claude Code took too long to answer. Run `claude` in a terminal once, then retry."); return }
+                cont.resume(returning: p.terminationStatus == 0 ? nil
+                    : "Claude Code couldn't refresh the sign-in (it may need you to sign in again). Run `claude` in a terminal, then retry.")
+            }
+        }
+    }
+
     private static func currentCredentials(forceReread: Bool) -> Read {
         lock.lock(); defer { lock.unlock() }
         if !forceReread, let c = cached, (c.expiresAt ?? .distantFuture) > Date() { return .success(c) }
@@ -56,7 +82,7 @@ enum ClaudePlanLimits {
         case .success(let c): creds = c
         }
         if let expiry = creds.expiresAt, expiry < Date() {
-            return (Result(plan: creds.plan, problem: expiredMessage(expiry)), false)
+            return (Result(plan: creds.plan, problem: expiredMessage(expiry), needsSignIn: true), false)
         }
 
         var request = URLRequest(url: endpoint, timeoutInterval: 15)
@@ -74,7 +100,7 @@ enum ClaudePlanLimits {
                     ? Result(plan: creds.plan, problem: "Claude's usage response had no limits Dashbar recognises. The format may have changed.")
                     : Result(limits: limits, plan: creds.plan), false)
             case 401, 403:
-                return (Result(plan: creds.plan, problem: "Claude didn't accept the sign-in. Run `claude` in a terminal once to refresh it, then retry."), true)
+                return (Result(plan: creds.plan, problem: "Claude didn't accept the sign-in. Run `claude` in a terminal once to refresh it, then retry.", needsSignIn: true), true)
             default:
                 return (Result(plan: creds.plan, problem: "Couldn't load Claude plan limits (HTTP \(status)). The endpoint may have changed."), false)
             }

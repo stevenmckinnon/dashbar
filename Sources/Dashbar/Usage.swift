@@ -56,8 +56,24 @@ struct Ranked: Identifiable {
     let value: Int
 }
 
+/// The span the usage card shows: one choice drives its totals, chart, projects and models.
+enum UsagePeriod: Int, CaseIterable, Identifiable {
+    case today, week, fortnight
+    var id: Int { rawValue }
+    var short: String { ["Today", "7d", "14d"][rawValue] }
+    var days: Int { [1, 7, 14][rawValue] }
+}
+
+struct PeriodUsage {
+    var totals = TokenTotals()
+    var models: [Ranked] = []
+    var projects: [Ranked] = []
+}
+
 struct UsageSummary {
     var found = false
+    /// Indexed by `UsagePeriod.rawValue`. Empty means only the single-day fields below are known.
+    var periods: [PeriodUsage] = []
     var today = TokenTotals()
     var week = TokenTotals()
     var last14: [DayPoint] = []
@@ -70,6 +86,11 @@ struct UsageSummary {
     var warning: String?
 
     static let empty = UsageSummary()
+
+    func period(_ p: UsagePeriod) -> PeriodUsage {
+        if periods.indices.contains(p.rawValue) { return periods[p.rawValue] }
+        return PeriodUsage(totals: p == .today ? today : week, models: topModels, projects: topProjects)
+    }
 }
 
 /// Day-bucketed token ledger shared by all agent scanners.
@@ -131,6 +152,20 @@ struct UsageBook: Codable {
         let t = days[Self.dayKey.string(from: today)] ?? DayUsage()
         s.today = t.totals
         s.topModels = t.byModel.sorted { $0.value > $1.value }.prefix(3).map { Ranked(name: $0.key, value: $0.value) }
+        for p in UsagePeriod.allCases {
+            var usage = PeriodUsage()
+            var models: [String: Int] = [:], projects: [String: Int] = [:]
+            for offset in 0..<p.days {
+                guard let date = cal.date(byAdding: .day, value: -offset, to: today),
+                      let d = days[Self.dayKey.string(from: date)] else { continue }
+                usage.totals.add(d.totals)
+                for (k, v) in d.byModel { models[k, default: 0] += v }
+                for (k, v) in d.byProject { projects[k, default: 0] += v }
+            }
+            usage.models = models.sorted { ($0.value, $1.key) > ($1.value, $0.key) }.prefix(3).map { Ranked(name: $0.key, value: $0.value) }
+            usage.projects = projects.sorted { ($0.value, $1.key) > ($1.value, $0.key) }.prefix(4).map { Ranked(name: $0.key, value: $0.value) }
+            s.periods.append(usage)
+        }
         s.topProjects = t.byProject.sorted { $0.value > $1.value }.prefix(4).map { Ranked(name: $0.key, value: $0.value) }
 
         let nowHour = cal.dateInterval(of: .hour, for: Date())?.start ?? Date()
