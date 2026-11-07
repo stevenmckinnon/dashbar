@@ -392,13 +392,14 @@
     font-weight: 600;
     color: var(--ss-text-strong);
   }
-  /* The symbol leading a card title is plain; colour is kept for the agents */
+  /* The symbol leading a card title is plain; colour is kept for the agents. Flush with the card's content
+     edge, in a fixed column so titles line up, as in the app. */
   .dd-chip {
-    width: 22px;
+    width: 16px;
     height: 22px;
     flex: none;
     display: grid;
-    place-items: center;
+    place-items: center start;
     color: var(--ss-icon);
   }
 

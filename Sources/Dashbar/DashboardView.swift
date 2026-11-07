@@ -1901,7 +1901,9 @@ private struct IconChip: View {
         Image(systemName: symbol)
             .font(.system(size: UI.Size.body, weight: .semibold))
             .foregroundStyle(namesAnAgent ? tint : UI.textSecondary)
-            .frame(width: 22, height: 22)
+            // Flush with the card's content edge, so it lines up with the icons and text below it. A fixed
+            // width keeps every card's title starting at the same place whatever the symbol's width.
+            .frame(width: 16, height: 22, alignment: .leading)
             .accessibilityHidden(true)
     }
 }
