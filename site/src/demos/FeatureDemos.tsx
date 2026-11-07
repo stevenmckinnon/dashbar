@@ -33,7 +33,7 @@ async function agentsScript(a: Act<A>) {
 
 export function AgentsDemo({ dark = false }: Props) {
   return (
-    <Frame height={325} compactHeight={359} initial={{ ctx: false, rows: 0 } as A} poster={{ ctx: true, rows: 2 } as A} script={agentsScript} theme={dark ? 'dark' : 'light'}>
+    <Frame height={315} compactHeight={349} initial={{ ctx: false, rows: 0 } as A} poster={{ ctx: true, rows: 2 } as A} script={agentsScript} theme={dark ? 'dark' : 'light'}>
       {(s: A) => (
         <>
           <div className="dd-card fd-fill">
@@ -76,7 +76,7 @@ async function limitsScript(a: Act<L>) {
 
 export function LimitsDemo({ dark = false }: Props) {
   return (
-    <Frame height={338} compactHeight={342} initial={{ limits: false, marks: false } as L} poster={{ limits: true, marks: true } as L} script={limitsScript} theme={dark ? 'dark' : 'light'}>
+    <Frame height={323} compactHeight={332} initial={{ limits: false, marks: false } as L} poster={{ limits: true, marks: true } as L} script={limitsScript} theme={dark ? 'dark' : 'light'}>
       {(s: L) => (
         <div className="dd-card">
           <CardHead icon={<Gauge size={14} strokeWidth={1.75} />} tone="green" title="Plan limits" />
@@ -145,7 +145,7 @@ function Tile({ label, value, unit, children }: { label: string; value: number; 
 
 export function SystemDemo({ dark = false }: Props) {
   return (
-    <Frame height={327} compactHeight={338} initial={{ on: false, apps: 0 } as Y} poster={{ on: true, apps: 3 } as Y} script={systemScript} theme={dark ? 'dark' : 'light'}>
+    <Frame height={317} compactHeight={328} initial={{ on: false, apps: 0 } as Y} poster={{ on: true, apps: 3 } as Y} script={systemScript} theme={dark ? 'dark' : 'light'}>
       {(s: Y, _r: any, layout: string) => {
         const cw = layout === 'compact' ? 120 : 190
         return (
@@ -197,7 +197,7 @@ async function cleanupScript(a: Act<C>) {
 
 export function CleanupDemo({ dark = false }: Props) {
   return (
-    <Frame height={377} compactHeight={377} initial={{ checked: 0 } as C} poster={{ checked: 3 } as C} script={cleanupScript} theme={dark ? 'dark' : 'light'}>
+    <Frame height={369} compactHeight={369} initial={{ checked: 0 } as C} poster={{ checked: 3 } as C} script={cleanupScript} theme={dark ? 'dark' : 'light'}>
       {(s: C) => (
         <div className="dd-card fd-fill">
           <CardHead icon={<Folder size={14} strokeWidth={1.75} />} tone="violet" title="Folders you can clear" />

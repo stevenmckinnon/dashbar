@@ -358,9 +358,11 @@
     display: grid;
     place-items: center;
     border-radius: 9px;
-    color: #fff;
+    color: var(--ss-text);
+    background: var(--ss-ink-3);
+    box-shadow: inset 0 0 0 0.5px var(--ss-line);
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 600;
   }
   .dd-mono--lg {
     width: 40px;
@@ -368,10 +370,6 @@
     border-radius: 11px;
     font-size: 17px;
   }
-  .dd-mono--blue { background: linear-gradient(#3b9dff, #2563eb); }
-  .dd-mono--green { background: linear-gradient(#4ade80, #16a34a); }
-  .dd-mono--red { background: linear-gradient(#fb7185, #e11d48); }
-  .dd-mono--magenta { background: linear-gradient(#e879f9, #c026d3); }
   .dd-dot {
     position: absolute;
     right: -3px;
@@ -394,17 +392,15 @@
     font-weight: 600;
     color: var(--ss-text-strong);
   }
+  /* The symbol leading a card title is plain; colour is kept for the agents */
   .dd-chip {
-    width: 32px;
-    height: 32px;
+    width: 22px;
+    height: 22px;
     flex: none;
     display: grid;
     place-items: center;
-    border-radius: 9px;
+    color: var(--ss-icon);
   }
-  .dd-chip[data-tone="violet"] { color: #7c5cf0; background: rgba(124, 92, 240, 0.14); }
-  .dd-chip[data-tone="green"] { color: #16a34a; background: rgba(34, 197, 94, 0.14); }
-  .dd-chip[data-tone="blue"] { color: #2563eb; background: rgba(59, 130, 246, 0.14); }
 
   .dd-ws {
     display: flex;
