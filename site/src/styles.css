@@ -89,10 +89,13 @@ code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.88em
 
 /* ---------- Features ---------- */
 .features { display: grid; grid-template-columns: repeat(12, 1fr); gap: var(--gap); padding-block: 120px; }
-.features-head { grid-column: 1 / span 4; align-self: start; }
+/* Sticky, so the heading travels beside the five demos instead of leaving an empty column. */
+.features-head { grid-column: 1 / span 4; align-self: start; position: sticky; top: 48px; }
 .features-head h2 { font-size: var(--step-head); }
 .features-head p { margin-top: 20px; max-width: 28ch; color: var(--muted); }
 .items { grid-column: 6 / -1; display: grid; gap: 88px; }
+/* As wide as the demo cards (the art bleeds 16px each side, to 592), so cards, text and Replay share one right edge. */
+.item { max-width: 560px; }
 .item .art { width: min(calc(100% + 32px), 592px); margin-left: -16px; margin-top: -16px; }
 .item .art img { width: 100%; border-radius: 14px; }
 .item h3 { margin-top: 0; }
@@ -242,14 +245,15 @@ code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.88em
 
 /* ---------- The Dashbar window ---------- */
 .window { display: grid; grid-template-columns: repeat(12, 1fr); gap: var(--gap); padding-block: 0 120px; }
-.window-head { grid-column: 1 / span 6; }
-.window-head h2 { font-size: var(--step-head); }
-.window-head p { margin-top: 20px; max-width: 52ch; color: var(--muted); }
+/* The page's section grammar: title in the first four columns, text from column 6, the demo full width below. */
+.window-head { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: start; }
+.window-head h2 { grid-column: 1 / span 4; font-size: var(--step-head); }
+.window-head p { grid-column: 6 / -1; max-width: 52ch; color: var(--muted); }
 .window-head kbd { font: inherit; font-weight: 600; color: var(--ink); }
 .window-demo { grid-column: 1 / -1; min-width: 0; margin-top: 24px; }
-.window-demo > [role="img"] { max-width: 1040px; }
-.window-demo .caption-row { max-width: 1040px; }
 @media (max-width: 900px) {
   .window { display: block; padding-block: 0 72px; }
+  .window-head { display: block; }
+  .window-head p { margin-top: 20px; }
   .window-demo { margin-top: 32px; }
 }

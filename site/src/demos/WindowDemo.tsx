@@ -20,7 +20,7 @@ type S = {
 
 const initial: S = { page: 0, tiles: false, rows: 0 }
 const POSTER: S = { page: 1, tiles: true, rows: 4 }
-const REST = { wide: { x: 900, y: 600 }, compact: { x: 300, y: 600 } }
+const REST = { wide: { x: 1000, y: 600 }, compact: { x: 300, y: 600 } }
 
 async function script(a: Act<S>) {
   await a.wait(1100)
@@ -38,7 +38,7 @@ async function script(a: Act<S>) {
 export function WindowDemo({ dark = false }: { dark?: boolean }) {
   return (
     <Stage
-      width={1040}
+      width={1160}   // the page's widest content width, so the demo fills it and lines up with both edges
       height={640}
       compact={{ below: 560, width: 358, height: 640 }}
       initial={initial}
