@@ -22,6 +22,15 @@ final class Popout: NSObject, NSWindowDelegate {
         NSApp.activate()
     }
 
+    /// The shortcut's action: bring the window up, or close it if it's already in front.
+    func toggle(store: Store) {
+        if let window, window.isVisible, window.isKeyWindow, NSApp.isActive {
+            window.performClose(nil)
+        } else {
+            show(store: store)
+        }
+    }
+
     /// Applies the "keep on top" setting to the open window.
     func applyLevel() {
         window?.level = UserDefaults.standard.bool(forKey: Self.floatKey) ? .floating : .normal

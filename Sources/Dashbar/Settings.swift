@@ -92,6 +92,8 @@ private struct GeneralSettings: View {
     @AppStorage(Notifier.defaultsKey) private var notify = true
     @AppStorage(Notifier.limitsKey) private var notifyLimits = true
     @AppStorage(Notifier.waitingKey) private var notifyWaiting = true
+    @AppStorage(GlobalShortcut.enabledKey) private var shortcut = true
+    @State private var shortcutUnavailable = GlobalShortcut.shared.unavailable
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -117,6 +119,15 @@ private struct GeneralSettings: View {
                     .help("When Claude stops to ask for permission or an answer.")
                 Toggle("Notify when a plan limit runs low", isOn: $notifyLimits)
                     .help("At 80%, when it's on course to run out before it resets, and when it's used up. Once per window.")
+                Toggle("Open the window with \(GlobalShortcut.display)", isOn: $shortcut)
+                    .onChange(of: shortcut) { _, on in
+                        GlobalShortcut.shared.setEnabled(on)
+                        shortcutUnavailable = GlobalShortcut.shared.unavailable
+                    }
+                if shortcut && shortcutUnavailable {
+                    Text("Another app is using \(GlobalShortcut.display), so it won't open Dashbar.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 Toggle("Launch at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, on in
                         do { on ? try SMAppService.mainApp.register() : try SMAppService.mainApp.unregister() }

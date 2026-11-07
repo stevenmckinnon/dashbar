@@ -332,7 +332,8 @@ private struct Header: View {
                     Popout.shared.applyLevel()
                 }
             } else {
-                IconButton(symbol: "arrow.up.forward.app", help: "Open in a window") {
+                IconButton(symbol: "arrow.up.forward.app",
+                           help: GlobalShortcut.isEnabled ? "Open in a window (\(GlobalShortcut.display))" : "Open in a window") {
                     let panel = NSApp.keyWindow   // the menu bar panel this button was clicked in
                     Popout.shared.show(store: store)
                     panel?.orderOut(nil)          // the popout replaces it
