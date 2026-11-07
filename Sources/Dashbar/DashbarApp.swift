@@ -23,7 +23,7 @@ struct DashbarApp: App {
         } label: {
             MenuBarLabel(store: store)
                 .onAppear {
-                    if CommandLine.arguments.contains("--popout") { Popout.shared.show(store: store) }
+                    if CommandLine.arguments.contains("--window") { AppWindow.shared.show(store: store) }
                 }
         }
         .menuBarExtraStyle(.window)

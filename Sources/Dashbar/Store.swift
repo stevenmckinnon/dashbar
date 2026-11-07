@@ -90,13 +90,12 @@ final class Store: ObservableObject {
         notifier.setup()
         GlobalShortcut.shared.action = { [weak self] in
             guard let self else { return }
-            Popout.shared.toggle(store: self)
+            AppWindow.shared.toggle(store: self)
         }
         GlobalShortcut.shared.setEnabled(GlobalShortcut.isEnabled)
         notifier.openLimits = { [weak self] in
             guard let self else { return }
-            UserDefaults.standard.set(PanelTab.agents.rawValue, forKey: "panelTab")   // the plan limits live there
-            Popout.shared.show(store: self)
+            AppWindow.shared.show(store: self, page: .tab(.agents))   // the plan limits live there
         }
         refresh(usage: true, servers: true, panel: true)
         scanCleanup()

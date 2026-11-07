@@ -77,6 +77,66 @@ enum Snapshot {
                 }
                 return
             }
+            if CommandLine.arguments.contains("--onscreen"), !CommandLine.arguments.contains("--app") {
+                // The panel in a real window for 8 seconds, for `screencapture -l` to catch what only the window server
+                // draws (Liquid Glass). Prints the window number.
+                let host = NSHostingView(rootView: DashboardView(scrolls: false).environmentObject(store)
+                    .background(Color(nsColor: .windowBackgroundColor))
+                    .environment(\.colorScheme, dark ? .dark : .light))
+                let window = NSWindow(contentRect: .init(origin: .zero, size: host.fittingSize), styleMask: [.borderless],
+                                      backing: .buffered, defer: false)
+                window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+                window.contentView = host
+                window.center()
+                window.level = .floating
+                window.orderFrontRegardless()
+                print("window", window.windowNumber)
+                fflush(stdout)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 8) { exit(0) }
+                return
+            }
+            if CommandLine.arguments.contains("--app") {
+                // The Dashbar window at 1100×760, laid out by AppKit so the sidebar list draws.
+                // DASHBAR_APP_PAGE picks the page: a tab ("agents") or a workspace's name.
+                let name = ProcessInfo.processInfo.environment["DASHBAR_APP_PAGE"] ?? "overview"
+                let page: AppPage = PanelTab(rawValue: name).map { .tab($0) }
+                    ?? .workspace(store.workspaces.first { $0.name == name }?.root ?? name)
+                // Hosted the way AppWindow hosts it (a hosting controller), so the window chrome matches the app's.
+                let controller = NSHostingController(rootView: AppView(model: AppWindowModel(page: page), snapshot: true)
+                    .environmentObject(store).environment(\.colorScheme, dark ? .dark : .light))
+                controller.sizingOptions = []
+                let window = NSWindow(contentViewController: controller)
+                window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+                window.titlebarAppearsTransparent = true
+                window.titleVisibility = .hidden
+                window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+                window.setContentSize(NSSize(width: 1100, height: 760))
+                let host = controller.view
+                if CommandLine.arguments.contains("--onscreen") {
+                    // On screen and active for 8 seconds, for `screencapture -l` to catch what only the window server
+                    // draws (Liquid Glass, the window buttons' colour). Prints the window number.
+                    NSApp.setActivationPolicy(.regular)
+                    window.center()
+                    window.makeKeyAndOrderFront(nil)
+                    window.makeFirstResponder(nil)
+                    NSApp.activate()
+                    print("window", window.windowNumber)
+                    fflush(stdout)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 8) { exit(0) }
+                    return
+                }
+                window.setFrameOrigin(NSPoint(x: -3000, y: -3000))   // drawn off screen
+                window.orderFrontRegardless()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    guard let frameView = host.superview else { exit(1) }
+                    if let rep = frameView.bitmapImageRepForCachingDisplay(in: frameView.bounds) {
+                        frameView.cacheDisplay(in: frameView.bounds, to: rep)
+                        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+                    }
+                    exit(0)
+                }
+                return
+            }
             if CommandLine.arguments.contains("--hosted") {
                 // Lay out the real scrolling panel the way MenuBarExtra does: at its fitting size.
                 let host = NSHostingView(rootView: DashboardView().environmentObject(store)

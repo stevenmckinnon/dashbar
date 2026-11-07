@@ -7,7 +7,7 @@ private let debugConfirm = ProcessInfo.processInfo.environment["DASHBAR_DEBUG_CO
 
 // MARK: - Design tokens
 
-private enum UI {
+enum UI {
     static let panelWidth: CGFloat = 420
     static let gutter: CGFloat = 12
     static let gap: CGFloat = 8
@@ -103,10 +103,7 @@ enum PanelTab: String, CaseIterable, Identifiable {
 struct DashboardView: View {
     @EnvironmentObject var store: Store
     @ObservedObject private var settings = AppSettings.shared
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var scrolls = true
-    /// The detached window: same width, but its height follows the window.
-    var popout = false
     @State private var query = ""
     @AppStorage("panelTab") private var tab: PanelTab = debugConfirm ? .cleanup : .overview
     /// Snapshots pass the tab to render directly.
@@ -122,7 +119,7 @@ struct DashboardView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Header(popout: popout)
+            Header()
             TabBar(selection: Binding(get: { forcedTab ?? tab }, set: { tab = $0 }))
             if scrolls {
                 ScrollView {
@@ -130,8 +127,7 @@ struct DashboardView: View {
                         .frame(maxWidth: .infinity, alignment: .top)
                         .id(forcedTab ?? tab)   // each tab opens scrolled to the top
                 }
-                .frame(height: popout ? nil : panelHeight)
-                .frame(maxHeight: popout ? .infinity : nil)
+                .frame(height: panelHeight)
                 .mask {
                     // Content fades out as it scrolls under the filter bar.
                     VStack(spacing: 0) {
@@ -145,8 +141,6 @@ struct DashboardView: View {
             BottomBar(query: $query, prompt: tab.filterPrompt, focused: $searchFocused)
         }
         .frame(width: UI.panelWidth)
-        .frame(maxHeight: popout ? .infinity : nil, alignment: .top)
-        .ignoresSafeArea(.container, edges: popout ? .top : [])   // popout content runs under its transparent title bar
         .background {
             Button("") { searchFocused = true }.keyboardShortcut("k").opacity(0)
             // ⌘1…⌘5 switch tabs.
@@ -154,18 +148,18 @@ struct DashboardView: View {
                 Button("") { tab = t }.keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command).opacity(0)
             }
         }
+        // A workspace's page lives in the Dashbar window, which takes over from the panel.
+        .environment(\.openWorkspace) { root in
+            let panel = NSApp.keyWindow
+            AppWindow.shared.show(store: store, page: .workspace(root))
+            panel?.orderOut(nil)
+        }
         // The window's see-through material turns muddy grey over a white page; a mostly opaque base keeps the panel legible on any backdrop.
         .background { if scrolls { Color(nsColor: .windowBackgroundColor).opacity(0.86) } }
-        .background { if popout { Color(nsColor: .windowBackgroundColor).ignoresSafeArea() } }
-        .background { if scrolls { WindowVisibilityReader { store.setPanelVisible($0, surface: surface) } } } // not in offline snapshots
-        .onAppear { store.setPanelVisible(true, surface: surface) }
-        .onDisappear { store.setPanelVisible(false, surface: surface) }
+        .background { if scrolls { WindowVisibilityReader { store.setPanelVisible($0, surface: "panel") } } } // not in offline snapshots
+        .onAppear { store.setPanelVisible(true, surface: "panel") }
+        .onDisappear { store.setPanelVisible(false, surface: "panel") }
     }
-
-    private var surface: String { popout ? "popout" : "panel" }
-
-    /// The panel's width, for the popout window to match.
-    static let width = UI.panelWidth
 
     private var cards: some View {
         VStack(spacing: UI.gap) {
@@ -203,7 +197,19 @@ struct DashboardView: View {
     }
 }
 
-private struct TabBar: View {
+/// Opens a workspace's detail page; set by the dashboard for the cards inside it.
+struct OpenWorkspaceKey: EnvironmentKey {
+    static let defaultValue: ((String) -> Void)? = nil
+}
+
+extension EnvironmentValues {
+    var openWorkspace: ((String) -> Void)? {
+        get { self[OpenWorkspaceKey.self] }
+        set { self[OpenWorkspaceKey.self] = newValue }
+    }
+}
+
+struct TabBar: View {
     @Binding var selection: PanelTab
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var pill
@@ -237,6 +243,7 @@ private struct TabBar: View {
             }
         }
         .padding(3)
+        // Kept solid: on the panel's flat background a glass track only adds a faint rim.
         .background(RoundedRectangle(cornerRadius: UI.innerRadius + 3, style: .continuous).fill(Color.primary.opacity(0.05)))
         .padding(.horizontal, UI.gutter)
         .padding(.bottom, 8)
@@ -245,7 +252,7 @@ private struct TabBar: View {
 
 /// Reports whether the panel's window is actually on screen, using AppKit occlusion state.
 /// More reliable than onAppear/onDisappear, which a menu bar window doesn't always send on reopen.
-private struct WindowVisibilityReader: NSViewRepresentable {
+struct WindowVisibilityReader: NSViewRepresentable {
     let onChange: (Bool) -> Void
 
     func makeNSView(context: Context) -> ReaderView { ReaderView(onChange: onChange) }
@@ -280,21 +287,13 @@ private struct WindowVisibilityReader: NSViewRepresentable {
 
 // MARK: - Chrome
 
-private struct Header: View {
+/// "1 needs you", "2 working", pause and refresh: shared by the panel's header and the window's.
+struct LiveControls: View {
     @EnvironmentObject var store: Store
-    var popout = false
-    @AppStorage(Popout.floatKey) private var floating = false
+    /// The window draws pause and refresh itself, grouped with its pin.
+    var buttons = true
     var body: some View {
         HStack(spacing: 7) {
-            BrandMarkView(size: 18)
-            Text("Dashbar").font(.system(size: UI.Size.title, weight: .semibold)).lineLimit(1)
-            if BuildInfo.isLocal {
-                Text("Local").font(.system(size: UI.Size.caption, weight: .medium)).foregroundStyle(UI.textSecondary)
-                    .padding(.horizontal, 7).padding(.vertical, 2)
-                    .background(Capsule().fill(Color.primary.opacity(0.1)))
-                    .help("A local build, not the installed release")
-            }
-            Spacer()
             if store.paused {
                 Text("Paused").font(.system(size: UI.Size.caption, weight: .medium)).foregroundStyle(UI.textSecondary)
             }
@@ -321,33 +320,52 @@ private struct Header: View {
                 .background(Capsule().fill(Color.green.opacity(0.12)))
                 .fixedSize()   // with two status pills, the title gives way rather than a pill wrapping
             }
-            IconButton(symbol: store.paused ? "play.fill" : "pause.fill",
-                       help: store.paused ? "Resume live updates" : "Pause live updates") {
-                store.paused.toggle()
-                if !store.paused { store.refreshNow() }
+            if buttons { LiveButtons() }
+        }
+    }
+}
+
+/// Pause or resume live updates, and refresh now.
+struct LiveButtons: View {
+    @EnvironmentObject var store: Store
+    var body: some View {
+        IconButton(symbol: store.paused ? "play.fill" : "pause.fill",
+                   help: store.paused ? "Resume live updates" : "Pause live updates") {
+            store.paused.toggle()
+            if !store.paused { store.refreshNow() }
+        }
+        IconButton(symbol: "arrow.clockwise", help: "Refresh now") { store.refreshNow() }
+    }
+}
+
+struct Header: View {
+    @EnvironmentObject var store: Store
+    var body: some View {
+        HStack(spacing: 7) {
+            BrandMarkView(size: 18)
+            Text("Dashbar").font(.system(size: UI.Size.title, weight: .semibold)).lineLimit(1)
+            if BuildInfo.isLocal {
+                Text("Local").font(.system(size: UI.Size.caption, weight: .medium)).foregroundStyle(UI.textSecondary)
+                    .padding(.horizontal, 7).padding(.vertical, 2)
+                    .background(Capsule().fill(Color.primary.opacity(0.1)))
+                    .help("A local build, not the installed release")
             }
-            IconButton(symbol: "arrow.clockwise", help: "Refresh now") { store.refreshNow() }
-            if popout {
-                IconButton(symbol: floating ? "pin.fill" : "pin", help: floating ? "Stop keeping on top" : "Keep on top of other windows") {
-                    floating.toggle()
-                    Popout.shared.applyLevel()
-                }
-            } else {
-                IconButton(symbol: "arrow.up.forward.app",
-                           help: GlobalShortcut.isEnabled ? "Open in a window (\(GlobalShortcut.display))" : "Open in a window") {
-                    let panel = NSApp.keyWindow   // the menu bar panel this button was clicked in
-                    Popout.shared.show(store: store)
-                    panel?.orderOut(nil)          // the popout replaces it
-                }
+            Spacer()
+            LiveControls()
+            IconButton(symbol: "arrow.up.forward.app",
+                       help: GlobalShortcut.isEnabled ? "Open the Dashbar window (\(GlobalShortcut.display))" : "Open the Dashbar window") {
+                let panel = NSApp.keyWindow   // the menu bar panel this button was clicked in
+                AppWindow.shared.show(store: store)
+                panel?.orderOut(nil)          // the window takes over from it
             }
         }
         .padding(.horizontal, 14)
-        .padding(.top, popout ? 30 : 12)   // the popout's content runs under its title bar; clear the window buttons
+        .padding(.top, 12)
         .padding(.bottom, 10)
     }
 }
 
-private struct BottomBar: View {
+struct BottomBar: View {
     @EnvironmentObject var store: Store
     @Binding var query: String
     var prompt: String
@@ -376,7 +394,7 @@ private struct BottomBar: View {
                 }
             }
             .padding(.horizontal, 10).padding(.vertical, 7)
-            .background(RoundedRectangle(cornerRadius: UI.fieldRadius, style: .continuous).fill(Color.primary.opacity(0.06)))
+            .modifier(SearchFieldSurface())
 
             Menu {
                 SettingsLink { Text("Settings…") }
@@ -410,7 +428,7 @@ private struct BottomBar: View {
 
 // MARK: - Tiles
 
-private struct TileRow: View {
+struct TileRow: View {
     @EnvironmentObject var store: Store
     let open: (PanelTab) -> Void
 
@@ -447,7 +465,7 @@ private struct TileRow: View {
     }
 }
 
-private struct Tile<Accessory: View>: View {
+struct Tile<Accessory: View>: View {
     let title: String
     let badge: String?
     let value: String
@@ -474,14 +492,14 @@ private struct Tile<Accessory: View>: View {
             }
         }
         .padding(.horizontal, 11).padding(.vertical, 10)
-        .frame(width: UI.column, height: 66, alignment: .topLeading)
+        .frame(minWidth: UI.column, maxWidth: .infinity, minHeight: 66, maxHeight: 66, alignment: .topLeading)
         .surface(selected: selected)
         .contentShape(Rectangle())
     }
 }
 
 /// Hourly activity: a 1pt baseline, with bars only where something happened.
-private struct HourBars: View {
+struct HourBars: View {
     let points: [HourPoint]
     let tint: Color
     var height: CGFloat = 16
@@ -508,7 +526,7 @@ private struct HourBars: View {
 }
 
 /// Reclaimable space by kind. Categories under 8% are dropped rather than drawn as dots.
-private struct CleanupMeter: View {
+struct CleanupMeter: View {
     let items: [CleanupItem]
     var body: some View {
         let total = Double(items.reduce(0) { $0 + $1.size })
@@ -545,19 +563,18 @@ private struct CleanupMeter: View {
 
 // MARK: - Now: the workspace that matters right now
 
-private struct NowCard: View {
+struct NowCard: View {
     @EnvironmentObject var store: Store
     let workspace: Workspace
+
+    @Environment(\.openWorkspace) private var openWorkspace
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                Monogram(name: workspace.name, root: workspace.root, active: workspace.isBusy, waiting: workspace.isWaiting, size: 32)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(workspace.name).font(.system(size: UI.Size.title, weight: .semibold)).lineLimit(1)
-                        .help("\(workspace.name) — \(Fmt.tilde(workspace.root))")
-                    Text(subtitle).font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary).lineLimit(1)
-                }
+                Button { openWorkspace?(workspace.root) } label: { title }
+                    .buttonStyle(PressStyle())
+                    .help("Show \(workspace.name) in the Dashbar window")
                 Spacer(minLength: 6)
                 StatusPill(workspace: workspace)
             }
@@ -574,6 +591,19 @@ private struct NowCard: View {
         .surface()
     }
 
+    private var title: some View {
+            HStack(spacing: 10) {
+                Monogram(name: workspace.name, root: workspace.root, active: workspace.isBusy, waiting: workspace.isWaiting, size: 32)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(workspace.name).font(.system(size: UI.Size.title, weight: .semibold)).lineLimit(1)
+                        .help("\(workspace.name) — \(Fmt.tilde(workspace.root))")
+                    Text(subtitle).font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary).lineLimit(1)
+                }
+                Image(systemName: "chevron.right").font(.system(size: UI.Size.micro, weight: .semibold)).foregroundStyle(UI.textSecondary)
+            }
+            .contentShape(Rectangle())
+    }
+
     private var subtitle: String {
         let servers = workspace.servers.prefix(2).map { l -> String in
             let name = l.hint.split(separator: " ").first.map(String.init) ?? l.command
@@ -585,7 +615,7 @@ private struct NowCard: View {
     }
 }
 
-private struct StatusPill: View {
+struct StatusPill: View {
     let workspace: Workspace
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
@@ -606,7 +636,7 @@ private struct StatusPill: View {
     }
 }
 
-private struct NowSessionLine: View {
+struct NowSessionLine: View {
     @EnvironmentObject var store: Store
     let session: LiveSession
     let context: ContextInfo?
@@ -645,7 +675,7 @@ private struct NowSessionLine: View {
 
 // MARK: - Widgets: context, last 5 hours, today
 
-private struct WidgetRow: View {
+struct WidgetRow: View {
     @EnvironmentObject var store: Store
 
     var body: some View {
@@ -679,7 +709,7 @@ private struct WidgetRow: View {
     }
 }
 
-private struct WeekCompare: View {
+struct WeekCompare: View {
     let this: Int
     let last: Int
 
@@ -706,7 +736,7 @@ private struct WeekCompare: View {
     }
 }
 
-private struct Widget<Content: View>: View {
+struct Widget<Content: View>: View {
     let title: String
     @ViewBuilder var content: Content
 
@@ -721,12 +751,12 @@ private struct Widget<Content: View>: View {
             content
         }
         .padding(UI.cardPadding)
-        .frame(width: UI.half, height: 118, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 118, maxHeight: 118, alignment: .topLeading)
         .surface()
     }
 }
 
-private struct DayBars: View {
+struct DayBars: View {
     let points: [DayPoint]
     let tint: Color
     var body: some View {
@@ -743,7 +773,7 @@ private struct DayBars: View {
     }
 }
 
-private struct BigNumber: View {
+struct BigNumber: View {
     let text: String
     init(_ text: String) { self.text = text }
     var body: some View {
@@ -751,7 +781,7 @@ private struct BigNumber: View {
     }
 }
 
-private struct Footnote: View {
+struct Footnote: View {
     let text: String
     init(_ text: String) { self.text = text }
     var body: some View {
@@ -761,7 +791,7 @@ private struct Footnote: View {
 
 // MARK: - Workspaces
 
-private struct WorkspacesCard: View {
+struct WorkspacesCard: View {
     @EnvironmentObject var store: Store
     let query: String
     var clearQuery: () -> Void = {}
@@ -801,7 +831,7 @@ private struct WorkspacesCard: View {
     }
 }
 
-private struct WorkspaceRow: View {
+struct WorkspaceRow: View {
     @EnvironmentObject var store: Store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let workspace: Workspace
@@ -877,7 +907,7 @@ private struct WorkspaceRow: View {
     }
 }
 
-private struct WorkspaceStatus: View {
+struct WorkspaceStatus: View {
     let workspace: Workspace
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
@@ -905,7 +935,7 @@ private struct WorkspaceStatus: View {
     }
 }
 
-private struct SessionLine: View {
+struct SessionLine: View {
     @EnvironmentObject var store: Store
     let session: LiveSession
     let context: ContextInfo?
@@ -939,7 +969,7 @@ private struct SessionLine: View {
 }
 
 /// "22%" over "context", so the number explains itself.
-private struct ContextLabel: View {
+struct ContextLabel: View {
     let context: ContextInfo
     var body: some View {
         VStack(alignment: .trailing, spacing: 0) {
@@ -976,7 +1006,7 @@ extension ContextInfo {
     var accessibilityText: String { "\(Int((fraction * 100).rounded())) percent of context window used" }
 }
 
-private struct ContextRing: View {
+struct ContextRing: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let fraction: Double
     var size: CGFloat = 16
@@ -996,7 +1026,7 @@ private struct ContextRing: View {
     }
 }
 
-private struct ContextBar: View {
+struct ContextBar: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let fraction: Double
     var body: some View {
@@ -1011,10 +1041,16 @@ private struct ContextBar: View {
     }
 }
 
-private struct QuickActions: View {
+struct QuickActions: View {
     let workspace: Workspace
+    /// The detail page itself leaves out the button that opens it.
+    var showDetails = true
+    @Environment(\.openWorkspace) private var openWorkspace
     var body: some View {
         HStack(spacing: 6) {
+            if showDetails, let openWorkspace {
+                ActionTile(symbol: "chart.bar.xaxis", help: "Show in the Dashbar window") { openWorkspace(workspace.root) }
+            }
             if let editor = Launcher.editor {
                 ActionTile(symbol: "chevron.left.forwardslash.chevron.right", help: "Open in \(editor.name)") {
                     Launcher.open(workspace.root, in: editor)
@@ -1036,7 +1072,7 @@ private struct QuickActions: View {
     }
 }
 
-private struct ActionTile: View {
+struct ActionTile: View {
     let symbol: String
     let help: String
     let action: () -> Void
@@ -1057,9 +1093,161 @@ private struct ActionTile: View {
     }
 }
 
+// MARK: - Workspace detail
+
+/// A figure with its recent history underneath.
+struct UsageTile: View {
+    let title: String
+    let value: String
+    let unit: String
+    let values: [Double]
+    var style: Sparkbars.Style = .bars
+    let caption: String
+    let help: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(.system(size: UI.Size.caption, weight: .medium)).foregroundStyle(.secondary)
+            HStack(alignment: .lastTextBaseline, spacing: 2) {
+                Text(value).font(.system(size: UI.Size.numeral, weight: .semibold, design: .rounded).monospacedDigit())
+                    .lineLimit(1).minimumScaleFactor(0.7)
+                if !unit.isEmpty {
+                    Text(unit).font(.system(size: UI.Size.caption, weight: .semibold)).foregroundStyle(UI.textSecondary).fixedSize()
+                }
+            }
+            if style == .none {
+                Color.clear.frame(height: 18)   // keeps a row of tiles level
+            } else {
+                Sparkbars(values: Array(values.suffix(Sparkbars.count)), style: style)
+            }
+            Text(caption).font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
+                .lineLimit(1).minimumScaleFactor(0.85)
+        }
+        .padding(.horizontal, 11).padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .surface()
+        .help(help)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title) \(value) \(unit), \(caption)")
+    }
+}
+
+/// Recent samples, newest on the right and in the info colour. Bars suit bursty figures (CPU, energy) and are scaled
+/// to their own peak: they show the shape of the last few minutes, the figure above gives the size. A line suits
+/// figures that drift (memory): it spans the recent low to high, and sits flat in the middle when nothing changes.
+struct Sparkbars: View {
+    enum Style { case bars, line, none }
+    static let count = 24
+    let values: [Double]
+    var style: Style = .bars
+    var height: CGFloat = 18
+
+    var body: some View {
+        switch style {
+        case .bars: bars
+        case .line: line
+        case .none: EmptyView()
+        }
+    }
+
+    private var line: some View {
+        let lo = values.min() ?? 0, hi = values.max() ?? 0
+        let flat = hi <= 0 || (hi - lo) / hi < 0.02
+        return GeometryReader { g in
+            let step = g.size.width / CGFloat(Self.count - 1)
+            let offset = CGFloat(Self.count - values.count)
+            let point: (Int) -> CGPoint = { i in
+                let y = flat ? 0.5 : (values[i] - lo) / (hi - lo)
+                return CGPoint(x: (offset + CGFloat(i)) * step, y: 2 + (height - 4) * (1 - y))
+            }
+            ZStack(alignment: .topLeading) {
+                Capsule().fill(Color.primary.opacity(0.12)).frame(height: 1).offset(y: height - 1)
+                if values.count > 1 {
+                    Path { p in
+                        p.move(to: point(0))
+                        for i in 1..<values.count { p.addLine(to: point(i)) }
+                    }
+                    .stroke(Color.secondary.opacity(0.7), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+                }
+                if !values.isEmpty {
+                    let last = point(values.count - 1)
+                    Circle().fill(UI.textInfo).frame(width: 5, height: 5).position(last)
+                }
+            }
+        }
+        .frame(height: height)
+        .accessibilityHidden(true)
+    }
+
+    private var bars: some View {
+        let peak = values.max() ?? 0
+        return GeometryReader { g in
+            let spacing: CGFloat = 1.5
+            let w = max(1, (g.size.width - spacing * CGFloat(Self.count - 1)) / CGFloat(Self.count))
+            ZStack(alignment: .bottom) {
+                Capsule().fill(Color.primary.opacity(0.12)).frame(height: 1)
+                HStack(alignment: .bottom, spacing: spacing) {
+                    ForEach(0..<Self.count, id: \.self) { i in
+                        let index = i - (Self.count - values.count)
+                        let v = index >= 0 ? values[index] : 0
+                        RoundedRectangle(cornerRadius: min(1, w / 2))
+                            .fill(index == values.count - 1 ? UI.textInfo : Color.secondary.opacity(0.5))
+                            .frame(width: w, height: index >= 0 && peak > 0 ? max(2, height * v / peak) : 0)
+                    }
+                }
+            }
+            .frame(height: height, alignment: .bottom)
+        }
+        .frame(height: height)
+        .accessibilityHidden(true)
+    }
+}
+
+/// What the workspace's figures are made of, busiest first.
+struct ProcessList: View {
+    let groups: [WorkspaceUsage.ProcessGroup]
+    var shown = 6
+    @State private var showAll = false
+
+    var body: some View {
+        let list = showAll ? groups : Array(groups.prefix(shown))
+        Card(title: "Processes", icon: "square.stack", count: groups.reduce(0) { $0 + $1.count }) {
+            VStack(spacing: 0) {
+                HStack {
+                    Spacer()
+                    Text("CPU").frame(width: 48, alignment: .trailing)
+                    Text("Memory").frame(width: 64, alignment: .trailing)
+                }
+                .font(.system(size: UI.Size.micro, weight: .medium)).foregroundStyle(UI.textSecondary)
+                .padding(.horizontal, 4).padding(.bottom, 4)
+                ForEach(list) { g in
+                    HStack(spacing: 6) {
+                        Text(g.name).font(.system(size: UI.Size.body, design: .monospaced)).lineLimit(1).truncationMode(.middle)
+                        if g.count > 1 {
+                            Text("×\(g.count)").font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
+                        }
+                        Spacer(minLength: 6)
+                        Text(UsageText.percent(g.cpu) + "%").frame(width: 48, alignment: .trailing)
+                        Text(Fmt.bytes(g.memory)).frame(width: 64, alignment: .trailing).foregroundStyle(UI.textSecondary)
+                    }
+                    .font(.system(size: UI.Size.caption).monospacedDigit())
+                    .padding(.horizontal, 4).padding(.vertical, 4)
+                }
+                if groups.count > shown {
+                    Button(showAll ? "Show fewer" : "Show \(groups.count - shown) more") { showAll.toggle() }
+                        .buttonStyle(PressStyle())
+                        .font(.system(size: UI.Size.caption, weight: .medium)).foregroundStyle(UI.textInfo)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 4).padding(.top, 4)
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Servers not tied to a repo
 
-private struct ServersCard: View {
+struct ServersCard: View {
     @EnvironmentObject var store: Store
     let query: String
     /// The Servers tab lists every dev server; Overview only those outside a project (projects show theirs).
@@ -1107,7 +1295,7 @@ private struct ServersCard: View {
     }
 }
 
-private struct ServerRow: View {
+struct ServerRow: View {
     @EnvironmentObject var store: Store
     let listener: Listener
     var compact = false
@@ -1205,7 +1393,7 @@ private struct ServerRow: View {
 
 // MARK: - Clean up
 
-private struct CleanupCard: View {
+struct CleanupCard: View {
     @EnvironmentObject var store: Store
     var query = ""
     @State private var showAll = false
@@ -1245,7 +1433,7 @@ private struct CleanupCard: View {
     }
 }
 
-private struct CleanupRow: View {
+struct CleanupRow: View {
     @EnvironmentObject var store: Store
     let item: CleanupItem
     @State private var hover = false
@@ -1300,7 +1488,7 @@ private struct CleanupRow: View {
 
 // MARK: - Usage
 
-private struct UsageCard: View {
+struct UsageCard: View {
     let title: String
     var icon: String? = nil
     let tint: Color
@@ -1394,7 +1582,7 @@ private struct UsageCard: View {
     }
 }
 
-private struct MiniStat: View {
+struct MiniStat: View {
     let label: String
     let value: Int
     var body: some View {
@@ -1408,7 +1596,7 @@ private struct MiniStat: View {
     }
 }
 
-private struct RankList: View {
+struct RankList: View {
     let title: String
     let items: [Ranked]
     let tint: Color
@@ -1435,7 +1623,7 @@ private struct RankList: View {
     }
 }
 
-private struct LimitBar: View {
+struct LimitBar: View {
     let limit: RateLimit
     let tint: Color
     var body: some View {
@@ -1504,7 +1692,7 @@ private struct LimitBar: View {
 
 // MARK: - Plan limits (Agents tab)
 
-private struct PlanLimitsCard: View {
+struct PlanLimitsCard: View {
     @EnvironmentObject var store: Store
     @ObservedObject private var settings = AppSettings.shared
 
@@ -1623,7 +1811,7 @@ private struct PlanLimitsCard: View {
 
 // MARK: - System tab
 
-private struct SystemPage: View {
+struct SystemPage: View {
     @EnvironmentObject var store: Store
     let query: String
 
@@ -1686,7 +1874,7 @@ private struct SystemPage: View {
     }
 }
 
-private struct MetricCard<Badge: View, Content: View>: View {
+struct MetricCard<Badge: View, Content: View>: View {
     let title: String
     let icon: String
     let tint: Color
@@ -1722,7 +1910,7 @@ private struct MetricCard<Badge: View, Content: View>: View {
 }
 
 /// Memory pressure with an icon and a word, so it never relies on colour alone.
-private struct PressureBadge: View {
+struct PressureBadge: View {
     let pressure: MemoryPressure
     var body: some View {
         let (symbol, color): (String, Color) = {
@@ -1741,7 +1929,7 @@ private struct PressureBadge: View {
     }
 }
 
-private struct StatRow: View {
+struct StatRow: View {
     let items: [(String, String)]
     init(_ items: [(String, String)]) { self.items = items }
     var body: some View {
@@ -1758,7 +1946,7 @@ private struct StatRow: View {
 }
 
 /// Recent samples as small vertical bars, newest on the right; empty slots show as faint stubs.
-private struct BarHistory: View {
+struct BarHistory: View {
     let values: [Double]
     let tint: Color
     /// Fixed scale (e.g. 1 for percentages); nil scales to the largest value shown.
@@ -1791,7 +1979,7 @@ private struct BarHistory: View {
     }
 }
 
-private struct MiniMetric: View {
+struct MiniMetric: View {
     let title: String
     let icon: String
     let tint: Color
@@ -1825,7 +2013,7 @@ private struct MiniMetric: View {
     }
 }
 
-private struct BusiestApps: View {
+struct BusiestApps: View {
     let apps: [AppUsage]
     let query: String
 
@@ -1866,7 +2054,7 @@ private struct BusiestApps: View {
 }
 
 /// The app's own icon when it lives in a bundle, a terminal glyph for command-line tools.
-private struct AppIcon: View {
+struct AppIcon: View {
     let path: String?
     private static var cache: [String: NSImage] = [:]
 
@@ -1897,7 +2085,7 @@ private struct AppIcon: View {
 
 /// Card and tile surface. Depth comes from fill (and a soft shadow in light mode), not a border;
 /// only the selected state draws an outline.
-private struct Surface: ViewModifier {
+struct Surface: ViewModifier {
     @Environment(\.colorScheme) private var scheme
     var selected = false
 
@@ -1914,11 +2102,36 @@ private struct Surface: ViewModifier {
 }
 
 extension View {
-    fileprivate func surface(selected: Bool = false) -> some View { modifier(Surface(selected: selected)) }
+    func surface(selected: Bool = false) -> some View { modifier(Surface(selected: selected)) }
+}
+
+/// Search and filter fields: a Liquid Glass capsule on macOS 26 and later, like the system's own fields there;
+/// before that, the quiet rounded fill the panel always had.
+struct SearchFieldSurface: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content.glassEffect(.regular, in: Capsule())
+        } else {
+            content.background(RoundedRectangle(cornerRadius: UI.fieldRadius, style: .continuous).fill(Color.primary.opacity(0.06)))
+        }
+    }
+}
+
+/// Groups glass controls that sit together (macOS 26 and later), so they render as one layer and blend where they meet.
+struct GlassGroup<Content: View>: View {
+    var spacing: CGFloat = 6
+    @ViewBuilder var content: Content
+    var body: some View {
+        if #available(macOS 26.0, *) {
+            GlassEffectContainer(spacing: spacing) { content }
+        } else {
+            content
+        }
+    }
 }
 
 /// Presses scale to 0.96 over 150ms; under Reduce Motion they dim instead. Disabled buttons never react.
-private struct PressStyle: ButtonStyle {
+struct PressStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -1931,7 +2144,7 @@ private struct PressStyle: ButtonStyle {
     }
 }
 
-private struct Card<Content: View>: View {
+struct Card<Content: View>: View {
     let title: String
     var icon: String? = nil
     var tint: Color = .secondary
@@ -1960,7 +2173,7 @@ private struct Card<Content: View>: View {
 
 /// The symbol leading a card's title. Plain, in secondary ink; only Claude's asterisk and Codex's brackets
 /// keep their colour, because there it names the agent.
-private struct IconChip: View {
+struct IconChip: View {
     let symbol: String
     let tint: Color
     private var namesAnAgent: Bool { symbol == "asterisk" || symbol.hasPrefix("chevron.left.forwardslash") }
@@ -1977,7 +2190,7 @@ private struct IconChip: View {
 
 /// A project's tile: its own icon when one is found in the folder, otherwise its first letter on a quiet
 /// neutral tile. Colour is left for state, so the only thing that lights up is a working agent's dot.
-private struct Monogram: View {
+struct Monogram: View {
     let name: String
     var root: String? = nil
     let active: Bool
@@ -2022,7 +2235,7 @@ private struct Monogram: View {
     }
 }
 
-private struct StatusDot: View {
+struct StatusDot: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let active: Bool
     /// Waiting for you: a steady amber dot. Working pulses green; waiting holds still until someone acts.
@@ -2060,7 +2273,7 @@ private struct StatusDot: View {
     }
 }
 
-private struct IconButton: View {
+struct IconButton: View {
     let symbol: String
     let help: String
     let action: () -> Void
@@ -2083,7 +2296,7 @@ private struct IconButton: View {
 
 /// Inline confirmation for a destructive action: a tinted pill in the danger colour,
 /// matching the panel's own buttons rather than a stock AppKit push button.
-private struct ConfirmButton: View {
+struct ConfirmButton: View {
     let title: String
     let action: () -> Void
     @State private var hover = false
@@ -2104,7 +2317,7 @@ private struct ConfirmButton: View {
     }
 }
 
-private struct NoticeBanner: View {
+struct NoticeBanner: View {
     let text: String
     let dismiss: (() -> Void)?
     var body: some View {
@@ -2121,14 +2334,14 @@ private struct NoticeBanner: View {
     }
 }
 
-private struct EmptyRow: View {
+struct EmptyRow: View {
     let text: String
     var body: some View {
         Text(text).font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary).frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-private struct AgentChips: View {
+struct AgentChips: View {
     let items: [String]
     var body: some View {
         HStack(spacing: 5) {
