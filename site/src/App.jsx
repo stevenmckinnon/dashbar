@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { RotateCw } from "lucide-react";
+import { FAQ } from "./faq";
 import { DashbarDemo } from "./demos/DashbarDemo";
 import { AgentsDemo, LimitsDemo, ServersDemo, SystemDemo, CleanupDemo } from "./demos/FeatureDemos";
 
@@ -51,6 +52,7 @@ function Hero() {
           <li><a href="#features">Features</a></li>
           <li><a href="#pace">Pace</a></li>
           <li><a href="#privacy">Privacy</a></li>
+          <li><a href="#faq">FAQ</a></li>
           <li><a href={REPO}>GitHub</a></li>
           <li><a className="btn small" href="#install">Install</a></li>
         </ul>
@@ -61,7 +63,7 @@ function Hero() {
           <p className="lede">Dashbar shows which <b>Claude Code</b> and <b>Codex</b> sessions are working, how much of your plan is left, and which dev servers are idling. Free and open source.</p>
           <div className="actions">
             <a className="btn" href={RELEASES}>Download for macOS</a>
-            <span className="note">Needs macOS 14 or later. Notarised by Apple.</span>
+            <span className="note">Open source under the MIT licence. Needs macOS 14 or later. Notarised by Apple.</span>
           </div>
         </div>
         <div className="demo">
@@ -175,6 +177,24 @@ function Pace() {
   );
 }
 
+/* ---------- Questions ---------- */
+
+function Faq() {
+  return (
+    <section className="wrap faq" id="faq" aria-labelledby="faq-h">
+      <h2 id="faq-h">Questions</h2>
+      <div className="faq-list">
+        {FAQ.map(({ q, a }) => (
+          <details key={q}>
+            <summary>{q}</summary>
+            <p>{a}</p>
+          </details>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 /* ---------- What it reads, and what it sends ---------- */
 
 function Privacy() {
@@ -250,6 +270,7 @@ function Footer() {
           <li><a href="#pace">Pace</a></li>
           <li><a href={`${REPO}/releases`}>Releases</a></li>
           <li><a href="#privacy">Privacy</a></li>
+          <li><a href="#faq">FAQ</a></li>
           <li><a href={`${REPO}/issues`}>Issues</a></li>
           <li><a href="#install">Install</a></li>
           <li><a href={`${REPO}/blob/main/LICENSE`}>Licence</a></li>
@@ -268,6 +289,7 @@ export default function App() {
         <Features />
         <Pace />
         <Privacy />
+        <Faq />
         <Install />
       </main>
       <Footer />
