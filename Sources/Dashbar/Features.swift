@@ -243,16 +243,19 @@ enum Launcher {
     }
 }
 
-// MARK: - "Agent finished" notifications
+// MARK: - Notifications: agent finished, plan limit running low
 
 final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     static let defaultsKey = "notifyOnFinish"
+    static let limitsKey = "notifyOnLimits"
+    /// Opens the plan limits (set by the store). Called when a limit notification is clicked.
+    var openLimits: (() -> Void)?
     /// UNUserNotificationCenter crashes outside an .app bundle (e.g. `swift run`, snapshots).
     private let available = Bundle.main.bundleURL.pathExtension == "app"
 
     func setup() {
         guard available else { return }
-        UserDefaults.standard.register(defaults: [Self.defaultsKey: true])
+        UserDefaults.standard.register(defaults: [Self.defaultsKey: true, Self.limitsKey: true])
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
@@ -268,6 +271,16 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: s.id + "-\(Date().timeIntervalSince1970)", content: content, trigger: nil))
     }
 
+    func limit(_ alert: LimitAlert) {
+        guard available, UserDefaults.standard.bool(forKey: Self.limitsKey) else { return }
+        let content = UNMutableNotificationContent()
+        content.title = alert.title
+        content.body = alert.body
+        content.sound = .default
+        content.userInfo = ["limits": true]
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: alert.sentKey, content: content, trigger: nil))
+    }
+
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
                                 withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         completionHandler([.banner, .sound])
@@ -275,7 +288,9 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
-        if let root = response.notification.request.content.userInfo["root"] as? String {
+        if response.notification.request.content.userInfo["limits"] as? Bool == true {
+            DispatchQueue.main.async { [weak self] in self?.openLimits?() }
+        } else if let root = response.notification.request.content.userInfo["root"] as? String {
             DispatchQueue.main.async {
                 if let editor = Launcher.editor { Launcher.open(root, in: editor) } else { Launcher.reveal(root) }
             }

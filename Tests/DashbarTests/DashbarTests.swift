@@ -377,6 +377,85 @@ private func session(id: String, root: String = "/dev/app", busy: Bool = false, 
     }
 }
 
+// MARK: - Plan limit alerts
+
+@Suite struct LimitAlertTests {
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    /// A 5-hour window with `left` seconds to go.
+    func fiveHour(_ used: Double, left: TimeInterval) -> RateLimit {
+        RateLimit(label: "5-hour", usedPercent: used, resetsAt: now.addingTimeInterval(left), window: 5 * 3600)
+    }
+
+    @Test func nearlyUsedFiresOnceAt80Percent() {
+        let limit = fiveHour(82, left: 600)   // nearly the end of the window, so it's on pace, not running out
+        let first = LimitAlerts.check(provider: "Claude", limits: [limit], sent: [], now: now)
+        #expect(first.map(\.kind) == [.nearlyUsed])
+        #expect(first.first?.title == "Claude 5-hour")
+        #expect(first.first?.body == "82% used. It resets in 10m.")
+        let again = LimitAlerts.check(provider: "Claude", limits: [limit], sent: Set(first.map(\.sentKey)), now: now)
+        #expect(again.isEmpty)
+    }
+
+    @Test func belowTheThresholdAndOnPaceSaysNothing() {
+        #expect(LimitAlerts.check(provider: "Codex", limits: [fiveHour(40, left: 2.5 * 3600)], sent: [], now: now).isEmpty)
+    }
+
+    @Test func onlyEscalates() {
+        let nearly = LimitAlerts.check(provider: "Claude", limits: [fiveHour(85, left: 600)], sent: [], now: now)
+        let sent = Set(nearly.map(\.sentKey))
+        let usedUp = LimitAlerts.check(provider: "Claude", limits: [fiveHour(100, left: 300)], sent: sent, now: now)
+        #expect(usedUp.map(\.kind) == [.usedUp])
+        #expect(usedUp.first?.body == "Used up. It resets in 5m.")
+        // After "used up", a reading back under 100% (rounding, a late sample) doesn't send "nearly used" again.
+        let after = LimitAlerts.check(provider: "Claude", limits: [fiveHour(90, left: 240)],
+                                      sent: sent.union(usedUp.map(\.sentKey)), now: now)
+        #expect(after.isEmpty)
+    }
+
+    @Test func runsOutWaitsForAQuarterOfTheWindow() {
+        // 10% of the window gone and already 30% used: on course to run out, but too early to say.
+        let early = fiveHour(30, left: 4.5 * 3600)
+        #expect(LimitAlerts.kind(for: early, now: now) == nil)
+        // Half the window gone and 70% used: 28% an hour, so the last 30% lasts ~64m, 1h 25m before the reset.
+        let later = fiveHour(70, left: 2.5 * 3600)
+        let alerts = LimitAlerts.check(provider: "Codex", limits: [later], sent: [], now: now)
+        #expect(alerts.map(\.kind) == [.runsOut])
+        #expect(alerts.first?.body.hasPrefix("At this rate it runs out at") == true)
+        #expect(alerts.first?.body.hasSuffix(", 1h 25m before it resets.") == true)
+    }
+
+    @Test func aNewWindowStartsAfresh() {
+        let sent = Set(LimitAlerts.check(provider: "Claude", limits: [fiveHour(85, left: 600)], sent: [], now: now).map(\.sentKey))
+        let next = fiveHour(85, left: 5 * 3600 - 60)   // the window after: a new reset time
+        #expect(LimitAlerts.check(provider: "Claude", limits: [next], sent: sent, now: now).map(\.kind) == [.nearlyUsed])
+    }
+
+    @Test func readingsThatDriftBySecondsAreTheSameWindow() {
+        let sent = Set(LimitAlerts.check(provider: "Codex", limits: [fiveHour(85, left: 600)], sent: [], now: now).map(\.sentKey))
+        #expect(LimitAlerts.check(provider: "Codex", limits: [fiveHour(86, left: 607)], sent: sent, now: now).isEmpty)
+    }
+
+    @Test func noResetTimeNoAlert() {
+        let limit = RateLimit(label: "Weekly", usedPercent: 95, resetsAt: nil, window: 7 * 86400)
+        #expect(LimitAlerts.check(provider: "Claude", limits: [limit], sent: [], now: now).isEmpty)
+    }
+
+    @Test func pruneForgetsWindowsThatHaveReset() {
+        let old = LimitAlerts.check(provider: "Claude", limits: [fiveHour(85, left: 600)], sent: [], now: now).map(\.sentKey)
+        let kept = LimitAlerts.prune(Set(old), now: now)
+        #expect(kept == Set(old))
+        #expect(LimitAlerts.prune(Set(old), now: now.addingTimeInterval(3 * 3600)).isEmpty)
+    }
+
+    @Test func durationsReadNaturally() {
+        #expect(Fmt.duration(30) == "less than a minute")
+        #expect(Fmt.duration(45 * 60) == "45m")
+        #expect(Fmt.duration(2 * 3600) == "2h")
+        #expect(Fmt.duration(2 * 3600 + 5 * 60) == "2h 5m")
+        #expect(Fmt.duration(3 * 86400 + 4 * 3600) == "3d 4h")
+    }
+}
+
 // MARK: - Window visibility
 
 @Suite struct SurfaceVisibilityTests {

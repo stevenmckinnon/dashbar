@@ -63,6 +63,8 @@ final class Store: ObservableObject {
     private var watcher: FileWatcher?
     /// Which windows (the menu bar panel, the popout) are on screen, as reported by their views. Closed until one opens.
     private var surfaces = SurfaceVisibility()
+    /// Limit alerts already sent, so each fires once per window even across relaunches.
+    private var sentLimitAlerts = LimitAlerts.prune(Set(UserDefaults.standard.stringArray(forKey: "limitAlertsSent") ?? []))
     private var panelVisible: Bool { surfaces.anyVisible }
     /// Demo stores hold invented data and never collect anything.
     private var isDemo = false
@@ -76,6 +78,11 @@ final class Store: ObservableObject {
             return
         }
         notifier.setup()
+        notifier.openLimits = { [weak self] in
+            guard let self else { return }
+            UserDefaults.standard.set(PanelTab.agents.rawValue, forKey: "panelTab")   // the plan limits live there
+            Popout.shared.show(store: self)
+        }
         refresh(usage: true, servers: true, panel: true)
         scanCleanup()
         startTimer()
@@ -138,6 +145,22 @@ final class Store: ObservableObject {
         refresh(usage: true, servers: false, panel: panelVisible)
     }
 
+    /// Notifies when a plan limit is nearly used, on course to run out, or used up (once per window).
+    private func checkLimits() {
+        guard !isDemo, !paused else { return }
+        var alerts = LimitAlerts.check(provider: "Codex", limits: codexLimits, sent: sentLimitAlerts)
+        if settings.claudeLimits, let plan = claudePlan, plan.problem == nil {
+            alerts += LimitAlerts.check(provider: "Claude", limits: plan.limits, sent: sentLimitAlerts)
+        }
+        guard !alerts.isEmpty else { return }
+        for alert in alerts {
+            notifier.limit(alert)
+            sentLimitAlerts.insert(alert.sentKey)
+        }
+        sentLimitAlerts = LimitAlerts.prune(sentLimitAlerts)
+        UserDefaults.standard.set(Array(sentLimitAlerts), forKey: "limitAlertsSent")
+    }
+
     /// Each window reports on its own, so closing one doesn't pause updates for the other.
     func setPanelVisible(_ visible: Bool, surface: String = "panel") {
         guard !isDemo else { return }
@@ -178,7 +201,7 @@ final class Store: ObservableObject {
             let result = await ClaudePlanLimits.fetch()
             await MainActor.run {
                 self.claudePlanLoading = false
-                if self.settings.claudeLimits { self.claudePlan = result }
+                if self.settings.claudeLimits { self.claudePlan = result; self.checkLimits() }
             }
         }
     }
@@ -246,7 +269,7 @@ final class Store: ObservableObject {
             if let l = r.listeners { self.listeners = l }
             if let s = r.spawned { self.spawned = s }
             if let c = r.claude { self.claude = c; self.usageLoading = false }
-            if let c = r.codex { self.codex = c; self.codexLimits = r.codexLimits }
+            if let c = r.codex { self.codex = c; self.codexLimits = r.codexLimits; self.checkLimits() }
             self.lastUpdated = Date()
         }
     }

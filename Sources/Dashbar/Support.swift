@@ -43,6 +43,17 @@ enum Fmt {
         }
     }
 
+    /// A span of time ahead, for sentences: "less than a minute", "45m", "2h 5m", "3d 4h".
+    static func duration(_ seconds: TimeInterval) -> String {
+        let s = max(0, Int(seconds.rounded()))
+        switch s {
+        case ..<60: return "less than a minute"
+        case ..<3600: return "\(s / 60)m"
+        case ..<86400: return s % 3600 / 60 == 0 ? "\(s / 3600)h" : "\(s / 3600)h \(s % 3600 / 60)m"
+        default: return s % 86400 / 3600 == 0 ? "\(s / 86400)d" : "\(s / 86400)d \(s % 86400 / 3600)h"
+        }
+    }
+
     /// "claude-opus-5-5" -> "Opus 5.5", "claude-sonnet-4-5-20250929" -> "Sonnet 4.5", "gpt-5-codex" stays.
     static func model(_ raw: String) -> String {
         guard raw.hasPrefix("claude-") else { return raw }
