@@ -3,6 +3,21 @@
     <channel>
         <title>Dashbar</title>
         <item>
+            <title>0.5.0</title>
+            <pubDate>Sat, 07 Nov 2026 13:50:20 +0000</pubDate>
+            <sparkle:version>36</sparkle:version>
+            <sparkle:shortVersionString>0.5.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[- **Plan limit alerts**: a notification when a Claude or Codex limit reaches 80%, when it's on course to run out before it resets, and when it's used up. Once per window
+- **Needs you**: when Claude stops to ask for permission or an answer, Dashbar shows it in amber, puts it first, counts it beside the menu bar icon and can notify you. A permission prompt no longer sends a false "finished" notification
+- **⌃⌥D** opens the Dashbar window from anywhere, and closes it again
+- Each new notification can be turned off in Settings
+- Claude plan limits cope with Claude's rate limiting: Dashbar waits before asking again and keeps showing the last reading, instead of an error
+- Superset is recognised among running agent apps, and card titles line up with their contents
+]]></description>
+            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.5.0/Dashbar-0.5.0.dmg" length="4681605" type="application/octet-stream" sparkle:edSignature="xzR90v7gUx7Ye0fHZDZM8Vs7nxy5mTMfdm4/j6AzncMwcsXiPdfJhwuEUC3gP1+cNPYrVnT2a4zNJLvao6yVDA=="/>
+        </item>
+        <item>
             <title>0.4.1</title>
             <pubDate>Sat, 07 Nov 2026 12:11:40 +0000</pubDate>
             <sparkle:version>26</sparkle:version>
@@ -22,14 +37,6 @@
 - **T3 Code** now shows up among the agent apps Dashbar spots running
 ]]></description>
             <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.4.0/Dashbar-0.4.0.dmg" length="4031630" type="application/octet-stream" sparkle:edSignature="jf4I/s4/0RIoE06vMz993RKKqu57Q7dvbonmqOH5f8CJjDe7Q2OMsZhq0OeQOBF7W3XufXRwXKzCFDweiRjuBQ=="/>
-        </item>
-        <item>
-            <title>0.3.1</title>
-            <pubDate>Sat, 07 Nov 2026 11:02:28 +0000</pubDate>
-            <sparkle:version>13</sparkle:version>
-            <sparkle:shortVersionString>0.3.1</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.3.1/Dashbar-0.3.1.dmg" length="4005857" type="application/octet-stream" sparkle:edSignature="bIRgY5Lil/WnNo2C9KYmoS+Si96Nj7nFVMLhUsB68EmgEm8PST1vBm8Bwn52OUG2pKlhQ+Os4Hk7cVBQSATFCQ=="/>
         </item>
     </channel>
 </rss>

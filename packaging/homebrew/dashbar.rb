@@ -1,6 +1,6 @@
 cask "dashbar" do
-  version "0.4.1"
-  sha256 "7c44eae4dd719a9d5ca9cd91e94d8f50b555477fe02c1e4c0a2d12a01153afdd"
+  version "0.5.0"
+  sha256 "23e581a56b2af0d8ad3a46917db7462d2ae63f83493637a2fb8840263f8d8a39"
 
   url "https://github.com/stevenmckinnon/dashbar/releases/download/v#{version}/Dashbar-#{version}.dmg"
   name "Dashbar"
