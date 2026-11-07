@@ -158,9 +158,15 @@ code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.88em
 .how { grid-column: 6 / span 3; }
 .how.brew { grid-column: 9 / span 4; }
 .how p { margin-top: 10px; color: var(--muted); }
-.how .btn { margin-top: 20px; }
+.how .btn { margin-top: 20px; white-space: nowrap; }
+/* Mid widths: the title takes its own row, so each way to install gets half the page */
+@media (max-width: 1180px) and (min-width: 901px) {
+  .install { grid-template-columns: 1fr 1fr; column-gap: 40px; row-gap: 32px; }
+  .install h2 { grid-column: 1 / -1; }
+  .how, .how.brew { grid-column: auto; }
+}
 .cmd { margin-top: 16px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; background: var(--surface); border-radius: 16px; padding: 16px; }
-.cmd code { flex: 1 1 100%; background: none; padding: 0; white-space: normal; overflow-wrap: anywhere; }
+.cmd code { flex: 1 1 100%; background: none; padding: 0; white-space: normal; overflow-wrap: break-word; }
 @media (max-width: 900px) {
   .install { display: block; padding-block: 72px; }
   .how { margin-top: 36px; }
