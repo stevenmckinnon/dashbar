@@ -19,6 +19,7 @@ GitHub Pages. Read `README.md` for what the app does; this file is how to work o
 | `release-notes/` | One `X.Y.Z.md` per release (bullets of user-facing changes). Feeds Sparkle's update dialog, the GitHub release and the site's "What's new" (`site/src/releases.js`, which only shows versions that are in `appcast.xml`) |
 | `docs/images/` | README pictures and the site's `og.png`; the site serves this folder as its public root. `og.png` is built from `scripts/og/og.html` by `scripts/render-og.sh` (headless Chrome); rerun it after re-rendering `overview-dark.png` |
 | `appcast.xml` | The update feed. Served from `raw.githubusercontent.com/.../main/appcast.xml` |
+| `scripts/stats.py`, `.github/workflows/stats.yml` | Daily copy of GitHub's release download counts (and repo traffic, with a `TRAFFIC_TOKEN` secret) to CSVs on the `stats` branch. Reads only what GitHub already keeps; the app is not involved |
 
 ## Run it
 

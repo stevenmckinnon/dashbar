@@ -1,0 +1,47 @@
+name: Save download stats
+
+# GitHub only keeps running totals for release downloads and 14 days of traffic, so once a day this saves
+# them to CSV files on the `stats` branch (kept off `main` so its history and your pushes stay clean).
+# Views and clones also need a TRAFFIC_TOKEN secret: a fine-grained token for this repo with
+# "Administration: read" (GITHUB_TOKEN cannot read traffic). Without it, only downloads are saved.
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: stats
+
+jobs:
+  save:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Open the stats branch
+        run: |
+          if git ls-remote --exit-code --heads origin stats >/dev/null; then
+            git fetch --depth=1 origin stats
+            git worktree add stats-data FETCH_HEAD
+            git -C stats-data switch -c stats
+          else
+            git worktree add --orphan -b stats stats-data
+          fi
+
+      - name: Read the numbers
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRAFFIC_TOKEN: ${{ secrets.TRAFFIC_TOKEN }}
+        run: python3 scripts/stats.py stats-data
+
+      - name: Save them
+        working-directory: stats-data
+        run: |
+          git add -A
+          if git diff --cached --quiet; then echo "Nothing new."; exit 0; fi
+          git -c user.name="github-actions[bot]" -c user.email="41898283+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "Stats for $(date -u +%F)"
+          git push origin stats
