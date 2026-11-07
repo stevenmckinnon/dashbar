@@ -3,6 +3,14 @@
     <channel>
         <title>Dashbar</title>
         <item>
+            <title>0.3.1</title>
+            <pubDate>Sat, 07 Nov 2026 11:02:28 +0000</pubDate>
+            <sparkle:version>13</sparkle:version>
+            <sparkle:shortVersionString>0.3.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.3.1/Dashbar-0.3.1.dmg" length="4005857" type="application/octet-stream" sparkle:edSignature="bIRgY5Lil/WnNo2C9KYmoS+Si96Nj7nFVMLhUsB68EmgEm8PST1vBm8Bwn52OUG2pKlhQ+Os4Hk7cVBQSATFCQ=="/>
+        </item>
+        <item>
             <title>0.3.0</title>
             <pubDate>Sat, 07 Nov 2026 00:33:32 +0000</pubDate>
             <sparkle:version>6</sparkle:version>
