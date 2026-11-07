@@ -9,11 +9,14 @@ enum DemoData {
         let home = "/Users/demo/Development"
 
         // Agents
+        // DASHBAR_DEMO_WAITING=1 makes billing-api's session stop for permission, to render the "needs you" state.
+        let waiting = ProcessInfo.processInfo.environment["DASHBAR_DEMO_WAITING"] != nil
         let sessions = [
             LiveSession(id: "s1", pid: 9001, name: "Add Stripe checkout and webhooks", cwd: "\(home)/storefront-web", status: "busy",
                         since: minutes(4), entrypoint: "cli", root: "\(home)/storefront-web"),
-            LiveSession(id: "s2", pid: 9002, name: "Fix flaky invoice export test", cwd: "\(home)/billing-api", status: "idle",
-                        since: minutes(38), entrypoint: "cli", root: "\(home)/billing-api"),
+            LiveSession(id: "s2", pid: 9002, name: "Fix flaky invoice export test", cwd: "\(home)/billing-api",
+                        status: waiting ? "waiting" : "idle", since: minutes(waiting ? 2 : 38), entrypoint: "cli",
+                        root: "\(home)/billing-api", waitingFor: waiting ? "permission prompt" : nil),
             LiveSession(id: "s3", pid: 9003, name: "Write docs for the plugin API", cwd: "\(home)/docs-site", status: "idle",
                         since: minutes(95), entrypoint: "claude-vscode", root: "\(home)/docs-site"),
             LiveSession(id: "s4", pid: 9004, name: "Migrate settings screen to SwiftUI", cwd: "\(home)/notes-ios", status: "idle",

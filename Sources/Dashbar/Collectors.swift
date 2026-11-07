@@ -12,9 +12,31 @@ struct LiveSession: Identifiable {
     let since: Date
     let entrypoint: String
     let root: String
+    /// Why Claude stopped to ask, while `status` is "waiting": "permission prompt", "input needed" or a dialog's own reason.
+    var waitingFor: String? = nil
 
     var project: String { URL(fileURLWithPath: root).lastPathComponent }
     var isBusy: Bool { status == "busy" }
+    /// Claude has stopped to ask for permission or an answer, and is blocked until someone replies.
+    var isWaiting: Bool { status == "waiting" }
+    /// Short form for status lines: "Needs permission".
+    var waitingLabel: String {
+        switch waitingFor {
+        case "permission prompt": return "Needs permission"
+        case "input needed": return "Needs input"
+        default: return "Waiting for you"
+        }
+    }
+    /// Sentence form for rows and notifications: "Claude needs permission".
+    var waitingSentence: String {
+        switch waitingFor {
+        case "permission prompt": return "Claude needs permission"
+        case "input needed": return "Claude needs input"
+        default: return "Claude is waiting for you"
+        }
+    }
+    /// Waiting first (someone has to act), then working, then idle.
+    var urgency: Int { isWaiting ? 0 : isBusy ? 1 : 2 }
     var surface: String {
         switch entrypoint {
         case "claude-desktop": return "Desktop"
@@ -45,9 +67,10 @@ enum ClaudeSessions {
                 status: o["status"] as? String ?? "unknown",
                 since: Date(timeIntervalSince1970: ms / 1000),
                 entrypoint: o["entrypoint"] as? String ?? "",
-                root: cwd.isEmpty ? homeDir.path : Fmt.root(fromCwd: cwd))
+                root: cwd.isEmpty ? homeDir.path : Fmt.root(fromCwd: cwd),
+                waitingFor: o["waitingFor"] as? String)
         }
-        return sessions.sorted { ($0.isBusy ? 0 : 1, $1.since) < ($1.isBusy ? 0 : 1, $0.since) }
+        return sessions.sorted { ($0.urgency, $1.since) < ($1.urgency, $0.since) }
     }
 
     static func isAlive(_ pid: Int32) -> Bool {

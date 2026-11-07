@@ -33,6 +33,9 @@ private enum UI {
     static let textSuccess = Color(light: .init(hex: 0x1A7F37), dark: .init(hex: 0x3FD06A))   // 5.1 / 7.1 — "working"
     static let textInfo = Color(light: .init(hex: 0x0B5CD5), dark: .init(hex: 0x80BBFF))      // 5.0 / 5.2 — ports, context OK
     static let textDanger = Color(light: .init(hex: 0xC4320A), dark: .init(hex: 0xFF6B5E))    // 5.5 / 5.1 — context nearly full, errors
+    static let textAttention = Color(light: .init(hex: 0x8A5C00), dark: .init(hex: 0xE3B341)) // 5.2 / 7.4 — waiting for you
+    /// Fills and dots for "waiting for you": amber, kept apart from Claude's coral and the problem red.
+    static let attention = Color(light: .init(hex: 0xBF8700), dark: .init(hex: 0xE3B341))
 
     /// Type scale: six sizes, each with one job.
     enum Size {
@@ -283,7 +286,7 @@ private struct Header: View {
     var body: some View {
         HStack(spacing: 7) {
             BrandMarkView(size: 18)
-            Text("Dashbar").font(.system(size: UI.Size.title, weight: .semibold))
+            Text("Dashbar").font(.system(size: UI.Size.title, weight: .semibold)).lineLimit(1)
             if BuildInfo.isLocal {
                 Text("Local").font(.system(size: UI.Size.caption, weight: .medium)).foregroundStyle(UI.textSecondary)
                     .padding(.horizontal, 7).padding(.vertical, 2)
@@ -293,7 +296,20 @@ private struct Header: View {
             Spacer()
             if store.paused {
                 Text("Paused").font(.system(size: UI.Size.caption, weight: .medium)).foregroundStyle(UI.textSecondary)
-            } else if store.busyCount > 0 {
+            }
+            if !store.paused, store.waitingCount > 0 {
+                HStack(spacing: 5) {
+                    StatusDot(active: false, waiting: true, size: 6)
+                    Text("\(store.waitingCount) \(store.waitingCount == 1 ? "needs" : "need") you")
+                }
+                .font(.system(size: UI.Size.caption, weight: .medium))
+                .foregroundStyle(UI.textAttention)
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .background(Capsule().fill(UI.attention.opacity(0.14)))
+                .fixedSize()
+                .help("Claude has stopped to ask for permission or an answer")
+            }
+            if !store.paused, store.busyCount > 0 {
                 HStack(spacing: 5) {
                     StatusDot(active: true, size: 6)
                     Text("\(store.busyCount) working")
@@ -302,6 +318,7 @@ private struct Header: View {
                 .foregroundStyle(UI.textSecondary)
                 .padding(.horizontal, 8).padding(.vertical, 3)
                 .background(Capsule().fill(Color.green.opacity(0.12)))
+                .fixedSize()   // with two status pills, the title gives way rather than a pill wrapping
             }
             IconButton(symbol: store.paused ? "play.fill" : "pause.fill",
                        help: store.paused ? "Resume live updates" : "Pause live updates") {
@@ -533,7 +550,7 @@ private struct NowCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                Monogram(name: workspace.name, root: workspace.root, active: workspace.isBusy, size: 32)
+                Monogram(name: workspace.name, root: workspace.root, active: workspace.isBusy, waiting: workspace.isWaiting, size: 32)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(workspace.name).font(.system(size: UI.Size.title, weight: .semibold)).lineLimit(1)
                         .help("\(workspace.name) — \(Fmt.tilde(workspace.root))")
@@ -570,16 +587,19 @@ private struct StatusPill: View {
     let workspace: Workspace
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
+            let waiting = workspace.sessions.first(where: \.isWaiting)
             let busy = workspace.sessions.first(where: \.isBusy)
-            let s = busy ?? workspace.sessions.first
+            let s = waiting ?? busy ?? workspace.sessions.first
             HStack(spacing: 5) {
-                StatusDot(active: busy != nil, size: 6)
-                Text(busy != nil ? "Working" : "Idle")
+                StatusDot(active: waiting == nil && busy != nil, waiting: waiting != nil, size: 6)
+                Text(waiting.map(\.waitingLabel) ?? (busy != nil ? "Working" : "Idle"))
+                    .foregroundStyle(waiting != nil ? AnyShapeStyle(UI.textAttention) : AnyShapeStyle(.primary))
                 if let s { Text(Fmt.ago(s.since, now: ctx.date)).foregroundStyle(UI.textSecondary) }
             }
             .font(.system(size: UI.Size.caption, weight: .medium).monospacedDigit())
             .padding(.horizontal, 8).padding(.vertical, 4)
-            .background(Capsule().fill((busy != nil ? Color.green : Color.primary).opacity(busy != nil ? 0.12 : 0.06)))
+            .background(Capsule().fill(waiting != nil ? UI.attention.opacity(0.14)
+                                       : (busy != nil ? Color.green : Color.primary).opacity(busy != nil ? 0.12 : 0.06)))
         }
     }
 }
@@ -812,7 +832,7 @@ private struct WorkspaceRow: View {
 
     private var header: some View {
         HStack(spacing: 10) {
-            Monogram(name: workspace.name, root: workspace.root, active: workspace.isBusy, size: 28)
+            Monogram(name: workspace.name, root: workspace.root, active: workspace.isBusy, waiting: workspace.isWaiting, size: 28)
             VStack(alignment: .leading, spacing: 2) {
                 Text(workspace.name).font(.system(size: UI.Size.emphasis, weight: .semibold)).lineLimit(1).truncationMode(.middle)
                 WorkspaceStatus(workspace: workspace)
@@ -861,7 +881,8 @@ private struct WorkspaceStatus: View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
             Text(text(now: ctx.date))
                 .font(.system(size: UI.Size.caption).monospacedDigit())
-                .foregroundStyle(workspace.isBusy ? AnyShapeStyle(UI.textSuccess) : AnyShapeStyle(UI.textSecondary))
+                .foregroundStyle(workspace.isWaiting ? AnyShapeStyle(UI.textAttention)
+                                 : workspace.isBusy ? AnyShapeStyle(UI.textSuccess) : AnyShapeStyle(UI.textSecondary))
                 .lineLimit(1)
         }
     }
@@ -869,6 +890,9 @@ private struct WorkspaceStatus: View {
     private func text(now: Date) -> String {
         let s = workspace.sessions
         let more = s.count > 1 ? " · \(s.count - 1) more" : ""
+        if let waiting = s.first(where: \.isWaiting) {
+            return "\(waiting.waitingSentence) · \(Fmt.ago(waiting.since, now: now))" + more
+        }
         if let busy = s.first(where: \.isBusy) {
             return "Claude is working · \(Fmt.ago(busy.since, now: now))" + more
         }
@@ -887,11 +911,11 @@ private struct SessionLine: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
             HStack(spacing: 8) {
-                StatusDot(active: session.isBusy, size: 7)
+                StatusDot(active: session.isBusy, waiting: session.isWaiting, size: 7)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(session.name).font(.system(size: UI.Size.body, weight: .medium)).lineLimit(1)
                         .help("\(session.name)\n\(Fmt.tilde(session.cwd))")
-                    Text("\(session.isBusy ? "Working" : session.status.capitalized) \(Fmt.ago(session.since, now: ctx.date)) · \(session.surface)"
+                    Text("\(session.isWaiting ? session.waitingLabel : session.isBusy ? "Working" : session.status.capitalized) \(Fmt.ago(session.since, now: ctx.date)) · \(session.surface)"
                          + (store.spawned[session.pid]?.portsText.map { " · " + $0 } ?? ""))
                         .font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary).lineLimit(1)
                         .help(store.spawned[session.pid]?.tooltip ?? "")
@@ -1914,6 +1938,8 @@ private struct Monogram: View {
     let name: String
     var root: String? = nil
     let active: Bool
+    /// An agent here is waiting for you: the dot turns amber.
+    var waiting = false
     var size: CGFloat = 28
     @State private var icon: NSImage?
 
@@ -1932,14 +1958,16 @@ private struct Monogram: View {
                 }
             }
             .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
-            if active {
+            if active || waiting {
                 // Punch a ring out of the tile so the dot reads cleanly on any surface.
                 Circle().frame(width: dot + 3, height: dot + 3).offset(x: 2.5, y: 2.5).blendMode(.destinationOut)
             }
         }
         .compositingGroup()
         .overlay(alignment: .bottomTrailing) {
-            if active { Circle().fill(Color.green).frame(width: dot, height: dot).offset(x: 1, y: 1) }
+            if active || waiting {
+                Circle().fill(waiting ? UI.attention : Color.green).frame(width: dot, height: dot).offset(x: 1, y: 1)
+            }
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)
@@ -1954,6 +1982,8 @@ private struct Monogram: View {
 private struct StatusDot: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let active: Bool
+    /// Waiting for you: a steady amber dot. Working pulses green; waiting holds still until someone acts.
+    var waiting = false
     var size: CGFloat = 7
     @State private var pulse = false
 
@@ -1976,7 +2006,10 @@ private struct StatusDot: View {
                         }
                 }
             }
-            Circle().fill(active ? Color.green : Color.secondary.opacity(0.5)).frame(width: size, height: size)
+            if waiting {
+                Circle().fill(UI.attention.opacity(0.25)).frame(width: size * 1.8, height: size * 1.8)
+            }
+            Circle().fill(waiting ? UI.attention : active ? Color.green : Color.secondary.opacity(0.5)).frame(width: size, height: size)
         }
         .frame(width: size * 2, height: size * 2)
         .accessibilityHidden(true)

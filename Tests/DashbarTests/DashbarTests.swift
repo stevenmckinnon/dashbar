@@ -377,6 +377,72 @@ private func session(id: String, root: String = "/dev/app", busy: Bool = false, 
     }
 }
 
+// MARK: - Waiting for you
+
+@Suite struct WaitingTests {
+    func live(_ id: String, _ status: String, waitingFor: String? = nil) -> LiveSession {
+        LiveSession(id: id, pid: 1, name: id, cwd: "/dev/\(id)", status: status, since: Date(), entrypoint: "cli",
+                    root: "/dev/\(id)", waitingFor: waitingFor)
+    }
+
+    @Test func aWaitingSessionIsReadFromItsFileAndSortsFirst() throws {
+        let fx = try Fixture(); defer { fx.remove() }
+        let me = Int(ProcessInfo.processInfo.processIdentifier)
+        let now = Date().timeIntervalSince1970 * 1000
+        try JSONSerialization.data(withJSONObject: [
+            "pid": me, "sessionId": "busy", "cwd": "/Users/x/dev/a", "status": "busy", "statusUpdatedAt": now,
+        ]).write(to: fx.root.appendingPathComponent("1.json"))
+        try JSONSerialization.data(withJSONObject: [   // the shape Claude Code writes when it stops to ask
+            "pid": me, "sessionId": "asks", "cwd": "/Users/x/dev/b", "status": "waiting",
+            "waitingFor": "permission prompt", "statusUpdatedAt": now - 60_000,
+        ]).write(to: fx.root.appendingPathComponent("2.json"))
+        let sessions = ClaudeSessions.read(dir: fx.root)
+        #expect(sessions.map(\.id) == ["asks", "busy"])
+        #expect(sessions.first?.isWaiting == true)
+        #expect(sessions.first?.isBusy == false)
+        #expect(sessions.first?.waitingLabel == "Needs permission")
+    }
+
+    @Test func labelsFollowWhatItIsWaitingFor() {
+        #expect(live("a", "waiting", waitingFor: "permission prompt").waitingSentence == "Claude needs permission")
+        #expect(live("a", "waiting", waitingFor: "input needed").waitingLabel == "Needs input")
+        #expect(live("a", "waiting", waitingFor: "dialog open").waitingSentence == "Claude is waiting for you")
+        #expect(live("a", "waiting").waitingLabel == "Waiting for you")
+    }
+
+    @Test func workspacesWithAWaitingAgentComeFirst() {
+        let ws = Workspace.build(sessions: [live("busy", "busy"), live("asks", "waiting")], servers: [])
+        #expect(ws.map(\.name) == ["asks", "busy"])
+        #expect(ws.first?.isWaiting == true)
+    }
+
+    @Test func stoppingToAskIsNotFinishing() {
+        var t = SessionTransitions()
+        let start = Date(timeIntervalSince1970: 1_000)
+        _ = t.update([live("s", "idle")], now: start)                            // baseline
+        #expect(t.update([live("s", "busy")], now: start.addingTimeInterval(1)).isEmpty)
+        let asks = t.update([live("s", "waiting", waitingFor: "permission prompt")], now: start.addingTimeInterval(60))
+        #expect(asks == [.waiting(id: "s")])                                     // not "finished"
+        #expect(t.update([live("s", "waiting")], now: start.addingTimeInterval(61)).isEmpty)   // once per ask
+        #expect(t.update([live("s", "busy")], now: start.addingTimeInterval(90)).isEmpty)      // answered: work resumes
+        let done = t.update([live("s", "idle")], now: start.addingTimeInterval(121))
+        #expect(done == [.finished(id: "s", after: 120)])                        // timed from when the work began
+    }
+
+    @Test func sessionsAlreadyWaitingAtLaunchDontNotify() {
+        var t = SessionTransitions()
+        #expect(t.update([live("s", "waiting")], now: Date()).isEmpty)
+    }
+
+    @Test func shortTurnsDontCountAsFinished() {
+        var t = SessionTransitions()
+        let start = Date(timeIntervalSince1970: 1_000)
+        _ = t.update([], now: start)
+        _ = t.update([live("s", "busy")], now: start)
+        #expect(t.update([live("s", "idle")], now: start.addingTimeInterval(5)).isEmpty)
+    }
+}
+
 // MARK: - Plan limit alerts
 
 @Suite struct LimitAlertTests {

@@ -53,6 +53,8 @@ struct MenuBarLabel: View {
         let s = store.system
         var parts: [Text] = []
         if busy > 0 { parts.append(Text("\(busy)")) }
+        let waiting = store.waitingCount
+        if waiting > 0 { parts.append(Text("\(Image(systemName: "hand.raised.fill")) \(waiting)")) }
         if settings.menuCPU {
             parts.append(Text("\(Image(systemName: "cpu")) \(Int((s.cpu * 100).rounded()))%"))
         }

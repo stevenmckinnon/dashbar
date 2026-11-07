@@ -31,6 +31,7 @@ final class Store: ObservableObject {
     @Published var notice: String?
 
     var busyCount: Int { sessions.filter(\.isBusy).count }
+    var waitingCount: Int { sessions.filter(\.isWaiting).count }
     var devListeners: [Listener] { listeners.filter(\.isDev) }
     var otherListeners: [Listener] { listeners.filter { !$0.isDev } }
     /// Dev servers that belong to a repo appear inside workspaces…
@@ -44,9 +45,11 @@ final class Store: ObservableObject {
     }
     var cleanupTotal: UInt64 { cleanup.reduce(0) { $0 + $1.size } }
 
-    /// The workspace worth featuring: one with a working agent, else the one whose agent changed state most recently.
+    /// The workspace worth featuring: one whose agent is waiting for you, then one with a working agent, else the one
+    /// whose agent changed state most recently.
     var featured: Workspace? {
         let ws = workspaces
+        if let waiting = ws.first(where: \.isWaiting) { return waiting }
         if let busy = ws.first(where: \.isBusy) { return busy }
         return ws.filter { !$0.sessions.isEmpty }.max {
             ($0.sessions.map(\.since).max() ?? .distantPast) < ($1.sessions.map(\.since).max() ?? .distantPast)
@@ -56,7 +59,7 @@ final class Store: ObservableObject {
     private let worker = Worker()
     private let notifier = Notifier()
     private let settings = AppSettings.shared
-    private var busySince: [String: Date] = [:]
+    private var transitions = SessionTransitions()
     private var tick = 0
     private var timer: Timer?
     private var subscriptions = Set<AnyCancellable>()
@@ -238,16 +241,14 @@ final class Store: ObservableObject {
     }
 
     private func trackTransitions(_ new: [LiveSession]) {
-        let now = Date()
-        for s in new {
-            if s.isBusy {
-                if busySince[s.id] == nil { busySince[s.id] = now }
-            } else if let start = busySince.removeValue(forKey: s.id), now.timeIntervalSince(start) >= 20 {
-                notifier.finished(s, after: now.timeIntervalSince(start))
+        for event in transitions.update(new, now: Date()) {
+            switch event {
+            case .finished(let id, let after):
+                if let s = new.first(where: { $0.id == id }) { notifier.finished(s, after: after) }
+            case .waiting(let id):
+                if let s = new.first(where: { $0.id == id }) { notifier.waiting(s) }
             }
         }
-        let live = Set(new.map(\.id))
-        busySince = busySince.filter { live.contains($0.key) }
     }
 
     /// `panel` adds what only the open panel shows (other agent processes, busiest apps) and implies `system`.
@@ -355,5 +356,43 @@ struct SurfaceVisibility {
         let before = anyVisible
         if isVisible { visible.insert(surface) } else { visible.remove(surface) }
         return anyVisible != before
+    }
+}
+
+/// Turns successive session readings into the moments worth a notification: an agent finishing a stretch of work,
+/// or stopping to ask for permission or input.
+struct SessionTransitions {
+    enum Event: Equatable {
+        case finished(id: String, after: TimeInterval)
+        case waiting(id: String)
+    }
+
+    /// Short turns aren't worth interrupting anyone for.
+    static let minimumWork: TimeInterval = 20
+
+    private var busySince: [String: Date] = [:]
+    private var waiting = Set<String>()
+    private var primed = false
+
+    mutating func update(_ sessions: [LiveSession], now: Date) -> [Event] {
+        var events: [Event] = []
+        for s in sessions {
+            if s.isWaiting {
+                // Asking isn't finishing: the work it started carries on once someone replies.
+                if waiting.insert(s.id).inserted, primed { events.append(.waiting(id: s.id)) }
+                continue
+            }
+            waiting.remove(s.id)
+            if s.isBusy {
+                if busySince[s.id] == nil { busySince[s.id] = now }
+            } else if let start = busySince.removeValue(forKey: s.id), now.timeIntervalSince(start) >= Self.minimumWork {
+                events.append(.finished(id: s.id, after: now.timeIntervalSince(start)))
+            }
+        }
+        let live = Set(sessions.map(\.id))
+        busySince = busySince.filter { live.contains($0.key) }
+        waiting = waiting.filter { live.contains($0) }
+        primed = true   // the first reading is a baseline: sessions already waiting at launch don't notify
+        return events
     }
 }

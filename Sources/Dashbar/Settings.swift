@@ -91,6 +91,7 @@ private struct GeneralSettings: View {
     @ObservedObject private var settings = AppSettings.shared
     @AppStorage(Notifier.defaultsKey) private var notify = true
     @AppStorage(Notifier.limitsKey) private var notifyLimits = true
+    @AppStorage(Notifier.waitingKey) private var notifyWaiting = true
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -112,6 +113,8 @@ private struct GeneralSettings: View {
             }
             Section {
                 Toggle("Notify when an agent finishes", isOn: $notify)
+                Toggle("Notify when an agent needs you", isOn: $notifyWaiting)
+                    .help("When Claude stops to ask for permission or an answer.")
                 Toggle("Notify when a plan limit runs low", isOn: $notifyLimits)
                     .help("At 80%, when it's on course to run out before it resets, and when it's used up. Once per window.")
                 Toggle("Launch at login", isOn: $launchAtLogin)

@@ -12,6 +12,9 @@ struct Workspace: Identifiable {
 
     var name: String { URL(fileURLWithPath: root).lastPathComponent }
     var isBusy: Bool { sessions.contains(where: \.isBusy) }
+    var isWaiting: Bool { sessions.contains(where: \.isWaiting) }
+    /// Same order as sessions: waiting, then working, then the rest.
+    var urgency: Int { sessions.map(\.urgency).min() ?? 2 }
     var ports: [Int] { Array(Set(servers.map(\.port))).sorted() }
     /// Counted once per process, since one process can listen on several ports.
     var memory: UInt64 { Dictionary(grouping: servers, by: \.pid).values.reduce(0) { $0 + ($1.first?.memory ?? 0) } }
@@ -30,8 +33,8 @@ struct Workspace: Identifiable {
         for s in sessions { map[s.root, default: Workspace(root: s.root)].sessions.append(s) }
         for l in servers { if let r = l.root { map[r, default: Workspace(root: r)].servers.append(l) } }
         return map.values.sorted {
-            ($0.isBusy ? 0 : 1, $0.sessions.isEmpty ? 1 : 0, $0.name.lowercased())
-                < ($1.isBusy ? 0 : 1, $1.sessions.isEmpty ? 1 : 0, $1.name.lowercased())
+            ($0.urgency, $0.sessions.isEmpty ? 1 : 0, $0.name.lowercased())
+                < ($1.urgency, $1.sessions.isEmpty ? 1 : 0, $1.name.lowercased())
         }
     }
 }
@@ -248,6 +251,7 @@ enum Launcher {
 final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     static let defaultsKey = "notifyOnFinish"
     static let limitsKey = "notifyOnLimits"
+    static let waitingKey = "notifyOnWaiting"
     /// Opens the plan limits (set by the store). Called when a limit notification is clicked.
     var openLimits: (() -> Void)?
     /// UNUserNotificationCenter crashes outside an .app bundle (e.g. `swift run`, snapshots).
@@ -255,7 +259,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
 
     func setup() {
         guard available else { return }
-        UserDefaults.standard.register(defaults: [Self.defaultsKey: true, Self.limitsKey: true])
+        UserDefaults.standard.register(defaults: [Self.defaultsKey: true, Self.limitsKey: true, Self.waitingKey: true])
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
@@ -269,6 +273,16 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         content.sound = .default
         content.userInfo = ["root": s.root]
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: s.id + "-\(Date().timeIntervalSince1970)", content: content, trigger: nil))
+    }
+
+    func waiting(_ s: LiveSession) {
+        guard available, UserDefaults.standard.bool(forKey: Self.waitingKey) else { return }
+        let content = UNMutableNotificationContent()
+        content.title = s.name
+        content.body = "\(s.waitingSentence) in \(s.project)."
+        content.sound = .default
+        content.userInfo = ["root": s.root]
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: s.id + "-waiting-\(Date().timeIntervalSince1970)", content: content, trigger: nil))
     }
 
     func limit(_ alert: LimitAlert) {
