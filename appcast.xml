@@ -3,6 +3,20 @@
     <channel>
         <title>Dashbar</title>
         <item>
+            <title>0.6.0</title>
+            <pubDate>Sat, 07 Nov 2026 17:09:23 +0000</pubDate>
+            <sparkle:version>49</sparkle:version>
+            <sparkle:shortVersionString>0.6.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[- **The Dashbar window**: the pop-out button or ⌃⌥D now opens Dashbar as a full window, with Overview, Agents, Servers, System, Clean-up and every running workspace in a sidebar. The menu bar panel stays the quick glance
+- **A page for each workspace**: its uptime, CPU, memory and energy, adding up its dev servers, its agents and everything they started, with its dev servers, agents and the processes behind the numbers. Open it from the sidebar, a workspace card, or the name or chart button in the panel
+- A filter at the top of the sidebar (⌘K) narrows the workspaces and the page you're on
+- On macOS 26 and later, the filter fields and the window's buttons use Liquid Glass
+- The window shows the checked-out git branch for each workspace
+]]></description>
+            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.6.0/Dashbar-0.6.0.dmg" length="5180957" type="application/octet-stream" sparkle:edSignature="RTmQ9dU16X1BT+CF/6AIg4De+w2u924oipP+rNh51ve2rYL91ywjQZwrh+p/bsJcLbTqsmKo8nyHxrNEBmwmAQ=="/>
+        </item>
+        <item>
             <title>0.5.2</title>
             <pubDate>Sat, 07 Nov 2026 14:07:34 +0000</pubDate>
             <sparkle:version>43</sparkle:version>
@@ -23,21 +37,6 @@
             <description sparkle:format="markdown"><![CDATA[- Clearer when Claude rate-limits plan usage: a calm message with a countdown, and Dashbar now retries as soon as the wait ends
 ]]></description>
             <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.5.1/Dashbar-0.5.1.dmg" length="4689681" type="application/octet-stream" sparkle:edSignature="31OCjSrLMvZqGHv/dubtV6/i2gswu9WLmsDAmEUnESqpXGclISJmdZ2+neKd9/vFMAS4FJncr5MbN3bYAmnEAQ=="/>
-        </item>
-        <item>
-            <title>0.5.0</title>
-            <pubDate>Sat, 07 Nov 2026 13:50:20 +0000</pubDate>
-            <sparkle:version>36</sparkle:version>
-            <sparkle:shortVersionString>0.5.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[- **Plan limit alerts**: a notification when a Claude or Codex limit reaches 80%, when it's on course to run out before it resets, and when it's used up. Once per window
-- **Needs you**: when Claude stops to ask for permission or an answer, Dashbar shows it in amber, puts it first, counts it beside the menu bar icon and can notify you. A permission prompt no longer sends a false "finished" notification
-- **⌃⌥D** opens the Dashbar window from anywhere, and closes it again
-- Each new notification can be turned off in Settings
-- Claude plan limits cope with Claude's rate limiting: Dashbar waits before asking again and keeps showing the last reading, instead of an error
-- Superset is recognised among running agent apps, and card titles line up with their contents
-]]></description>
-            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.5.0/Dashbar-0.5.0.dmg" length="4681605" type="application/octet-stream" sparkle:edSignature="xzR90v7gUx7Ye0fHZDZM8Vs7nxy5mTMfdm4/j6AzncMwcsXiPdfJhwuEUC3gP1+cNPYrVnT2a4zNJLvao6yVDA=="/>
         </item>
     </channel>
 </rss>
