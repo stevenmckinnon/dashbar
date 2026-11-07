@@ -90,15 +90,16 @@ the real app's preferences, so reset it afterwards (`defaults write fun.dashbar.
 
 Only when the user asks. A release publishes publicly and cannot be quietly undone.
 
-1. Write `release-notes/X.Y.Z.md` (Markdown, what changed for users). Sparkle shows it in the update dialog
-   and step 4 reuses it for the GitHub release. `release.sh` refuses to run without it.
+1. Write `release-notes/X.Y.Z.md` (Markdown, what changed for users). Sparkle shows it in the update dialog,
+   the site's "What's new" and step 5's GitHub release all use it. `release.sh` refuses to run without it.
 2. `swift test`, then `git push origin main` with everything committed.
 3. `scripts/release.sh X.Y.Z`: builds a universal app, signs it with the Developer ID certificate, notarises
    through the `dashbar-notary` keychain profile, staples, and adds the entry to `appcast.xml`. If signing the
    DMG fails once with `errSecInternalComponent`, rerun it.
 4. Put the printed SHA-256 into `packaging/homebrew/dashbar.rb` (version and sha256), commit `appcast.xml`
    and the cask, push, then `git tag vX.Y.Z && git push origin vX.Y.Z`.
-5. `gh release create vX.Y.Z build/Dashbar-X.Y.Z.dmg --title "Dashbar X.Y.Z" --notes-file release-notes/X.Y.Z.md`.
+5. `gh release create vX.Y.Z build/Dashbar-X.Y.Z.dmg --title "Dashbar X.Y.Z" --notes-file build/github-release-X.Y.Z.md`
+   (`release.sh` builds that body from the notes file plus the install line and SHA-256).
 6. Copy the cask into `stevenmckinnon/homebrew-tap` under `Casks/dashbar.rb` and push.
 7. Pushing to `main` redeploys the site (`.github/workflows/pages.yml`). Check the run and the live page.
 

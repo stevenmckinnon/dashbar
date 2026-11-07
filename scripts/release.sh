@@ -70,7 +70,17 @@ fi
 xcrun notarytool submit "$DMG" --keychain-profile "$PROFILE" --wait
 xcrun stapler staple "$DMG"
 spctl --assess --type open --context context:primary-signature --verbose "$DMG"
-shasum -a 256 "$DMG"
+SHA=$(shasum -a 256 "$DMG" | awk '{print $1}')
+echo "SHA-256: $SHA"
+
+# The GitHub release body: the notes, then how to install and the checksum (the cask needs it too).
+GITHUB_NOTES="build/github-release-$VERSION.md"
+{
+  echo "**What's new**"
+  cat "$NOTES"
+  printf '\n**Install:** open the DMG and drag Dashbar to Applications. Signed with a Developer ID and notarised by Apple. Requires macOS 14 or later.\n'
+  printf '\nSHA-256: `%s`\n' "$SHA"
+} > "$GITHUB_NOTES"
 
 # Update feed: Sparkle signs the finished DMG with the key in the Keychain and adds an entry to appcast.xml.
 # Run after stapling, since stapling changes the file. Commit appcast.xml once the GitHub release exists.
@@ -84,4 +94,4 @@ cp "$NOTES" "$FEED_STAGE/Dashbar-$VERSION.md"   # generate_appcast matches notes
 cp "$FEED_STAGE/appcast.xml" appcast.xml
 rm -rf "$FEED_STAGE"
 echo "Updated appcast.xml"
-echo "Ready to upload: $DMG (gh release create v$VERSION $DMG --notes-file $NOTES)"
+echo "Ready to upload: $DMG (gh release create v$VERSION $DMG --title \"Dashbar $VERSION\" --notes-file $GITHUB_NOTES)"
