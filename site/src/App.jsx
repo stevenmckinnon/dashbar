@@ -59,7 +59,7 @@ function Hero() {
         </ul>
       </nav>
       <div className="hero">
-        <div>
+        <div className="hero-copy">
           <h1 id="top">Your agents, in the menu bar</h1>
           <p className="lede">Dashbar shows which <b>Claude Code</b> and <b>Codex</b> sessions are working, how much of your plan is left, and which dev servers are idling. Free and open source.</p>
           <div className="actions">

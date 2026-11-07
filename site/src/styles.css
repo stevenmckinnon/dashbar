@@ -66,7 +66,9 @@ code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.88em
 @media (max-width: 760px) { .nav ul li:not(:last-child) { display: none; } }
 
 /* ---------- Hero ---------- */
-.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: 64px; align-items: center; padding-block: 48px 120px; }
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: 64px; align-items: start; padding-block: 48px 120px; }
+/* Top-aligned, not centred on the tall demo: centred, the headline sat a third of the way down a laptop screen. */
+.hero-copy { padding-top: clamp(0px, 9vh, 88px); }
 .hero h1 { font-size: clamp(3rem, 5.4vw, 5.25rem); }
 .lede { margin-top: 28px; max-width: 36ch; font-size: var(--step-lead); line-height: 1.4; color: var(--muted); }
 .lede b { color: var(--ink); font-weight: 600; }
@@ -80,6 +82,7 @@ code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.88em
 @media (hover: hover) { .replay:hover { color: var(--ink); } }
 @media (max-width: 900px) {
   .hero { grid-template-columns: 1fr; gap: 48px; padding-block: 24px 80px; }
+  .hero-copy { padding-top: 0; }
   .hero h1 { font-size: 11vw; }
   .demo { margin-inline: auto; }
 }
