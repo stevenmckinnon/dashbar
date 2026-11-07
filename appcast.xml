@@ -1,0 +1,14 @@
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>Dashbar</title>
+        <item>
+            <title>0.3.0</title>
+            <pubDate>Sat, 07 Nov 2026 00:33:32 +0000</pubDate>
+            <sparkle:version>6</sparkle:version>
+            <sparkle:shortVersionString>0.3.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.3.0/Dashbar-0.3.0.dmg" length="3941713" type="application/octet-stream" sparkle:edSignature="YaFpWzTlHVOxz+TkqDHnDoPZc8GBl1CdSSlZEc9nTTJuO4zB9XkwElzo9Z3nuU0T0tEAmajJmyGqNrRaAWA/Cg=="/>
+        </item>
+    </channel>
+</rss>
