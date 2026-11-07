@@ -6,3 +6,6 @@ node_modules/
 site/dist/
 .taste-skill/
 .vscode/
+
+# The installer window background (1x and @2x) is a committed image.
+!packaging/dmg/*.png

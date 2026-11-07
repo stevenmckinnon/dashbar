@@ -13,6 +13,7 @@ GitHub Pages. Read `README.md` for what the app does; this file is how to work o
 | `Tests/DashbarTests/` | Swift Testing suites that run against throwaway log folders (`Fixtures.swift`) |
 | `build.sh` | Builds the app into `build/`, signs it, embeds Sparkle. A local build is `Dashbar Local.app`; `scripts/release.sh` (via `DASHBAR_HARDENED=1`) makes the real `Dashbar.app`. Flags: `--run`, `--install` |
 | `scripts/release.sh` | Signed, notarised, stapled DMG plus the Sparkle `appcast.xml` entry |
+| `scripts/make-dmg.sh`, `packaging/dmg/` | The styled installer window (arrow, caption, icon positions), built with `dmgbuild` (`pip3 install dmgbuild`). `make-background.sh` redraws `background.png`; it is 1x only because macOS 27's Finder mis-sized every Retina variant |
 | `packaging/homebrew/dashbar.rb` | The cask. The live copy is in the separate `stevenmckinnon/homebrew-tap` repo |
 | `site/` | Vite and React product site. `src/demos/` holds the Stageshow demos, `src/stageshow/` the vendored kit (MIT, see its `NOTICE.md`), `src/faq.js` the FAQ (also written into `index.html` as structured data at build time) |
 | `release-notes/` | One `X.Y.Z.md` per release (bullets of user-facing changes). Feeds Sparkle's update dialog, the GitHub release and the site's "What's new" (`site/src/releases.js`, which only shows versions that are in `appcast.xml`) |

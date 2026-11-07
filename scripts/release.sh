@@ -13,6 +13,7 @@
 #   3. Create an app-specific password at account.apple.com, then store a notary profile:
 #        xcrun notarytool store-credentials dashbar-notary --apple-id YOU@EXAMPLE.COM --team-id TEAMID
 #      (use another profile name with NOTARY_PROFILE=name).
+#   4. The installer window is built with dmgbuild: pip3 install dmgbuild. Its layout is in packaging/dmg/.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -53,12 +54,7 @@ DETAILS=$(codesign -dv "$APP" 2>&1)
 lipo -archs "$APP/Contents/MacOS/Dashbar"
 
 DMG="build/Dashbar-$VERSION.dmg"
-STAGE=$(mktemp -d)
-cp -R "$APP" "$STAGE/"
-ln -s /Applications "$STAGE/Applications"
-rm -f "$DMG"
-hdiutil create -quiet -volname "Dashbar" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
-rm -rf "$STAGE"
+scripts/make-dmg.sh "$APP" "$DMG"   # the styled installer window (needs dmgbuild)
 [[ -n "$IDENTITY" ]] && codesign --force --sign "$IDENTITY" --timestamp "$DMG"
 echo "Built $DMG"
 
