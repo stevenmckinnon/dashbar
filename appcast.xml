@@ -3,6 +3,17 @@
     <channel>
         <title>Dashbar</title>
         <item>
+            <title>0.4.0</title>
+            <pubDate>Sat, 07 Nov 2026 11:30:59 +0000</pubDate>
+            <sparkle:version>20</sparkle:version>
+            <sparkle:shortVersionString>0.4.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[- **Open in a window**: a new button in the panel header opens the dashboard in its own window, handy on a second display. It keeps the panel's width, resizes in height, and has a pin to keep it on top
+- **T3 Code** now shows up among the agent apps Dashbar spots running
+]]></description>
+            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.4.0/Dashbar-0.4.0.dmg" length="4031630" type="application/octet-stream" sparkle:edSignature="jf4I/s4/0RIoE06vMz993RKKqu57Q7dvbonmqOH5f8CJjDe7Q2OMsZhq0OeQOBF7W3XufXRwXKzCFDweiRjuBQ=="/>
+        </item>
+        <item>
             <title>0.3.1</title>
             <pubDate>Sat, 07 Nov 2026 11:02:28 +0000</pubDate>
             <sparkle:version>13</sparkle:version>
