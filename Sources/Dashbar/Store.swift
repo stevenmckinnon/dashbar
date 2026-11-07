@@ -62,8 +62,8 @@ final class Store: ObservableObject {
     private var subscriptions = Set<AnyCancellable>()
     private var watcher: FileWatcher?
     /// Which windows (the menu bar panel, the popout) are on screen, as reported by their views. Closed until one opens.
-    private var visibleSurfaces = Set<String>()
-    private var panelVisible: Bool { !visibleSurfaces.isEmpty }
+    private var surfaces = SurfaceVisibility()
+    private var panelVisible: Bool { surfaces.anyVisible }
     /// Demo stores hold invented data and never collect anything.
     private var isDemo = false
 
@@ -141,9 +141,7 @@ final class Store: ObservableObject {
     /// Each window reports on its own, so closing one doesn't pause updates for the other.
     func setPanelVisible(_ visible: Bool, surface: String = "panel") {
         guard !isDemo else { return }
-        let wasVisible = panelVisible
-        if visible { visibleSurfaces.insert(surface) } else { visibleSurfaces.remove(surface) }
-        guard panelVisible != wasVisible else { return }
+        guard surfaces.set(visible, surface: surface) else { return }
         if visible && !paused {
             refresh(usage: false, servers: true, panel: true)   // fresh on open
             if let fetched = claudePlan?.fetchedAt, Date().timeIntervalSince(fetched) > 120 { refreshClaudePlan() }
@@ -320,5 +318,19 @@ final class Worker: @unchecked Sendable {
             let items = Cleanup.scan(roots: roots)
             DispatchQueue.main.async { done(items) }
         }
+    }
+}
+
+/// Which of Dashbar's windows (the menu bar panel, the popout) are on screen. Updates run while any is, so closing
+/// one never pauses them for the other.
+struct SurfaceVisibility {
+    private var visible = Set<String>()
+    var anyVisible: Bool { !visible.isEmpty }
+
+    /// Records one window's state. Returns whether "is anything visible" changed, which is when the store reacts.
+    mutating func set(_ isVisible: Bool, surface: String) -> Bool {
+        let before = anyVisible
+        if isVisible { visible.insert(surface) } else { visible.remove(surface) }
+        return anyVisible != before
     }
 }

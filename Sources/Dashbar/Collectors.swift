@@ -72,6 +72,7 @@ enum AgentProcesses {
         "amp": "Amp", "goose": "Goose", "copilot": "Copilot CLI",
         "ollama": "Ollama", "LM Studio": "LM Studio",
         "T3 Code": "T3 Code", "T3 Code (Beta)": "T3 Code", "T3 Code (Alpha)": "T3 Code",
+        "Superset": "Superset",
     ]
 
     /// Apps that run a second copy of their own binary as a helper, so they count once however many show up.

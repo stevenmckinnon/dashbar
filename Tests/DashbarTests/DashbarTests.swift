@@ -363,12 +363,52 @@ private func session(id: String, root: String = "/dev/app", busy: Bool = false, 
         #expect(found.first?.count == 2)
     }
 
+    @Test func supersetIsRecognised() {
+        let found = AgentProcesses.read(executables: ["/Applications/Superset.app/Contents/MacOS/Superset"])
+        #expect(found.map(\.name) == ["Superset"])
+    }
+
     @Test func t3CodeShowsOnceEvenThoughItRunsItsBinaryTwice() {
         let app = "/Applications/T3 Code (Beta).app/Contents/MacOS/T3 Code (Beta)"
         let found = AgentProcesses.read(executables: [app, app,
             "/Applications/T3 Code (Beta).app/Contents/Frameworks/T3 Code (Beta) Helper.app/Contents/MacOS/T3 Code (Beta) Helper"])
         #expect(found.map(\.name) == ["T3 Code"])
         #expect(found.first?.count == 1)
+    }
+}
+
+// MARK: - Window visibility
+
+@Suite struct SurfaceVisibilityTests {
+    /// The store only reacts when "is anything visible" flips, so each report returns whether it did.
+    private func report(_ v: inout SurfaceVisibility, _ visible: Bool, _ surface: String) -> Bool {
+        v.set(visible, surface: surface)
+    }
+
+    @Test func theStoreOnlyReactsWhenTheFirstWindowOpensOrTheLastCloses() {
+        var v = SurfaceVisibility()
+        let panelOpens = report(&v, true, "panel")        // first window opens: updates start
+        let popoutOpens = report(&v, true, "popout")      // a second one changes nothing
+        let panelCloses = report(&v, false, "panel")      // closing the panel must not pause the popout
+        #expect(panelOpens)
+        #expect(!popoutOpens)
+        #expect(!panelCloses)
+        #expect(v.anyVisible)
+        let popoutCloses = report(&v, false, "popout")    // the last one closes: updates can slow down
+        #expect(popoutCloses)
+        #expect(!v.anyVisible)
+    }
+
+    @Test func repeatedReportsAreHarmless() {
+        var v = SurfaceVisibility()
+        let neverOpened = report(&v, false, "panel")      // closing something that never opened
+        let opens = report(&v, true, "panel")
+        let again = report(&v, true, "panel")             // onAppear and the occlusion callback both report
+        let closes = report(&v, false, "panel")
+        #expect(!neverOpened)
+        #expect(opens)
+        #expect(!again)
+        #expect(closes)
     }
 }
 
