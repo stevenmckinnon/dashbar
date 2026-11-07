@@ -1,4 +1,4 @@
-import { Asterisk, ChevronDown, ChevronRight, Code, Compass, Folder, Gauge, Layers, Moon, Pause, RotateCw, Server, Terminal } from 'lucide-react'
+import { Asterisk, ChevronDown, ChevronRight, Code, Compass, Folder, Gauge, Layers, Moon, Pause, RotateCw, Server, SquareArrowOutUpRight, Terminal } from 'lucide-react'
 import { Badge, Bar, Count, Segmented, Stage, type Act } from '../stageshow/kit'
 import './dashbar-demo.css'
 
@@ -122,6 +122,7 @@ function Header() {
         <Badge tone="success" dot>1 working</Badge>
         <Pause size={15} strokeWidth={1.75} className="dd-icon" />
         <RotateCw size={15} strokeWidth={1.75} className="dd-icon" />
+        <SquareArrowOutUpRight size={15} strokeWidth={1.75} className="dd-icon" />
       </div>
     </div>
   )
