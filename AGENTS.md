@@ -38,7 +38,7 @@ binary cannot find `Sparkle.framework`):
 ```bash
 DASHBAR_TAB=agents Dashbar --snapshot out.png --demo --dark   # render a tab with invented data
 DASHBAR_DEMO_WAITING=1 Dashbar --snapshot out.png --demo     # the same, with one agent waiting for permission
-DASHBAR_DEMO_RATE_LIMITED=1 Dashbar --snapshot out.png --demo  # the Claude plan limits rate-limited wait
+DASHBAR_DEMO_RATE_LIMITED=1 Dashbar --snapshot out.png --demo  # the Claude plan limits rate-limited wait (=stale: kept limits)
 Dashbar --snapshot out.png --demo --hosted                    # real scrolling panel, so native controls draw
 Dashbar --bench                                               # collector timings
 ```
@@ -88,8 +88,9 @@ images stay clean.
   `~/.claude` or `~/.codex`.
 
 **Design (app and site)**
-- Colour carries meaning. Green means a working agent, amber means an agent is waiting for you (`UI.attention`),
-  orange is Claude, teal is Codex, red is a problem.
+- Colour carries meaning. Green means a working agent, amber means something needs your attention soon (an agent
+  waiting for you, a limit on course to run out; `UI.attention`), orange is Claude, teal is Codex, red is a problem
+  (an error, a limit used up).
   Do not add decorative tints, gradients or coloured icon tiles. Workspace tiles show the project's own icon
   or a neutral monogram.
 - Demo and screenshot data is invented (`Demo.swift`). Never put a real project name, path or token in

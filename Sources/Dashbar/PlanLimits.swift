@@ -25,8 +25,19 @@ enum ClaudePlanLimits {
         var transient = false
         /// How long Anthropic asked us to wait (`Retry-After`), when it said.
         var retryAfter: TimeInterval?
-        /// Shown under limits kept from an earlier reading, saying why they weren't refreshed.
-        var staleNote: String?
+        /// Set on limits kept from an earlier reading: why the latest fetch didn't replace them.
+        var stale: Stale?
+    }
+
+    enum Stale: Equatable {
+        case rateLimited, failed
+        /// The longer explanation, for the tooltip.
+        var explanation: String {
+            switch self {
+            case .rateLimited: return ClaudePlanLimits.rateLimitedMessage
+            case .failed: return "The last refresh didn't work (a server problem or no connection)."
+            }
+        }
     }
 
     struct Credentials {
@@ -147,9 +158,7 @@ enum ClaudePlanLimits {
     static func keepingLastGood(_ previous: Result?, _ new: Result, now: Date = Date()) -> Result {
         guard new.transient, let previous, previous.problem == nil, !previous.limits.isEmpty else { return new }
         var kept = previous
-        kept.staleNote = "Updated \(Fmt.ago(previous.fetchedAt, now: now)) ago. " + (new.retryAfter != nil || new.problem == rateLimitedMessage
-            ? "Claude asked Dashbar to slow down, so it will refresh in a few minutes."
-            : "The last refresh failed; Dashbar will try again shortly.")
+        kept.stale = new.problem == rateLimitedMessage ? .rateLimited : .failed
         return kept
     }
 

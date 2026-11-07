@@ -33,8 +33,9 @@ private enum UI {
     static let textSuccess = Color(light: .init(hex: 0x1A7F37), dark: .init(hex: 0x3FD06A))   // 5.1 / 7.1 — "working"
     static let textInfo = Color(light: .init(hex: 0x0B5CD5), dark: .init(hex: 0x80BBFF))      // 5.0 / 5.2 — ports, context OK
     static let textDanger = Color(light: .init(hex: 0xC4320A), dark: .init(hex: 0xFF6B5E))    // 5.5 / 5.1 — context nearly full, errors
-    static let textAttention = Color(light: .init(hex: 0x8A5C00), dark: .init(hex: 0xE3B341)) // 5.2 / 7.4 — waiting for you
-    /// Fills and dots for "waiting for you": amber, kept apart from Claude's coral and the problem red.
+    static let textAttention = Color(light: .init(hex: 0x8A5C00), dark: .init(hex: 0xE3B341)) // 5.2 / 7.4 — needs attention soon
+    /// Amber: something needs your attention soon (an agent waiting for you, a limit on course to run out).
+    /// Kept apart from Claude's coral and the problem red.
     static let attention = Color(light: .init(hex: 0xBF8700), dark: .init(hex: 0xE3B341))
 
     /// Type scale: six sizes, each with one job.
@@ -1470,7 +1471,7 @@ private struct LimitBar: View {
             if let pace {
                 Text(Self.text(pace))
                     .font(.system(size: UI.Size.caption))
-                    .foregroundStyle(Self.isWarning(pace) ? UI.textDanger : UI.textSecondary)
+                    .foregroundStyle(Self.color(pace))
             }
         }
         .help(expected.map { "The mark shows where an even pace would be by now: \(Int($0.rounded()))% used." } ?? "")
@@ -1478,10 +1479,12 @@ private struct LimitBar: View {
         .accessibilityLabel("\(limit.label) limit, \(Int(used.rounded())) percent used" + (pace.map { ". " + Self.text($0) } ?? ""))
     }
 
-    static func isWarning(_ pace: RateLimit.Pace) -> Bool {
+    /// A forecast of running out is a heads-up (amber); only a limit that's actually used up is a problem (red).
+    static func color(_ pace: RateLimit.Pace) -> Color {
         switch pace {
-        case .runsOut, .usedUp: return true
-        case .under, .onPace: return false
+        case .usedUp: return UI.textDanger
+        case .runsOut: return UI.textAttention
+        case .under, .onPace: return UI.textSecondary
         }
     }
 
@@ -1512,6 +1515,13 @@ private struct PlanLimitsCard: View {
                 if store.codex.found { codex }
             }
         }
+    }
+
+    /// Under limits kept from an earlier reading: "Updated 2m ago · trying again in 3m".
+    static func staleLine(fetched: Date, retryAt: Date?, now: Date) -> String {
+        let updated = "Updated \(Fmt.ago(fetched, now: now)) ago"
+        guard let retryAt else { return updated }
+        return updated + (retryAt > now ? " · trying again in \(countdown(retryAt.timeIntervalSince(now)))" : " · refreshing…")
     }
 
     /// "45s" under a minute, then the usual "4m", "1h 5m".
@@ -1576,12 +1586,17 @@ private struct PlanLimitsCard: View {
                 }
             } else if let limits = store.claudePlan?.limits, !limits.isEmpty {
                 ForEach(limits) { LimitBar(limit: $0, tint: UI.claude) }
-                if let note = store.claudePlan?.staleNote {
-                    HStack(alignment: .top, spacing: 5) {
-                        Image(systemName: "clock").accessibilityHidden(true)
-                        Text(note).fixedSize(horizontal: false, vertical: true)
+                if let stale = store.claudePlan?.stale, let fetched = store.claudePlan?.fetchedAt {
+                    // Worked out live, so "2m ago" keeps counting and the countdown says when it will refresh.
+                    TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                        HStack(spacing: 5) {
+                            Image(systemName: "clock").accessibilityHidden(true)
+                            Text(Self.staleLine(fetched: fetched, retryAt: store.claudePlanRetryAt, now: ctx.date))
+                                .monospacedDigit().lineLimit(1)
+                        }
                     }
                     .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+                    .help(stale.explanation)
                 }
             } else {
                 Text("Loading plan limits…").font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)

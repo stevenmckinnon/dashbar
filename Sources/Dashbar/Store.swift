@@ -208,7 +208,7 @@ final class Store: ObservableObject {
         guard !isDemo else { return }
         guard settings.claudeLimits, !claudePlanLoading else { return }
         if let retryAt = claudePlanRetryAt, Date() < retryAt { return }
-        if !force, let fetched = claudePlan?.fetchedAt, claudePlan?.staleNote == nil,
+        if !force, let fetched = claudePlan?.fetchedAt, claudePlan?.stale == nil,
            Date().timeIntervalSince(fetched) < 60 { return }
         claudePlanLoading = true
         Task.detached(priority: .utility) {

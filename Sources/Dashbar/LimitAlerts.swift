@@ -23,8 +23,6 @@ struct LimitAlert: Equatable {
 
 enum LimitAlerts {
     static let nearlyUsedPercent = 80.0
-    /// Projections from the first minutes of a window swing wildly, so "runs out" waits for a quarter of it.
-    static let minimumElapsedPercent = 25.0
     /// Reset times are bucketed so a reading that drifts by seconds still counts as the same window.
     static let bucket: TimeInterval = 15 * 60
 
@@ -46,9 +44,7 @@ enum LimitAlerts {
     /// The most urgent alert that applies right now, if any.
     static func kind(for limit: RateLimit, now: Date) -> LimitAlert.Kind? {
         if limit.usedPercent >= 100 { return .usedUp }
-        if case .runsOut? = limit.pace(now: now), (limit.expectedPercent(now: now) ?? 0) >= minimumElapsedPercent {
-            return .runsOut
-        }
+        if case .runsOut? = limit.pace(now: now) { return .runsOut }   // pace waits for a quarter of the window
         if limit.usedPercent >= nearlyUsedPercent { return .nearlyUsed }
         return nil
     }

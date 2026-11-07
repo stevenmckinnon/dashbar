@@ -407,7 +407,7 @@ private func session(id: String, root: String = "/dev/app", busy: Bool = false, 
         let shown = ClaudePlanLimits.keepingLastGood(good, limited, now: now)
         #expect(shown.problem == nil)
         #expect(shown.limits.first?.usedPercent == 40)
-        #expect(shown.staleNote?.hasPrefix("Updated 3m ago.") == true)
+        #expect(shown.stale == .rateLimited)
     }
 
     @Test func withNothingToKeepTheProblemShows() {
@@ -748,6 +748,10 @@ struct PaceTests {
 
     @Test func tooEarlyOrUnknownWindowHasNoPace() {
         #expect(limit(used: 3, hoursLeft: 4.9).pace(now: now) == nil)
+        // 20 minutes into a 5-hour window at 17%: on course to run out, but too early to say so.
+        #expect(limit(used: 17, hoursLeft: 4 + 40.0 / 60).pace(now: now) == nil)
+        // Light use early still gets a reading.
+        #expect(limit(used: 2, hoursLeft: 4 + 40.0 / 60).pace(now: now) == .onPace)
         let unknown = RateLimit(label: "Extra usage", usedPercent: 50, resetsAt: now.addingTimeInterval(3600))
         #expect(unknown.pace(now: now) == nil)
     }

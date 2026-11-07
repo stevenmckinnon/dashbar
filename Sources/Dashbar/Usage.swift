@@ -374,6 +374,9 @@ extension RateLimit {
         case usedUp
     }
 
+    /// How much of the window (%) must have passed before a "runs out" projection is shown or notified.
+    static let minimumElapsedForRunsOut = 25.0
+
     /// The share used if usage were spread evenly across the window, given how much of it has passed.
     func expectedPercent(now: Date = Date()) -> Double? {
         guard let window, window > 0, let resetsAt else { return nil }
@@ -391,7 +394,11 @@ extension RateLimit {
         let perSecond = usedPercent / elapsed
         if perSecond > 0 {
             let runsOut = now.addingTimeInterval((100 - usedPercent) / perSecond)
-            if runsOut < resetsAt { return .runsOut(runsOut) }
+            if runsOut < resetsAt {
+                // Early in a window one burst projects wildly (20 minutes in, 17% used "runs out" in two hours).
+                // Say nothing until a quarter has passed rather than raise a false alarm.
+                return expected >= Self.minimumElapsedForRunsOut ? .runsOut(runsOut) : nil
+            }
         }
         return usedPercent < expected - 10 ? .under : .onPace
     }

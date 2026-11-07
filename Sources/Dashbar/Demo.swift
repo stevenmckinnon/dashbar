@@ -113,10 +113,21 @@ enum DemoData {
             RateLimit(label: "5-hour", usedPercent: 55, resetsAt: now.addingTimeInterval(2.2 * 3600), window: 5 * 3600),
             RateLimit(label: "Weekly", usedPercent: 38, resetsAt: now.addingTimeInterval(3.5 * 86400), window: 7 * 86400),
         ], plan: "Max 5x")
-        // DASHBAR_DEMO_RATE_LIMITED=1 shows the rate-limited wait instead, to check its layout.
-        if ProcessInfo.processInfo.environment["DASHBAR_DEMO_RATE_LIMITED"] != nil {
+        // DASHBAR_DEMO_RATE_LIMITED=1 shows the rate-limited wait with nothing to show; =stale shows earlier limits
+        // kept through it (with a 5-hour limit on course to run out, to see that forecast too).
+        switch ProcessInfo.processInfo.environment["DASHBAR_DEMO_RATE_LIMITED"] {
+        case "stale"?:
+            var kept = ClaudePlanLimits.Result(limits: [
+                RateLimit(label: "5-hour", usedPercent: 80, resetsAt: now.addingTimeInterval(2.5 * 3600), window: 5 * 3600),
+                RateLimit(label: "Weekly", usedPercent: 38, resetsAt: now.addingTimeInterval(3.5 * 86400), window: 7 * 86400),
+            ], plan: "Pro", fetchedAt: now.addingTimeInterval(-125))
+            kept.stale = .rateLimited
+            store.claudePlan = kept
+            store.claudePlanRetryAt = now.addingTimeInterval(190)
+        case _?:
             store.claudePlan = ClaudePlanLimits.Result(plan: "Pro", problem: ClaudePlanLimits.rateLimitedMessage, transient: true)
             store.claudePlanRetryAt = now.addingTimeInterval(45)
+        case nil: break
         }
 
         // System
