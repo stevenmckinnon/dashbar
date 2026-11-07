@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { RotateCw } from "lucide-react";
 import { FAQ } from "./faq";
+import { RELEASE_NOTES, inline } from "./releases";
 import { DashbarDemo } from "./demos/DashbarDemo";
 import { AgentsDemo, LimitsDemo, ServersDemo, SystemDemo, CleanupDemo } from "./demos/FeatureDemos";
 
@@ -177,6 +178,42 @@ function Pace() {
   );
 }
 
+/* ---------- What's new ---------- */
+
+function Inline({ text }) {
+  return inline(text).map(({ key, tag: Tag, text: t }) => (Tag ? <Tag key={key}>{t}</Tag> : t));
+}
+
+function WhatsNew() {
+  const shown = RELEASE_NOTES.slice(0, 3);
+  if (!shown.length) return null;
+  return (
+    <section className="wrap news" id="whats-new" aria-labelledby="news-h">
+      <h2 id="news-h">What’s new</h2>
+      <div className="news-list">
+        {shown.map(({ version, date, blocks }) => (
+          <article key={version}>
+            <h3>
+              {version}
+              <time dateTime={date.toISOString().slice(0, 10)}>
+                {date.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}
+              </time>
+            </h3>
+            {blocks.map((b, i) =>
+              b.list ? (
+                <ul key={i}>{b.items.map((item) => <li key={item}><Inline text={item} /></li>)}</ul>
+              ) : (
+                <p key={i}><Inline text={b.text} /></p>
+              ),
+            )}
+          </article>
+        ))}
+        <a className="link" href={`${REPO}/releases`}>All releases on GitHub</a>
+      </div>
+    </section>
+  );
+}
+
 /* ---------- Questions ---------- */
 
 function Faq() {
@@ -270,6 +307,7 @@ function Footer() {
           <li><a href="#pace">Pace</a></li>
           <li><a href={`${REPO}/releases`}>Releases</a></li>
           <li><a href="#privacy">Privacy</a></li>
+          <li><a href="#whats-new">What’s new</a></li>
           <li><a href="#faq">FAQ</a></li>
           <li><a href={`${REPO}/issues`}>Issues</a></li>
           <li><a href="#install">Install</a></li>
@@ -289,6 +327,7 @@ export default function App() {
         <Features />
         <Pace />
         <Privacy />
+        <WhatsNew />
         <Faq />
         <Install />
       </main>

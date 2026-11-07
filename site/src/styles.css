@@ -201,6 +201,24 @@ code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.88em
 @media (hover: hover) { .replay-pill:hover { background: var(--track); } }
 @media (prefers-reduced-motion: reduce) { .replay-pill:active { scale: 1; } }
 
+/* ---------- What's new ---------- */
+.news { display: grid; grid-template-columns: repeat(12, 1fr); gap: var(--gap); padding-block: 120px 0; }
+.news h2 { grid-column: 1 / span 4; align-self: start; font-size: var(--step-head); }
+.news-list { grid-column: 6 / -1; }
+.news article { padding-block: 24px; border-bottom: 1px solid var(--track); }
+.news article:first-child { border-top: 1px solid var(--track); }
+.news h3 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin: 0 0 12px; }
+.news time { font-size: var(--step-small); font-weight: 400; color: var(--muted); }
+.news ul { margin: 0; padding-left: 1.2em; max-width: 58ch; color: var(--muted); }
+.news li + li { margin-top: 8px; }
+.news li strong { color: var(--ink); font-weight: 600; }
+.news p { margin: 0; max-width: 58ch; color: var(--muted); }
+.news .link { display: inline-block; margin-top: 24px; }
+@media (max-width: 900px) {
+  .news { display: block; padding-block: 72px 0; }
+  .news-list { margin-top: 32px; }
+}
+
 /* ---------- Questions ---------- */
 .faq { display: grid; grid-template-columns: repeat(12, 1fr); gap: var(--gap); padding-block: 120px; }
 .faq h2 { grid-column: 1 / span 4; align-self: start; font-size: var(--step-head); }

@@ -20,4 +20,6 @@ export default defineConfig({
   base: "./",
   plugins: [react(), faqSchema],
   publicDir: "../docs/images",
+  // "What's new" reads release-notes/ and appcast.xml from the repository root.
+  server: { fs: { allow: [".."] } },
 });
