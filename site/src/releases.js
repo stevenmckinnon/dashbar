@@ -18,6 +18,9 @@ function released() {
   return dates;
 }
 
+/** The newest version in the feed, which is the one the Download button fetches. */
+export const LATEST_VERSION = [...released().keys()].sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))[0] ?? null;
+
 const byVersion = (a, b) => b.version.localeCompare(a.version, undefined, { numeric: true });
 
 export const RELEASE_NOTES = (() => {

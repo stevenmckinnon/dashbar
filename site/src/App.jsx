@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
 import { RotateCw } from "lucide-react";
 import { FAQ } from "./faq";
-import { RELEASE_NOTES, inline } from "./releases";
+import { RELEASE_NOTES, LATEST_VERSION, inline } from "./releases";
 import { DashbarDemo } from "./demos/DashbarDemo";
 import { AgentsDemo, LimitsDemo, ServersDemo, SystemDemo, CleanupDemo } from "./demos/FeatureDemos";
 
 const REPO = "https://github.com/stevenmckinnon/dashbar";
-const RELEASES = `${REPO}/releases/latest`;
+// The DMG itself, so the button downloads straight away. The version comes from the update feed at build time;
+// if the feed can't be read it falls back to the releases page.
+const DOWNLOAD = LATEST_VERSION
+  ? `${REPO}/releases/download/v${LATEST_VERSION}/Dashbar-${LATEST_VERSION}.dmg`
+  : `${REPO}/releases/latest`;
 const BREW = "brew install --cask stevenmckinnon/tap/dashbar";
 
 /** A picture in the visitor's colour scheme: *-light.png by default, *-dark.png in dark mode. */
@@ -63,7 +67,7 @@ function Hero() {
           <h1 id="top">Your agents, in the menu bar</h1>
           <p className="lede">Dashbar shows which <b>Claude Code</b> and <b>Codex</b> sessions are working, how much of your plan is left, and which dev servers are idling. Free and open source.</p>
           <div className="actions">
-            <a className="btn" href={RELEASES}>Download for macOS</a>
+            <a className="btn" href={DOWNLOAD}>Download for macOS</a>
             <span className="note">Open source under the MIT licence. Needs macOS 14 or later. Notarised by Apple.</span>
           </div>
         </div>
@@ -275,7 +279,7 @@ function Install() {
       <div className="how">
         <h3>Download</h3>
         <p>Open the DMG and drag Dashbar to Applications. It is signed and notarised by Apple, and needs macOS 14 or later.</p>
-        <a className="btn" href={RELEASES}>Download for macOS</a>
+        <a className="btn" href={DOWNLOAD}>Download for macOS</a>
       </div>
       <div className="how brew">
         <h3>Homebrew</h3>
