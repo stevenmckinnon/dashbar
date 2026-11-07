@@ -2,7 +2,7 @@
 // structured data in index.html, so the two can never disagree.
 export const FAQ = [
   { q: "Which agents does Dashbar support?",
-    a: "Claude Code and Codex. It reads their session files on your Mac. Other agents, such as Cursor, are not supported yet. If you want one added, open an issue on GitHub." },
+    a: "Claude Code and Codex get full support: it reads their session files on your Mac for working status and usage. Other tools, such as T3 Code, Cursor, Gemini CLI and Aider, show up as a chip when they are running, without usage numbers. If you want one added, open an issue on GitHub." },
   { q: "Does it work on Intel Macs?",
     a: "Yes. The app is universal, so it runs on Apple silicon and on Intel, on macOS 14 or later." },
   { q: "Does it use my tokens or send my data anywhere?",

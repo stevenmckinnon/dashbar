@@ -33,7 +33,7 @@ The project site is a small React app in `site/` (`npm run dev` inside it), depl
 `.github/workflows/pages.yml`. Its pictures come from `docs/images`, rendered with `Dashbar --snapshot … --demo`.
 
 
-- **Agents**: live Claude Code sessions (`~/.claude/sessions`), working/idle status, plus other agent processes it spots (Codex, Cursor, Gemini, Aider, Ollama…). Click a session to open its folder.
+- **Agents**: live Claude Code sessions (`~/.claude/sessions`), working/idle status, plus other agent apps and CLIs it spots running (T3 Code, Codex, Cursor, Gemini, Aider, Ollama…). Click a session to open its folder.
 - **Claude Code usage**: today's tokens (in / out / cache read / cache write), a 14-day chart, and top projects and models, read incrementally from `~/.claude/projects/**/*.jsonl`.
 - **Codex usage**: the same, plus 5h/weekly rate-limit gauges, from `~/.codex/sessions`. Shown once Codex has session logs.
 - **Local servers**: listening TCP ports with their project name, command and uptime. Hover a row to open it in the browser or stop the process.
@@ -42,6 +42,7 @@ The project site is a small React app in `site/` (`npm run dev` inside it), depl
 - **System tab**: CPU (user/system split, load average), memory (app/wired/compressed, swap, and macOS memory
   pressure), network up/down, GPU utilisation, disk, battery with time remaining, and the busiest apps right
   now with their icons. Recent samples show as small bar charts.
+- **Popout window**: the arrow button in the panel header opens the dashboard in a normal window for a second display. It keeps the panel's width, resizes in height, and has a pin to keep it on top.
 - **Tabs**: Overview · Agents · Servers · System · Clean-up (⌘1–⌘5). Overview tiles jump to their tab.
 - **Menu bar stats** (optional, in Settings): CPU, memory, download speed and, with the Labs setting on, what's left of
   your Claude 5-hour or weekly limit, beside the icon.
