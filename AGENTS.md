@@ -15,6 +15,7 @@ GitHub Pages. Read `README.md` for what the app does; this file is how to work o
 | `scripts/release.sh` | Signed, notarised, stapled DMG plus the Sparkle `appcast.xml` entry |
 | `packaging/homebrew/dashbar.rb` | The cask. The live copy is in the separate `stevenmckinnon/homebrew-tap` repo |
 | `site/` | Vite and React product site. `src/demos/` holds the Stageshow demos, `src/stageshow/` the vendored kit (MIT, see its `NOTICE.md`), `src/faq.js` the FAQ (also written into `index.html` as structured data at build time) |
+| `release-notes/` | One `X.Y.Z.md` per release (bullets of user-facing changes). Feeds Sparkle's update dialog, the GitHub release and the site's "What's new" (`site/src/releases.js`, which only shows versions that are in `appcast.xml`) |
 | `docs/images/` | README pictures and the site's `og.png`; the site serves this folder as its public root |
 | `appcast.xml` | The update feed. Served from `raw.githubusercontent.com/.../main/appcast.xml` |
 
@@ -89,15 +90,17 @@ the real app's preferences, so reset it afterwards (`defaults write fun.dashbar.
 
 Only when the user asks. A release publishes publicly and cannot be quietly undone.
 
-1. `swift test`, then `git push origin main` with everything committed.
-2. `scripts/release.sh X.Y.Z`: builds a universal app, signs it with the Developer ID certificate, notarises
+1. Write `release-notes/X.Y.Z.md` (Markdown, what changed for users). Sparkle shows it in the update dialog
+   and step 4 reuses it for the GitHub release. `release.sh` refuses to run without it.
+2. `swift test`, then `git push origin main` with everything committed.
+3. `scripts/release.sh X.Y.Z`: builds a universal app, signs it with the Developer ID certificate, notarises
    through the `dashbar-notary` keychain profile, staples, and adds the entry to `appcast.xml`. If signing the
    DMG fails once with `errSecInternalComponent`, rerun it.
-3. Put the printed SHA-256 into `packaging/homebrew/dashbar.rb` (version and sha256), commit `appcast.xml`
+4. Put the printed SHA-256 into `packaging/homebrew/dashbar.rb` (version and sha256), commit `appcast.xml`
    and the cask, push, then `git tag vX.Y.Z && git push origin vX.Y.Z`.
-4. `gh release create vX.Y.Z build/Dashbar-X.Y.Z.dmg --title "Dashbar X.Y.Z" --notes-file <notes>`.
-5. Copy the cask into `stevenmckinnon/homebrew-tap` under `Casks/dashbar.rb` and push.
-6. Pushing to `main` redeploys the site (`.github/workflows/pages.yml`). Check the run and the live page.
+5. `gh release create vX.Y.Z build/Dashbar-X.Y.Z.dmg --title "Dashbar X.Y.Z" --notes-file release-notes/X.Y.Z.md`.
+6. Copy the cask into `stevenmckinnon/homebrew-tap` under `Casks/dashbar.rb` and push.
+7. Pushing to `main` redeploys the site (`.github/workflows/pages.yml`). Check the run and the live page.
 
 The Sparkle signing key lives only in the login Keychain (public half in `Resources/sparkle-public-key.txt`).
 It was backed up to a password manager. Never commit, paste or print it; losing it means installed copies
