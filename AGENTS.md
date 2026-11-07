@@ -17,7 +17,7 @@ GitHub Pages. Read `README.md` for what the app does; this file is how to work o
 | `packaging/homebrew/dashbar.rb` | The cask. The live copy is in the separate `stevenmckinnon/homebrew-tap` repo |
 | `site/` | Vite and React product site. `src/demos/` holds the Stageshow demos, `src/stageshow/` the vendored kit (MIT, see its `NOTICE.md`), `src/faq.js` the FAQ (also written into `index.html` as structured data at build time) |
 | `release-notes/` | One `X.Y.Z.md` per release (bullets of user-facing changes). Feeds Sparkle's update dialog, the GitHub release and the site's "What's new" (`site/src/releases.js`, which only shows versions that are in `appcast.xml`) |
-| `docs/images/` | README pictures and the site's `og.png`; the site serves this folder as its public root |
+| `docs/images/` | README pictures and the site's `og.png`; the site serves this folder as its public root. `og.png` is built from `scripts/og/og.html` by `scripts/render-og.sh` (headless Chrome); rerun it after re-rendering `overview-dark.png` |
 | `appcast.xml` | The update feed. Served from `raw.githubusercontent.com/.../main/appcast.xml` |
 
 ## Run it
@@ -96,7 +96,7 @@ images stay clean.
 - Do not invent facts on the site: no user counts, quotes, star counts or prices. FAQ answers must state
   what the app really does today.
 - Site demos mirror the app. When a visual in the app changes (tiles, header icons, card layout), update
-  `site/src/demos/` to match, then re-render `docs/images/` and re-check the demos' heights.
+  `site/src/demos/` to match, then re-render `docs/images/` (and `og.png` with `scripts/render-og.sh`) and re-check the demos' heights.
 
 ## Release
 
