@@ -38,6 +38,7 @@ binary cannot find `Sparkle.framework`):
 ```bash
 DASHBAR_TAB=agents Dashbar --snapshot out.png --demo --dark   # render a tab with invented data
 DASHBAR_DEMO_WAITING=1 Dashbar --snapshot out.png --demo     # the same, with one agent waiting for permission
+DASHBAR_DEMO_RATE_LIMITED=1 Dashbar --snapshot out.png --demo  # the Claude plan limits rate-limited wait
 Dashbar --snapshot out.png --demo --hosted                    # real scrolling panel, so native controls draw
 Dashbar --bench                                               # collector timings
 ```

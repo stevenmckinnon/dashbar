@@ -27,7 +27,7 @@ final class Store: ObservableObject {
     @Published var claudePlanLoading = false
     /// After a temporary failure, no plan request goes out before this, not even from Retry or Refresh:
     /// asking again while rate limited only keeps the limit tripped.
-    @Published private(set) var claudePlanRetryAt: Date?
+    @Published var claudePlanRetryAt: Date?
     private var claudePlanFailures = 0
     /// Claude Code is running to refresh its own sign-in.
     @Published var claudeSigningIn = false
@@ -219,7 +219,13 @@ final class Store: ObservableObject {
                 if result.transient {
                     self.claudePlanFailures += 1
                     let wait = ClaudePlanLimits.backoff(failures: self.claudePlanFailures, retryAfter: result.retryAfter)
-                    self.claudePlanRetryAt = Date().addingTimeInterval(wait)
+                    let retryAt = Date().addingTimeInterval(wait)
+                    self.claudePlanRetryAt = retryAt
+                    // Retry when the wait ends, so the countdown means what it says (the regular check is 5 minutes).
+                    DispatchQueue.main.asyncAfter(deadline: .now() + wait + 1) { [weak self] in
+                        guard let self, self.claudePlanRetryAt == retryAt, !self.paused else { return }
+                        self.refreshClaudePlan(force: true)
+                    }
                 } else {
                     self.claudePlanFailures = 0
                     self.claudePlanRetryAt = nil

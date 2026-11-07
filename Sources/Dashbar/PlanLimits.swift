@@ -110,7 +110,7 @@ enum ClaudePlanLimits {
                 let wait = retryAfter((response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Retry-After"))
                 return (Result(plan: creds.plan, problem: rateLimitedMessage, transient: true, retryAfter: wait), false)
             case 500...599:
-                return (Result(plan: creds.plan, problem: "Anthropic's usage service had a problem (HTTP \(status)). Dashbar will try again shortly.", transient: true), false)
+                return (Result(plan: creds.plan, problem: "Anthropic's usage service had a problem (HTTP \(status)).", transient: true), false)
             case 401, 403:
                 return (Result(plan: creds.plan, problem: "Claude didn't accept the sign-in. Run `claude` in a terminal once to refresh it, then retry.", needsSignIn: true), true)
             default:
@@ -123,7 +123,7 @@ enum ClaudePlanLimits {
 
     // MARK: Waiting out failures
 
-    static let rateLimitedMessage = "Claude is limiting how often plan usage can be read, often because another app (or another copy of Dashbar) is also asking. Dashbar will try again shortly."
+    static let rateLimitedMessage = "Claude is limiting how often plan usage can be read. This often happens when another app, or another copy of Dashbar, is asking too."
 
     /// `Retry-After` as seconds, from either form the header allows: a number of seconds or an HTTP date.
     static func retryAfter(_ header: String?, now: Date = Date()) -> TimeInterval? {

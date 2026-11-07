@@ -113,6 +113,11 @@ enum DemoData {
             RateLimit(label: "5-hour", usedPercent: 55, resetsAt: now.addingTimeInterval(2.2 * 3600), window: 5 * 3600),
             RateLimit(label: "Weekly", usedPercent: 38, resetsAt: now.addingTimeInterval(3.5 * 86400), window: 7 * 86400),
         ], plan: "Max 5x")
+        // DASHBAR_DEMO_RATE_LIMITED=1 shows the rate-limited wait instead, to check its layout.
+        if ProcessInfo.processInfo.environment["DASHBAR_DEMO_RATE_LIMITED"] != nil {
+            store.claudePlan = ClaudePlanLimits.Result(plan: "Pro", problem: ClaudePlanLimits.rateLimitedMessage, transient: true)
+            store.claudePlanRetryAt = now.addingTimeInterval(45)
+        }
 
         // System
         var sys = SystemSnapshot()

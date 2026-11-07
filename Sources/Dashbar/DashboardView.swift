@@ -1514,6 +1514,11 @@ private struct PlanLimitsCard: View {
         }
     }
 
+    /// "45s" under a minute, then the usual "4m", "1h 5m".
+    static func countdown(_ seconds: TimeInterval) -> String {
+        seconds < 60 ? "\(max(1, Int(seconds.rounded(.up))))s" : Fmt.duration(seconds)
+    }
+
     @ViewBuilder private var claude: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
@@ -1539,9 +1544,24 @@ private struct PlanLimitsCard: View {
                         .buttonStyle(.link).font(.system(size: UI.Size.caption, weight: .medium))
                 }
             } else if let problem = store.claudePlan?.problem {
+                // A temporary wait (rate limited, server trouble, offline) gets a quiet clock and a countdown under
+                // the message; a problem the user has to fix keeps the red triangle and its action on the right.
+                let waiting = store.claudePlan?.transient == true
                 HStack(alignment: .top, spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(UI.textDanger).accessibilityHidden(true)
-                    Text(problem).font(.system(size: UI.Size.caption)).fixedSize(horizontal: false, vertical: true)
+                    Image(systemName: waiting ? "clock" : "exclamationmark.triangle.fill")
+                        .foregroundStyle(waiting ? AnyShapeStyle(UI.textSecondary) : AnyShapeStyle(UI.textDanger))
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(problem).fixedSize(horizontal: false, vertical: true)
+                        if waiting, let retryAt = store.claudePlanRetryAt {
+                            TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                                Text(retryAt > ctx.date ? "Trying again in \(Self.countdown(retryAt.timeIntervalSince(ctx.date)))"
+                                                        : "Trying again…")
+                                    .monospacedDigit().foregroundStyle(UI.textSecondary)
+                            }
+                        }
+                    }
+                    .font(.system(size: UI.Size.caption))
                     Spacer(minLength: 4)
                     if store.claudeSigningIn {
                         HStack(spacing: 4) { ProgressView().controlSize(.mini); Text("Refreshing…").font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary) }
@@ -1549,14 +1569,7 @@ private struct PlanLimitsCard: View {
                         Button("Refresh") { store.refreshClaudeSignIn() }
                             .buttonStyle(.link).font(.system(size: UI.Size.caption, weight: .medium))
                             .help("Runs Claude Code once in the background, which refreshes its sign-in. Uses a few tokens.")
-                    } else if let retryAt = store.claudePlanRetryAt, retryAt > Date() {
-                        // Waiting out a rate limit: a Retry button would only ask too soon again.
-                        TimelineView(.periodic(from: .now, by: 1)) { ctx in
-                            Text(retryAt > ctx.date ? "Retrying in \(Fmt.duration(retryAt.timeIntervalSince(ctx.date)))" : "Retrying…")
-                                .font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
-                        }
-                        .fixedSize()
-                    } else {
+                    } else if !waiting {
                         Button("Retry") { store.refreshClaudePlan(force: true) }
                             .buttonStyle(.link).font(.system(size: UI.Size.caption, weight: .medium))
                     }
