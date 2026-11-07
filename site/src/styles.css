@@ -239,3 +239,17 @@ code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.88em
   .faq-list { margin-top: 32px; }
 }
 @media (prefers-reduced-motion: reduce) { .faq summary::after { transition: none; } }
+
+/* ---------- The Dashbar window ---------- */
+.window { display: grid; grid-template-columns: repeat(12, 1fr); gap: var(--gap); padding-block: 0 120px; }
+.window-head { grid-column: 1 / span 6; }
+.window-head h2 { font-size: var(--step-head); }
+.window-head p { margin-top: 20px; max-width: 52ch; color: var(--muted); }
+.window-head kbd { font: inherit; font-weight: 600; color: var(--ink); }
+.window-demo { grid-column: 1 / -1; min-width: 0; margin-top: 24px; }
+.window-demo > [role="img"] { max-width: 1040px; }
+.window-demo .caption-row { max-width: 1040px; }
+@media (max-width: 900px) {
+  .window { display: block; padding-block: 0 72px; }
+  .window-demo { margin-top: 32px; }
+}

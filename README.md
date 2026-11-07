@@ -16,6 +16,13 @@ A native macOS menu bar dashboard for agent usage, local dev servers, and system
   </picture>
 </p>
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/window-dark.png">
+    <img src="docs/images/window-light.png" alt="The Dashbar window: a sidebar of pages and workspaces, and a workspace's page with its uptime, CPU, memory and energy, its dev server, its agent and the processes behind the numbers" width="740">
+  </picture>
+</p>
+
 ## Install
 
 **Download:** get the latest `Dashbar-x.y.z.dmg` from [Releases](https://github.com/stevenmckinnon/dashbar/releases/latest),
@@ -42,7 +49,7 @@ The project site is a small React app in `site/` (`npm run dev` inside it), depl
 - **System tab**: CPU (user/system split, load average), memory (app/wired/compressed, swap, and macOS memory
   pressure), network up/down, GPU utilisation, disk, battery with time remaining, and the busiest apps right
   now with their icons. Recent samples show as small bar charts.
-- **Popout window**: the arrow button in the panel header, or ⌃⌥D from anywhere, opens the dashboard in a normal window for a second display. It keeps the panel's width, resizes in height, and has a pin to keep it on top. ⌃⌥D again closes it.
+- **Dashbar window**: the arrow button in the panel header, or ⌃⌥D from anywhere, opens Dashbar as a full window: the panel's pages and every running workspace in a sidebar. A workspace's page shows its uptime, CPU, memory and energy (its servers, agents, what they started and anything else working in its folder), its dev servers and agents, and the processes behind the numbers. There's a pin to keep it on top; ⌃⌥D again closes it.
 - **Notifications** (each can be turned off in Settings): when an agent finishes a stretch of work, when it needs you, and when a plan limit runs low: at 80%, when it's on course to run out before it resets, and when it's used up, once per window.
 - **Tabs**: Overview · Agents · Servers · System · Clean-up (⌘1–⌘5). Overview tiles jump to their tab.
 - **Menu bar stats** (optional, in Settings): CPU, memory, download speed and, with the Labs setting on, what's left of

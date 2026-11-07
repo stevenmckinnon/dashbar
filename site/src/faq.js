@@ -3,6 +3,8 @@
 export const FAQ = [
   { q: "Which agents does Dashbar support?",
     a: "Claude Code and Codex get full support: it reads their session files on your Mac for working status and usage. Other tools, such as T3 Code, Cursor, Gemini CLI and Aider, show up as a chip when they are running, without usage numbers. If you want one added, open an issue on GitHub." },
+  { q: "Can I keep it open in a window?",
+    a: "Yes. Press Control-Option-D, or the arrow at the top of the panel, to open the Dashbar window: the panel’s pages and every running workspace in a sidebar. A workspace’s page shows its uptime, CPU, memory and energy, its dev servers and agents, and the processes behind the numbers. Like the panel, it only watches: it never starts or runs anything. A pin keeps it on top of other windows." },
   { q: "Does it work on Intel Macs?",
     a: "Yes. The app is universal, so it runs on Apple silicon and on Intel, on macOS 14 or later." },
   { q: "Does it use my tokens or send my data anywhere?",

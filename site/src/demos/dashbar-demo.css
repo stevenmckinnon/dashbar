@@ -312,9 +312,12 @@
   .dd-actions {
     margin-top: 12px;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 8px;
   }
+  /* The name opens the workspace in the Dashbar window, so a chevron follows it, then room before the status */
+  .dd-now-chevron { margin-right: auto; }
+  .dd-now-top .dd-grow:has(+ .dd-now-chevron) { flex: 0 1 auto; }
   .dd-actions span {
     height: 34px;
     display: grid;

@@ -1,4 +1,4 @@
-import { Asterisk, ChevronDown, ChevronRight, Code, Compass, Folder, Gauge, Layers, Moon, Pause, RotateCw, Server, SquareArrowOutUpRight, Terminal } from 'lucide-react'
+import { Asterisk, ChartColumn, ChevronDown, ChevronRight, Code, Compass, Folder, Gauge, Layers, Moon, Pause, RotateCw, Server, SquareArrowOutUpRight, Terminal } from 'lucide-react'
 import { Badge, Bar, Count, Segmented, Stage, type Act } from '../stageshow/kit'
 import './dashbar-demo.css'
 
@@ -152,6 +152,7 @@ function Overview() {
         <div className="dd-now-top">
           <span className="dd-mono dd-mono--blue dd-mono--lg">S<i className="dd-dot" /></span>
           <div className="dd-grow"><b>storefront-web</b><small>node :3000 · 412 MB</small></div>
+          <ChevronRight size={14} strokeWidth={1.75} className="dd-chevron dd-now-chevron" />
           <Badge tone="success" dot>Working 4m</Badge>
         </div>
         <div className="dd-session">
@@ -160,7 +161,7 @@ function Overview() {
           <div className="dd-context"><span className="dd-meter"><i style={{ width: '34%' }} /></span><b>34%</b><small>context</small></div>
         </div>
         <div className="dd-actions">
-          {[Code, Terminal, Folder, Compass].map((Glyph, i) => <span key={i}><Glyph size={15} strokeWidth={1.75} /></span>)}
+          {[ChartColumn, Code, Terminal, Folder, Compass].map((Glyph, i) => <span key={i}><Glyph size={15} strokeWidth={1.75} /></span>)}
         </div>
       </div>
 

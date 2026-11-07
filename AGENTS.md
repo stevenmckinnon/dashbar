@@ -9,7 +9,7 @@ GitHub Pages. Read `README.md` for what the app does; this file is how to work o
 
 | Path | What it is |
 |---|---|
-| `Sources/Dashbar/` | The app. `DashboardView.swift` is the whole panel UI, `Store.swift` the state, `Collectors.swift`, `Usage.swift`, `PlanLimits.swift`, `SystemStats.swift` and `Proc.swift` read data, `Demo.swift` invents data for screenshots, `Snapshot.swift` renders PNGs, `Updater.swift` wraps Sparkle |
+| `Sources/Dashbar/` | The app. `DashboardView.swift` is the whole panel UI, `Store.swift` the state, `Collectors.swift`, `Usage.swift`, `PlanLimits.swift`, `SystemStats.swift` and `Proc.swift` read data, `Demo.swift` invents data for screenshots, `Snapshot.swift` renders PNGs, `Updater.swift` wraps Sparkle. `AppView.swift` and `AppWindow.swift` are the Dashbar window (sidebar and pages), `WorkspaceUsage.swift` what each workspace's processes use |
 | `Tests/DashbarTests/` | Swift Testing suites that run against throwaway log folders (`Fixtures.swift`) |
 | `build.sh` | Builds the app into `build/`, signs it, embeds Sparkle. A local build is `Dashbar Local.app`; `scripts/release.sh` (via `DASHBAR_HARDENED=1`) makes the real `Dashbar.app`. Flags: `--run`, `--install` |
 | `scripts/release.sh` | Signed, notarised, stapled DMG plus the Sparkle `appcast.xml` entry |
@@ -40,6 +40,8 @@ binary cannot find `Sparkle.framework`):
 DASHBAR_TAB=agents Dashbar --snapshot out.png --demo --dark   # render a tab with invented data
 DASHBAR_DEMO_WAITING=1 Dashbar --snapshot out.png --demo     # the same, with one agent waiting for permission
 DASHBAR_DEMO_RATE_LIMITED=1 Dashbar --snapshot out.png --demo  # the Claude plan limits rate-limited wait (=stale: kept limits)
+DASHBAR_APP_PAGE=storefront-web Dashbar --snapshot out.png --demo --app  # the Dashbar window (a tab name or a workspace)
+Dashbar --snapshot x --demo --app --onscreen   # the window on screen for 8s (prints its number) for `screencapture -o -l`, which draws Liquid Glass
 Dashbar --snapshot out.png --demo --hosted                    # real scrolling panel, so native controls draw
 Dashbar --bench                                               # collector timings
 ```

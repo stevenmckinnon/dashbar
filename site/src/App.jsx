@@ -4,6 +4,7 @@ import { FAQ } from "./faq";
 import { RELEASE_NOTES, LATEST_VERSION, inline } from "./releases";
 import { DashbarDemo } from "./demos/DashbarDemo";
 import { AgentsDemo, LimitsDemo, ServersDemo, SystemDemo, CleanupDemo } from "./demos/FeatureDemos";
+import { WindowDemo } from "./demos/WindowDemo";
 
 const REPO = "https://github.com/stevenmckinnon/dashbar";
 // The DMG itself, so the button downloads straight away. The version comes from the update feed at build time;
@@ -132,6 +133,30 @@ function Features() {
             <p>{it.body}</p>
           </article>
         ))}
+      </div>
+    </section>
+  );
+}
+
+/* ---------- The Dashbar window ---------- */
+
+function WindowSection() {
+  const dark = useDark();
+  const [run, setRun] = useState(0);
+  return (
+    <section className="wrap window" id="window" aria-labelledby="window-h">
+      <div className="window-head">
+        <h2 id="window-h">Or a whole window</h2>
+        <p>Press <kbd>⌃⌥D</kbd>, or the arrow at the top of the panel, and Dashbar opens as a window. Its pages and every running workspace sit in a sidebar. A workspace’s page adds up what it is using right now, its dev servers, its agents and everything they started, and shows the processes behind the numbers.</p>
+      </div>
+      <div className="window-demo">
+        <div role="img" aria-label="A short animation of the Dashbar window. It opens on Overview, with a card for each workspace. Clicking storefront-web opens its page: uptime 52 minutes, CPU 12%, memory 1.19 GB and energy 3.1 watts, its dev server on port 3000, its Claude Code session at 34% context, and the processes behind the numbers.">
+          <div aria-hidden="true"><WindowDemo key={run} dark={dark} /></div>
+        </div>
+        <div className="caption-row">
+          <p className="caption">The menu bar panel stays the quick glance. Clicking a workspace there opens its page here.</p>
+          <button className="replay-pill" type="button" onClick={() => setRun((n) => n + 1)}><RotateCw size={14} strokeWidth={2} aria-hidden="true" />Replay<span className="sr-only"> the window demo</span></button>
+        </div>
       </div>
     </section>
   );
@@ -329,6 +354,7 @@ export default function App() {
       <Hero />
       <main>
         <Features />
+        <WindowSection />
         <Pace />
         <Privacy />
         <WhatsNew />
