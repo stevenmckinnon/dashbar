@@ -6,7 +6,10 @@
 #
 # One-time setup, needs a paid Apple Developer membership:
 #   1. Create a "Developer ID Application" certificate (Xcode → Settings → Accounts → Manage Certificates).
-#   2. Create an app-specific password at account.apple.com, then store a notary profile:
+#   2. Updates use a Sparkle signing key kept in your login Keychain (made with Sparkle's generate_keys; the
+#      public half is in Resources/sparkle-public-key.txt). Back it up with generate_keys -x; without it,
+#      installed copies can never accept an update.
+#   3. Create an app-specific password at account.apple.com, then store a notary profile:
 #        xcrun notarytool store-credentials dashbar-notary --apple-id YOU@EXAMPLE.COM --team-id TEAMID
 #      (use another profile name with NOTARY_PROFILE=name).
 set -euo pipefail
@@ -58,4 +61,16 @@ xcrun notarytool submit "$DMG" --keychain-profile "$PROFILE" --wait
 xcrun stapler staple "$DMG"
 spctl --assess --type open --context context:primary-signature --verbose "$DMG"
 shasum -a 256 "$DMG"
+
+# Update feed: Sparkle signs the finished DMG with the key in the Keychain and adds an entry to appcast.xml.
+# Run after stapling, since stapling changes the file. Commit appcast.xml once the GitHub release exists.
+GENERATE_APPCAST=$(find .build -path "*Sparkle/bin/generate_appcast" -type f | head -1)
+[[ -n "$GENERATE_APPCAST" ]] || { echo "generate_appcast not found; run swift build first" >&2; exit 1; }
+FEED_STAGE=$(mktemp -d)
+cp "$DMG" "$FEED_STAGE/"
+[[ -f appcast.xml ]] && cp appcast.xml "$FEED_STAGE/"
+"$GENERATE_APPCAST" --download-url-prefix "https://github.com/stevenmckinnon/dashbar/releases/download/v$VERSION/" "$FEED_STAGE"
+cp "$FEED_STAGE/appcast.xml" appcast.xml
+rm -rf "$FEED_STAGE"
+echo "Updated appcast.xml"
 echo "Ready to upload: $DMG"

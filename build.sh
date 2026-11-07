@@ -36,6 +36,11 @@ APP=build/Dashbar.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BINARY" "$APP/Contents/MacOS/Dashbar"
+
+# Sparkle (in-app updates) ships as a framework next to the binary: embed it and let the binary find it.
+mkdir -p "$APP/Contents/Frameworks"
+cp -R "$(dirname "$BINARY")/Sparkle.framework" "$APP/Contents/Frameworks/"
+install_name_tool -add_rpath @executable_path/../Frameworks "$APP/Contents/MacOS/Dashbar"
 cp "$ICON_ICNS" "$APP/Contents/Resources/AppIcon.icns"
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
@@ -54,9 +59,24 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
+__UPDATES__
 </dict>
 </plist>
 PLIST
+# Update feed and the public half of the signing key. Without a key file, the app builds with updates off.
+PUBLIC_KEY_FILE=Resources/sparkle-public-key.txt
+if [[ -f "$PUBLIC_KEY_FILE" ]]; then
+  UPDATES="  <key>SUFeedURL</key><string>https://raw.githubusercontent.com/stevenmckinnon/dashbar/main/appcast.xml</string>
+  <key>SUPublicEDKey</key><string>$(tr -d '[:space:]' < "$PUBLIC_KEY_FILE")</string>"
+else
+  UPDATES=""
+fi
+python3 - "$APP/Contents/Info.plist" "$UPDATES" <<'PY'
+import sys
+path, updates = sys.argv[1], sys.argv[2]
+s = open(path).read().replace("__UPDATES__", updates)
+open(path, "w").write(s)
+PY
 sed -i '' -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD_NUMBER/" "$APP/Contents/Info.plist"
 
 # Sign with a stable identity when one exists, so macOS recognises rebuilds as the same app
@@ -64,17 +84,19 @@ sed -i '' -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD_NUMBER/" "$APP/Con
 # falls back to ad-hoc signing, which macOS treats as a new app on every build.
 IDENTITY="${DASHBAR_SIGN_IDENTITY:-$(security find-identity -v -p codesigning 2>/dev/null \
   | grep -E '"(Developer ID Application|Apple Development):' | head -1 | sed -E 's/.*"(.*)".*/\1/')}"
-if [[ -n "$IDENTITY" ]]; then
-  if [[ "${DASHBAR_HARDENED:-}" == "1" ]]; then
-    codesign --force --sign "$IDENTITY" --options runtime --timestamp "$APP" >/dev/null
-  else
-    codesign --force --sign "$IDENTITY" --timestamp=none "$APP" >/dev/null
-  fi
-  echo "Signed with: $IDENTITY"
-else
-  codesign --force --sign - "$APP" >/dev/null
-  echo "Signed ad-hoc (no signing identity found)"
-fi
+# Nested code is signed first (inside out), then the app, so every signature covers what's inside it.
+sign() {
+  local flags=()
+  if [[ "${DASHBAR_HARDENED:-}" == "1" ]]; then flags=(--options runtime --timestamp); else flags=(--timestamp=none); fi
+  codesign --force --sign "${IDENTITY:--}" "${flags[@]}" "$@" >/dev/null
+}
+SPARKLE="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
+for item in "$SPARKLE"/XPCServices/*.xpc; do sign --preserve-metadata=entitlements "$item"; done
+sign "$SPARKLE/Autoupdate"
+sign "$SPARKLE/Updater.app"
+sign "$APP/Contents/Frameworks/Sparkle.framework"
+sign "$APP"
+if [[ -n "$IDENTITY" ]]; then echo "Signed with: $IDENTITY"; else echo "Signed ad-hoc (no signing identity found)"; fi
 echo "Built $APP"
 
 if [[ "${1:-}" == "--install" || "${2:-}" == "--install" ]]; then

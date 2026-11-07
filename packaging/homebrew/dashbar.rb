@@ -1,0 +1,23 @@
+cask "dashbar" do
+  version "0.2.0"
+  sha256 "c95e3d5eee20402a363677a8f9daaf61c449aabd081dacb10527f6d940bbbaad"
+
+  url "https://github.com/stevenmckinnon/dashbar/releases/download/v#{version}/Dashbar-#{version}.dmg"
+  name "Dashbar"
+  desc "Menu bar dashboard for AI agent usage, dev servers and system stats"
+  homepage "https://github.com/stevenmckinnon/dashbar"
+
+  livecheck do
+    url :url
+    strategy :github_latest
+  end
+
+  depends_on macos: ">= :sonoma"
+
+  app "Dashbar.app"
+
+  zap trash: [
+    "~/Library/Application Support/Dashbar",
+    "~/Library/Preferences/fun.dashbar.app.plist",
+  ]
+end

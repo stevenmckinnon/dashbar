@@ -62,7 +62,9 @@ final class AppSettings: ObservableObject {
         menuMemory = defaults.bool(forKey: Key.menuMemory)
         menuNetwork = defaults.bool(forKey: Key.menuNetwork)
         menuLimit = defaults.bool(forKey: Key.menuLimit)
-        claudeLimits = defaults.bool(forKey: Key.claudeLimits)
+        // Demo renders show the plan limits without reading the Keychain; assigning here skips `didSet`, so nothing is saved.
+        claudeLimits = defaults.bool(forKey: Key.claudeLimits) || CommandLine.arguments.contains("--demo")
+        if CommandLine.arguments.contains("--demo") { menuLimit = true }
     }
 }
 
@@ -232,6 +234,8 @@ private struct FolderSettings: View {
 }
 
 private struct AboutSettings: View {
+    @ObservedObject private var updater = Updater.shared
+
     var body: some View {
         VStack(spacing: 10) {
             Image(nsImage: NSApp.applicationIconImage)
@@ -241,6 +245,9 @@ private struct AboutSettings: View {
             Text("Dashbar").font(.title2.weight(.semibold))
             Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev")")
                 .foregroundStyle(.secondary)
+            if updater.isAvailable {
+                Button("Check for Updates…") { updater.checkForUpdates() }.disabled(!updater.canCheck)
+            }
             Text("Everything stays on your Mac. Dashbar reads Claude Code and Codex logs, lists listening ports and measures cache folders. It sends nothing anywhere.")
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)

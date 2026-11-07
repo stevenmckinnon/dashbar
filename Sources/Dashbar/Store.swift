@@ -61,8 +61,17 @@ final class Store: ObservableObject {
     private var watcher: FileWatcher?
     /// Whether the panel is on screen, reported by the panel's window. Closed until it first opens.
     private var panelVisible = false
+    /// Demo stores hold invented data and never collect anything.
+    private var isDemo = false
 
-    init() {
+    /// `demo` fills the store with invented data and starts nothing: no scanning, timers, watchers or
+    /// Keychain access. Used for README and website screenshots (`Dashbar --snapshot out.png --demo`).
+    init(demo: Bool = false) {
+        if demo {
+            isDemo = true
+            DemoData.apply(to: self)
+            return
+        }
         notifier.setup()
         refresh(usage: true, servers: true, panel: true)
         scanCleanup()
@@ -127,6 +136,7 @@ final class Store: ObservableObject {
     }
 
     func setPanelVisible(_ visible: Bool) {
+        guard !isDemo else { return }
         guard visible != panelVisible else { return }
         panelVisible = visible
         if visible && !paused {
@@ -136,12 +146,14 @@ final class Store: ObservableObject {
     }
 
     func refreshNow() {
+        guard !isDemo else { return }
         refresh(usage: true, servers: true, panel: true)
         refreshClaudePlan(force: true)
     }
 
     /// Experimental Claude plan limits, only while the user has opted in.
     func refreshClaudePlan(force: Bool = false) {
+        guard !isDemo else { return }
         guard settings.claudeLimits, !claudePlanLoading else { return }
         if !force, let fetched = claudePlan?.fetchedAt, Date().timeIntervalSince(fetched) < 60 { return }
         claudePlanLoading = true
@@ -167,6 +179,7 @@ final class Store: ObservableObject {
     }
 
     func scanCleanup() {
+        guard !isDemo else { return }
         let roots = settings.scanRoots.map { URL(fileURLWithPath: $0) }
         worker.scanCleanup(roots: roots) { [weak self] items in
             self?.cleanup = items
@@ -200,6 +213,7 @@ final class Store: ObservableObject {
     /// `panel` adds what only the open panel shows (other agent processes, busiest apps) and implies `system`.
     /// `system` samples CPU, memory, network, GPU and battery, which the menu bar stats also need.
     private func refresh(usage: Bool, servers: Bool, panel: Bool, system: Bool = false) {
+        guard !isDemo else { return }
         worker.collect(usage: usage, servers: servers, panel: panel, system: system || panel) { [weak self] r in
             guard let self else { return }
             self.trackTransitions(r.sessions)

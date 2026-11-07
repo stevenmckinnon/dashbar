@@ -1,0 +1,154 @@
+/* Layout for the five feature demos. Cards, limits and servers come from dashbar-demo.css. */
+.fd {
+  & .ss-stage {
+    overflow: hidden;
+    background: transparent;
+  }
+  .fd-box {
+    position: absolute;
+    inset: 16px 16px auto;
+    display: grid;
+    gap: 8px;
+    align-content: start;
+  }
+  .fd-box { grid-template-rows: none; }
+  .fd-pct {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  .fd-pct[data-show] { opacity: 1; }
+
+  .fd-in {
+    opacity: 0;
+    transform: translateY(8px);
+    will-change: transform;
+    transition: opacity 0.35s ease, transform 0.45s cubic-bezier(0.25, 0.8, 0.25, 1);
+  }
+  .fd-in[data-show] {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Compact: the context meter drops under the session so the name keeps its line */
+  .fd-box[data-layout="compact"] .dd-session {
+    flex-wrap: wrap;
+  }
+  .fd-box[data-layout="compact"] .dd-context {
+    margin-left: 34px;
+  }
+  .fd-box[data-layout="compact"] .dd-srv > .dd-faint {
+    display: none;
+  }
+
+  /* System */
+  .fd-tiles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .fd-tile {
+    padding: 12px 14px 14px;
+  }
+  .fd-tile-top {
+    font-size: 12px;
+    color: var(--ss-text);
+  }
+  .fd-tile strong {
+    display: block;
+    margin-top: 4px;
+    font-size: 22px;
+    line-height: 1.1;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    color: var(--ss-text-strong);
+  }
+  .fd-tile strong {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  .fd-tile strong[data-show] { opacity: 1; }
+  .fd-tile strong small {
+    margin-left: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ss-text);
+    letter-spacing: 0;
+  }
+  .fd-tile-chart {
+    margin-top: 8px;
+    color: var(--dd-codex);
+  }
+  .fd-app {
+    display: grid;
+    grid-template-columns: 64px 1fr 36px;
+    align-items: center;
+    gap: 10px;
+    height: 34px;
+    font-size: 13px;
+    color: var(--ss-text-strong);
+  }
+  .fd-app .dd-faint {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .fd-track {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--ss-ink-3);
+    overflow: hidden;
+  }
+  .fd-track i {
+    display: block;
+    height: 100%;
+    border-radius: 3px;
+    background: var(--dd-codex);
+    transition: width 0.9s cubic-bezier(0.25, 0.8, 0.25, 1);
+  }
+
+  /* Clean-up */
+  .fd-folder {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 46px;
+  }
+  .fd-action {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 6px;
+    padding-top: 12px;
+    border-top: 1px solid var(--ss-line);
+  }
+  .fd-total {
+    font-size: 15px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--ss-text-strong);
+  }
+  .fd-total small {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--ss-text);
+  }
+  .fd-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 9px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ss-text);
+    background: var(--ss-ink-2);
+    transition: background 0.3s ease, color 0.3s ease;
+  }
+  .fd-btn[data-on] {
+    color: #fff;
+    background: var(--dd-signal);
+  }
+}
+
+.fd .fd-fill { padding-bottom: 18px; }

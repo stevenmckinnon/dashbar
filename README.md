@@ -2,6 +2,35 @@
 
 A native macOS menu bar dashboard for agent usage, local dev servers, and system stats.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/overview-dark.png">
+    <img src="docs/images/overview-light.png" alt="Dashbar's Overview tab: working agents, servers, clean-up size and token usage" width="360">
+  </picture>
+  &nbsp;
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/agents-dark.png">
+    <img src="docs/images/agents-light.png" alt="Dashbar's Agents tab: plan limits with pace, workspaces and usage" width="360">
+  </picture>
+</p>
+
+## Install
+
+**Download:** get the latest `Dashbar-x.y.z.dmg` from [Releases](https://github.com/stevenmckinnon/dashbar/releases/latest),
+open it and drag Dashbar to Applications. It's signed with a Developer ID and notarised by Apple. Needs macOS 14 or later.
+
+**Homebrew:**
+
+```bash
+brew install --cask stevenmckinnon/tap/dashbar
+```
+
+Dashbar checks for updates itself (Settings → About → Check for Updates…).
+
+The project site is a small React app in `site/` (`npm run dev` inside it), deployed to GitHub Pages by
+`.github/workflows/pages.yml`. Its pictures come from `docs/images`, rendered with `Dashbar --snapshot … --demo`.
+
+
 - **Agents**: live Claude Code sessions (`~/.claude/sessions`), working/idle status, plus other agent processes it spots (Codex, Cursor, Gemini, Aider, Ollama…). Click a session to open its folder.
 - **Claude Code usage**: today's tokens (in / out / cache read / cache write), a 14-day chart, and top projects and models, read incrementally from `~/.claude/projects/**/*.jsonl`.
 - **Codex usage**: the same, plus 5h/weekly rate-limit gauges, from `~/.codex/sessions`. Shown once Codex has session logs.
@@ -67,6 +96,9 @@ Needs macOS 14+ and Xcode / Swift 6.
 `scripts/release.sh <version>` builds a universal (Apple silicon and Intel) app signed with a Developer ID
 certificate and the hardened runtime, wraps it in a DMG, notarises it with Apple and staples the ticket.
 `scripts/release.sh <version> --dry-run` does everything except notarise, with any signing identity.
+After notarising it signs the DMG for Sparkle and adds an entry to `appcast.xml`, the update feed the app reads;
+commit that file once the GitHub release exists. The signing key lives in the login Keychain
+(`Resources/sparkle-public-key.txt` is its public half), so back it up with Sparkle's `generate_keys -x`.
 
 One-time setup needs a paid Apple Developer membership: create a "Developer ID Application" certificate in
 Xcode, then store notary credentials with `xcrun notarytool store-credentials dashbar-notary` (the script's

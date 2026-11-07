@@ -11,9 +11,10 @@ enum Snapshot {
         if let tab = ProcessInfo.processInfo.environment["DASHBAR_TAB"] {
             UserDefaults.standard.set(tab, forKey: "panelTab")
         }
-        let store = Store()
+        let demo = CommandLine.arguments.contains("--demo")
+        let store = Store(demo: demo)
         self.store = store
-        store.setPanelVisible(true)   // offline renders never get the window's visibility callback
+        if !demo { store.setPanelVisible(true) }   // offline renders never get the window's visibility callback
         let dark = CommandLine.arguments.contains("--dark")
         let delay = Double(ProcessInfo.processInfo.environment["DASHBAR_SNAPSHOT_DELAY"] ?? "") ?? 10
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
@@ -79,7 +80,9 @@ enum Snapshot {
             if CommandLine.arguments.contains("--hosted") {
                 // Lay out the real scrolling panel the way MenuBarExtra does: at its fitting size.
                 let host = NSHostingView(rootView: DashboardView().environmentObject(store)
+                    .background(dark ? Color(white: 0.14) : Color(white: 0.97))
                     .environment(\.colorScheme, dark ? .dark : .light))
+                host.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
                 host.frame.size = host.fittingSize
                 host.layoutSubtreeIfNeeded()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1) {

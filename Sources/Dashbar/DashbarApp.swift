@@ -6,6 +6,7 @@ struct DashbarApp: App {
     @StateObject private var store = Store()
 
     init() {
+        _ = Updater.shared   // starts Sparkle's scheduled checks in a built app
         // Belt-and-braces: hide the Dock icon even when run outside the .app bundle.
         NSApplication.shared.setActivationPolicy(.accessory)
         if CommandLine.arguments.contains("--bench") { Bench.run() }

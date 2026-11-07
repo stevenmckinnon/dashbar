@@ -145,6 +145,8 @@ struct DashboardView: View {
                 Button("") { tab = t }.keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command).opacity(0)
             }
         }
+        // The window's see-through material turns muddy grey over a white page; a mostly opaque base keeps the panel legible on any backdrop.
+        .background { if scrolls { Color(nsColor: .windowBackgroundColor).opacity(0.86) } }
         .background { if scrolls { WindowVisibilityReader { store.setPanelVisible($0) } } } // not in offline snapshots
         .onAppear { store.setPanelVisible(true) }
         .onDisappear { store.setPanelVisible(false) }
@@ -301,6 +303,7 @@ private struct BottomBar: View {
     var prompt: String
     var focused: FocusState<Bool>.Binding
     @AppStorage(Notifier.defaultsKey) private var notify = true
+    @ObservedObject private var updater = Updater.shared
 
     var body: some View {
         HStack(spacing: 8) {
@@ -331,6 +334,10 @@ private struct BottomBar: View {
                 Divider()
                 Toggle("Notify when an agent finishes", isOn: $notify)
                 Divider()
+                if updater.isAvailable {
+                    Button("Check for Updates…") { updater.checkForUpdates() }.disabled(!updater.canCheck)
+                    Divider()
+                }
                 Button("Rescan for clean-up") { store.scanCleanup() }
                 Button("Refresh now") { store.refreshNow() }
                 Divider()
