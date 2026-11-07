@@ -1549,6 +1549,13 @@ private struct PlanLimitsCard: View {
                         Button("Refresh") { store.refreshClaudeSignIn() }
                             .buttonStyle(.link).font(.system(size: UI.Size.caption, weight: .medium))
                             .help("Runs Claude Code once in the background, which refreshes its sign-in. Uses a few tokens.")
+                    } else if let retryAt = store.claudePlanRetryAt, retryAt > Date() {
+                        // Waiting out a rate limit: a Retry button would only ask too soon again.
+                        TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                            Text(retryAt > ctx.date ? "Retrying in \(Fmt.duration(retryAt.timeIntervalSince(ctx.date)))" : "Retrying…")
+                                .font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
+                        }
+                        .fixedSize()
                     } else {
                         Button("Retry") { store.refreshClaudePlan(force: true) }
                             .buttonStyle(.link).font(.system(size: UI.Size.caption, weight: .medium))
@@ -1556,6 +1563,13 @@ private struct PlanLimitsCard: View {
                 }
             } else if let limits = store.claudePlan?.limits, !limits.isEmpty {
                 ForEach(limits) { LimitBar(limit: $0, tint: UI.claude) }
+                if let note = store.claudePlan?.staleNote {
+                    HStack(alignment: .top, spacing: 5) {
+                        Image(systemName: "clock").accessibilityHidden(true)
+                        Text(note).fixedSize(horizontal: false, vertical: true)
+                    }
+                    .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+                }
             } else {
                 Text("Loading plan limits…").font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
             }

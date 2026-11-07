@@ -377,6 +377,51 @@ private func session(id: String, root: String = "/dev/app", busy: Bool = false, 
     }
 }
 
+// MARK: - Waiting out plan limit failures
+
+@Suite struct PlanLimitBackoffTests {
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+
+    @Test func retryAfterReadsSecondsOrADate() {
+        #expect(ClaudePlanLimits.retryAfter("120", now: now) == 120)
+        #expect(ClaudePlanLimits.retryAfter(" 30 ", now: now) == 30)
+        let date = "Fri, 15 Jan 2027 08:05:00 GMT"   // 1_800_000_000 is 08:00:00 that day
+        #expect(ClaudePlanLimits.retryAfter(date, now: now) == 300)
+        #expect(ClaudePlanLimits.retryAfter("soon", now: now) == nil)
+        #expect(ClaudePlanLimits.retryAfter(nil, now: now) == nil)
+    }
+
+    @Test func backoffDoublesUpToHalfAnHourAndHonoursTheServer() {
+        #expect(ClaudePlanLimits.backoff(failures: 1, retryAfter: nil) == 120)
+        #expect(ClaudePlanLimits.backoff(failures: 2, retryAfter: nil) == 240)
+        #expect(ClaudePlanLimits.backoff(failures: 3, retryAfter: nil) == 480)
+        #expect(ClaudePlanLimits.backoff(failures: 10, retryAfter: nil) == 1800)
+        #expect(ClaudePlanLimits.backoff(failures: 1, retryAfter: 900) == 900)
+        #expect(ClaudePlanLimits.backoff(failures: 1, retryAfter: 5) == 60)   // never sooner than a minute
+    }
+
+    @Test func aRateLimitKeepsTheLastGoodLimits() {
+        let good = ClaudePlanLimits.Result(limits: [RateLimit(label: "5-hour", usedPercent: 40, resetsAt: now, window: 5 * 3600)],
+                                           plan: "Pro", fetchedAt: now.addingTimeInterval(-180))
+        let limited = ClaudePlanLimits.Result(plan: "Pro", problem: ClaudePlanLimits.rateLimitedMessage, transient: true)
+        let shown = ClaudePlanLimits.keepingLastGood(good, limited, now: now)
+        #expect(shown.problem == nil)
+        #expect(shown.limits.first?.usedPercent == 40)
+        #expect(shown.staleNote?.hasPrefix("Updated 3m ago.") == true)
+    }
+
+    @Test func withNothingToKeepTheProblemShows() {
+        let limited = ClaudePlanLimits.Result(problem: ClaudePlanLimits.rateLimitedMessage, transient: true)
+        #expect(ClaudePlanLimits.keepingLastGood(nil, limited, now: now).problem == ClaudePlanLimits.rateLimitedMessage)
+    }
+
+    @Test func aProblemTheUserMustFixIsNeverHidden() {
+        let good = ClaudePlanLimits.Result(limits: [RateLimit(label: "5-hour", usedPercent: 40, resetsAt: now, window: 5 * 3600)])
+        let signIn = ClaudePlanLimits.Result(problem: "Claude didn't accept the sign-in.", needsSignIn: true)
+        #expect(ClaudePlanLimits.keepingLastGood(good, signIn, now: now).problem == "Claude didn't accept the sign-in.")
+    }
+}
+
 // MARK: - Waiting for you
 
 @Suite struct WaitingTests {

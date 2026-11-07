@@ -25,6 +25,10 @@ final class Store: ObservableObject {
     @Published var history = SystemHistory()
     @Published var claudePlan: ClaudePlanLimits.Result?
     @Published var claudePlanLoading = false
+    /// After a temporary failure, no plan request goes out before this, not even from Retry or Refresh:
+    /// asking again while rate limited only keeps the limit tripped.
+    @Published private(set) var claudePlanRetryAt: Date?
+    private var claudePlanFailures = 0
     /// Claude Code is running to refresh its own sign-in.
     @Published var claudeSigningIn = false
     /// A failed user action, phrased with what to do next. Shown until dismissed.
@@ -203,13 +207,25 @@ final class Store: ObservableObject {
     func refreshClaudePlan(force: Bool = false) {
         guard !isDemo else { return }
         guard settings.claudeLimits, !claudePlanLoading else { return }
-        if !force, let fetched = claudePlan?.fetchedAt, Date().timeIntervalSince(fetched) < 60 { return }
+        if let retryAt = claudePlanRetryAt, Date() < retryAt { return }
+        if !force, let fetched = claudePlan?.fetchedAt, claudePlan?.staleNote == nil,
+           Date().timeIntervalSince(fetched) < 60 { return }
         claudePlanLoading = true
         Task.detached(priority: .utility) {
             let result = await ClaudePlanLimits.fetch()
             await MainActor.run {
                 self.claudePlanLoading = false
-                if self.settings.claudeLimits { self.claudePlan = result; self.checkLimits() }
+                guard self.settings.claudeLimits else { return }
+                if result.transient {
+                    self.claudePlanFailures += 1
+                    let wait = ClaudePlanLimits.backoff(failures: self.claudePlanFailures, retryAfter: result.retryAfter)
+                    self.claudePlanRetryAt = Date().addingTimeInterval(wait)
+                } else {
+                    self.claudePlanFailures = 0
+                    self.claudePlanRetryAt = nil
+                }
+                self.claudePlan = ClaudePlanLimits.keepingLastGood(self.claudePlan, result)
+                self.checkLimits()
             }
         }
     }

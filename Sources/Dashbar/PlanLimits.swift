@@ -20,6 +20,13 @@ enum ClaudePlanLimits {
         /// The sign-in is expired or rejected, which Claude Code itself can fix by making any request.
         var needsSignIn = false
         var fetchedAt = Date()
+        /// A failure that clears up by itself (rate limited, a server error, no connection): worth waiting out,
+        /// and not a reason to throw away the last good reading.
+        var transient = false
+        /// How long Anthropic asked us to wait (`Retry-After`), when it said.
+        var retryAfter: TimeInterval?
+        /// Shown under limits kept from an earlier reading, saying why they weren't refreshed.
+        var staleNote: String?
     }
 
     struct Credentials {
@@ -99,14 +106,51 @@ enum ClaudePlanLimits {
                 return (limits.isEmpty
                     ? Result(plan: creds.plan, problem: "Claude's usage response had no limits Dashbar recognises. The format may have changed.")
                     : Result(limits: limits, plan: creds.plan), false)
+            case 429:
+                let wait = retryAfter((response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Retry-After"))
+                return (Result(plan: creds.plan, problem: rateLimitedMessage, transient: true, retryAfter: wait), false)
+            case 500...599:
+                return (Result(plan: creds.plan, problem: "Anthropic's usage service had a problem (HTTP \(status)). Dashbar will try again shortly.", transient: true), false)
             case 401, 403:
                 return (Result(plan: creds.plan, problem: "Claude didn't accept the sign-in. Run `claude` in a terminal once to refresh it, then retry.", needsSignIn: true), true)
             default:
                 return (Result(plan: creds.plan, problem: "Couldn't load Claude plan limits (HTTP \(status)). The endpoint may have changed."), false)
             }
         } catch {
-            return (Result(plan: creds.plan, problem: "Couldn't reach Anthropic to load plan limits. Check your connection."), false)
+            return (Result(plan: creds.plan, problem: "Couldn't reach Anthropic to load plan limits. Check your connection.", transient: true), false)
         }
+    }
+
+    // MARK: Waiting out failures
+
+    static let rateLimitedMessage = "Claude is limiting how often plan usage can be read, often because another app (or another copy of Dashbar) is also asking. Dashbar will try again shortly."
+
+    /// `Retry-After` as seconds, from either form the header allows: a number of seconds or an HTTP date.
+    static func retryAfter(_ header: String?, now: Date = Date()) -> TimeInterval? {
+        guard let header = header?.trimmingCharacters(in: .whitespaces), !header.isEmpty else { return nil }
+        if let seconds = Double(header) { return max(0, seconds) }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        return f.date(from: header).map { max(0, $0.timeIntervalSince(now)) }
+    }
+
+    /// How long to wait after the `failures`-th failure in a row: what Anthropic asked for if it said
+    /// (but at least a minute), else 2, 4, 8… minutes, up to half an hour.
+    static func backoff(failures: Int, retryAfter: TimeInterval?) -> TimeInterval {
+        if let retryAfter { return min(max(retryAfter, 60), 3600) }
+        return min(120 * pow(2, Double(max(failures, 1) - 1)), 1800)
+    }
+
+    /// What to show after a fetch: a transient failure keeps the last good limits, with a note, instead of
+    /// replacing them with an error. Anything else (success, or a problem the user has to fix) is shown as is.
+    static func keepingLastGood(_ previous: Result?, _ new: Result, now: Date = Date()) -> Result {
+        guard new.transient, let previous, previous.problem == nil, !previous.limits.isEmpty else { return new }
+        var kept = previous
+        kept.staleNote = "Updated \(Fmt.ago(previous.fetchedAt, now: now)) ago. " + (new.retryAfter != nil || new.problem == rateLimitedMessage
+            ? "Claude asked Dashbar to slow down, so it will refresh in a few minutes."
+            : "The last refresh failed; Dashbar will try again shortly.")
+        return kept
     }
 
     // MARK: Keychain (read-only)
