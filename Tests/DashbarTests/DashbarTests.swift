@@ -362,6 +362,14 @@ private func session(id: String, root: String = "/dev/app", busy: Bool = false, 
         #expect(found.map(\.name) == ["Codex", "Cursor"])
         #expect(found.first?.count == 2)
     }
+
+    @Test func t3CodeShowsOnceEvenThoughItRunsItsBinaryTwice() {
+        let app = "/Applications/T3 Code (Beta).app/Contents/MacOS/T3 Code (Beta)"
+        let found = AgentProcesses.read(executables: [app, app,
+            "/Applications/T3 Code (Beta).app/Contents/Frameworks/T3 Code (Beta) Helper.app/Contents/MacOS/T3 Code (Beta) Helper"])
+        #expect(found.map(\.name) == ["T3 Code"])
+        #expect(found.first?.count == 1)
+    }
 }
 
 // MARK: - Plan limits (experimental Claude, parsing only)

@@ -71,7 +71,11 @@ enum AgentProcesses {
         "gemini": "Gemini CLI", "aider": "Aider", "opencode": "opencode",
         "amp": "Amp", "goose": "Goose", "copilot": "Copilot CLI",
         "ollama": "Ollama", "LM Studio": "LM Studio",
+        "T3 Code": "T3 Code", "T3 Code (Beta)": "T3 Code", "T3 Code (Alpha)": "T3 Code",
     ]
+
+    /// Apps that run a second copy of their own binary as a helper, so they count once however many show up.
+    private static let countsOnce: Set<String> = ["T3 Code"]
 
     static func read() -> [AgentProcess] {
         read(executables: Proc.allPIDs().compactMap(Proc.path))
@@ -83,7 +87,7 @@ enum AgentProcesses {
         for path in executables {
             if let name = known[URL(fileURLWithPath: path).lastPathComponent] { counts[name, default: 0] += 1 }
         }
-        return counts.map { AgentProcess(name: $0.key, count: $0.value) }.sorted { $0.name < $1.name }
+        return counts.map { AgentProcess(name: $0.key, count: countsOnce.contains($0.key) ? 1 : $0.value) }.sorted { $0.name < $1.name }
     }
 }
 
