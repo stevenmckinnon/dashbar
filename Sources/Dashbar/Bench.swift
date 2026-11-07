@@ -38,6 +38,19 @@ enum Bench {
         print("  Network ↓\(Fmt.rate(sys.netDown)) ↑\(Fmt.rate(sys.netUp)), GPU \(sys.gpu.map { String(format: "%.0f%%", $0 * 100) } ?? "n/a")")
         print("  Battery \(sys.battery.map { "\($0)%" } ?? "none"), charging \(sys.charging), AC \(sys.onAC), \(sys.batteryMinutes.map { Fmt.minutes($0) } ?? "no estimate")")
         for a in apps { print(String(format: "  %5.1f%%  %@", a.cpu * 100, a.name)) }
+        let workspaces = Workspace.build(sessions: ClaudeSessions.read(), servers: l.filter { $0.isDev && $0.root != nil && !$0.isDocker })
+        var anchors: [pid_t: String] = [:]
+        for w in workspaces { for s in w.sessions { anchors[s.pid] = w.root }; for s in w.servers { anchors[s.pid] = w.root } }
+        let ws = WorkspaceSampler()
+        _ = ws.sample(roots: workspaces.map(\.root), anchors: anchors)
+        Thread.sleep(forTimeInterval: 1.5)
+        let usage = time("Workspace usage") { ws.sample(roots: workspaces.map(\.root), anchors: anchors) }
+        for w in workspaces {
+            guard let u = usage[w.root] else { continue }
+            print(String(format: "  %-22@ %5.1f%% %9@ %@  %@", w.name as NSString, u.cpu * 100, Fmt.bytes(u.memory) as NSString,
+                         u.watts.map { String(format: "%.2f W", $0) } ?? "no energy",
+                         u.processes.prefix(4).map { "\($0.name)×\($0.count)" }.joined(separator: " ")))
+        }
         print("Resident memory: \(Fmt.bytes(residentBytes()))")
         exit(0)
     }

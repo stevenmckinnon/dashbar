@@ -58,6 +58,39 @@ enum DemoData {
             9003: SpawnedProcesses(count: 3, memory: 210 * 1_048_576, ports: [5173], names: ["node", "zsh"]),
         ]
 
+        // What each workspace uses (its detail page)
+        func usage(cpu: Double, mb: Double, watts: Double, upMinutes: Double, branch: String,
+                   _ processes: [(String, Int, Double, Double)]) -> WorkspaceUsage {
+            WorkspaceUsage(cpu: cpu, memory: UInt64(mb * 1_048_576), watts: watts, started: minutes(upMinutes),
+                           processes: processes.map { .init(name: $0.0, count: $0.1, cpu: $0.2, memory: UInt64($0.3 * 1_048_576)) },
+                           branch: branch)
+        }
+        store.workspaceUsage = [
+            "\(home)/storefront-web": usage(cpu: 0.12, mb: 1_136, watts: 3.1, upMinutes: 52, branch: "checkout-flow", [
+                ("node", 3, 0.071, 498), ("claude", 1, 0.029, 344), ("esbuild", 1, 0.014, 86), ("next-server", 1, 0.004, 182),
+                ("git", 1, 0.002, 17), ("zsh", 2, 0, 9)]),
+            "\(home)/billing-api": usage(cpu: 0.003, mb: 512, watts: 0.2, upMinutes: 60 * 20, branch: "main", [
+                ("node", 1, 0.002, 186), ("claude", 1, 0.001, 318), ("zsh", 1, 0, 8)]),
+            "\(home)/docs-site": usage(cpu: 0.02, mb: 610, watts: 0.6, upMinutes: 60 * 3, branch: "plugin-api-docs", [
+                ("node", 2, 0.015, 290), ("claude", 1, 0.005, 300), ("zsh", 1, 0, 9)]),
+            "\(home)/notes-ios": usage(cpu: 0.001, mb: 296, watts: 0.05, upMinutes: 60 * 4, branch: "swiftui-settings", [
+                ("claude", 1, 0.001, 288), ("zsh", 1, 0, 8)]),
+            "\(home)/ml-notebooks": usage(cpu: 0.002, mb: 262, watts: 0.04, upMinutes: 60 * 27, branch: "main", [
+                ("python3.12", 2, 0.002, 238), ("zsh", 1, 0, 9)]),
+        ]
+        store.workspaceHistory = store.workspaceUsage.mapValues { u in
+            var h = WorkspaceHistory()
+            for i in 0..<WorkspaceHistory.length {
+                var s = u
+                let wave = 0.75 + 0.35 * sin(Double(i) / 3.0) + (i % 9 == 4 ? 0.9 : 0)
+                s.cpu = u.cpu * (i == WorkspaceHistory.length - 1 ? 1 : wave)
+                s.memory = UInt64(Double(u.memory) * (0.9 + 0.1 * Double(i) / Double(WorkspaceHistory.length)))
+                s.watts = (u.watts ?? 0) * (i == WorkspaceHistory.length - 1 ? 1 : 0.8 + 0.3 * sin(Double(i) / 3.0 + 0.5))
+                h.append(s)
+            }
+            return h
+        }
+
         // Usage
         var today = TokenTotals(); today.input = 1_200_000; today.output = 640_000; today.cacheRead = 148_000_000; today.cacheWrite = 2_900_000; today.messages = 486
         var week = TokenTotals(); week.input = 5_100_000; week.output = 2_800_000; week.cacheRead = 668_000_000; week.cacheWrite = 11_000_000; week.messages = 2_310

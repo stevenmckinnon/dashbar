@@ -23,6 +23,9 @@ final class Store: ObservableObject {
     @Published var paused = false
     @Published var topApps: [AppUsage] = []
     @Published var history = SystemHistory()
+    /// What each workspace's processes use, keyed by workspace root. Sampled only while a window is open.
+    @Published var workspaceUsage: [String: WorkspaceUsage] = [:]
+    @Published var workspaceHistory: [String: WorkspaceHistory] = [:]
     @Published var claudePlan: ClaudePlanLimits.Result?
     @Published var claudePlanLoading = false
     /// After a temporary failure, no plan request goes out before this, not even from Retry or Refresh:
@@ -329,6 +332,12 @@ final class Store: ObservableObject {
                 self.history.append(sys)
             }
             if let apps = r.topApps { self.topApps = apps }
+            if let usage = r.workspaceUsage {
+                self.workspaceUsage = usage
+                var history = self.workspaceHistory.filter { usage[$0.key] != nil }
+                for (root, u) in usage { history[root, default: WorkspaceHistory()].append(u) }
+                self.workspaceHistory = history
+            }
             if let l = r.listeners { self.listeners = l }
             if let s = r.spawned { self.spawned = s }
             if let c = r.claude { self.claude = c; self.usageLoading = false }
@@ -348,6 +357,7 @@ final class Worker: @unchecked Sendable {
         var topApps: [AppUsage]?
         var listeners: [Listener]?
         var spawned: [Int32: SpawnedProcesses]?
+        var workspaceUsage: [String: WorkspaceUsage]?
         var claude: UsageSummary?
         var codex: UsageSummary?
         var codexLimits: [RateLimit] = []
@@ -361,6 +371,9 @@ final class Worker: @unchecked Sendable {
     private let contextReader = ContextReader()
     private let sampler = SystemSampler()
     private let serverActivity = ServerActivity()
+    private let workspaceSampler = WorkspaceSampler()
+    /// Servers are read every few ticks; workspace sampling uses the latest reading in between.
+    private var lastListeners: [Listener] = []
     private var lastSave = Date()
 
     func collect(usage: Bool, servers: Bool, panel: Bool, system: Bool, done: @escaping @MainActor (Result) -> Void) {
@@ -369,15 +382,24 @@ final class Worker: @unchecked Sendable {
             r.sessions = ClaudeSessions.read()
             r.contexts = contextReader.read(r.sessions)
             if system { r.system = sampler.sample() }
-            if panel {
-                r.agents = AgentProcesses.read()
-                r.topApps = sampler.topApps()
-            }
             if servers {
                 var listeners = Listeners.read()
                 serverActivity.annotate(&listeners)
                 r.spawned = ProcessTree.spawned(sessions: r.sessions, listeners: &listeners)
                 r.listeners = listeners
+                lastListeners = listeners
+            }
+            if panel {
+                r.agents = AgentProcesses.read()
+                r.topApps = sampler.topApps()
+                let workspaces = Workspace.build(sessions: r.sessions,
+                                                 servers: lastListeners.filter { $0.isDev && $0.root != nil && !$0.isDocker })
+                var anchors: [pid_t: String] = [:]
+                for w in workspaces {
+                    for s in w.sessions { anchors[s.pid] = w.root }
+                    for l in w.servers { anchors[l.pid] = w.root }
+                }
+                r.workspaceUsage = workspaceSampler.sample(roots: workspaces.map(\.root), anchors: anchors)
             }
             if usage {
                 r.claude = claudeScanner.scan()

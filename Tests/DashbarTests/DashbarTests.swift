@@ -926,3 +926,91 @@ struct MenuBarReadingTests {
         #expect((image.representations.map(\.pixelsWide).max() ?? 0) == 256)
     }
 }
+
+// MARK: - Workspace detail
+
+@Suite("Workspace usage")
+struct WorkspaceUsageTests {
+    let root = "/Users/me/code/shop"
+    let other = "/Users/me/code/shop-admin"
+
+    /// pid → (parent, cwd, executable path)
+    func assign(_ table: [pid_t: (pid_t, String?, String)], anchors: [pid_t: String], exclude: pid_t = 999) -> [pid_t: String] {
+        WorkspaceSampler.assign(pids: Array(table.keys), parents: table.mapValues(\.0), roots: [root, other], anchors: anchors,
+                                exclude: exclude, cwd: { table[$0]?.1 }, path: { table[$0]?.2 })
+    }
+
+    @Test func agentsServersAndWhatTheyStartedBelongToTheirWorkspace() {
+        let owners = assign([
+            10: (1, root, "/usr/local/bin/claude"),           // the agent session
+            11: (10, "/Users/me", "/usr/local/bin/gotemail"), // an MCP server it started, working elsewhere
+            12: (11, "/tmp", "/usr/bin/python3"),             // and that one's child
+            20: (1, other, "/usr/local/bin/node"),            // a dev server in the other workspace
+        ], anchors: [10: root, 20: other])
+        #expect(owners == [10: root, 11: root, 12: root, 20: other])
+    }
+
+    @Test func otherProcessesGoByTheirFolderDeepestMatchFirst() {
+        let owners = assign([
+            30: (1, root + "/packages/web", "/bin/zsh"),
+            31: (1, other, "/bin/zsh"),             // "shop-admin" is not inside "shop"
+            32: (1, "/Users/me/code", "/bin/zsh"),  // above both: nobody's
+            33: (1, "/", "/usr/sbin/syslogd"),
+        ], anchors: [:])
+        #expect(owners == [30: root, 31: other])
+    }
+
+    @Test func appHelpersAndDashbarItselfAreLeftOut() {
+        let owners = assign([
+            40: (1, root, "/Applications/Cursor.app/Contents/Frameworks/Cursor Helper.app/Contents/MacOS/Cursor Helper"),
+            41: (40, root, "/bin/zsh"),   // a terminal inside the editor still counts: it works in the project
+            999: (1, root, "/Applications/Dashbar.app/Contents/MacOS/Dashbar"),
+        ], anchors: [:])
+        #expect(owners == [41: root])
+    }
+
+    @Test func branchFromHead() {
+        #expect(WorkspaceSampler.parseHead("ref: refs/heads/main\n") == "main")
+        #expect(WorkspaceSampler.parseHead("ref: refs/heads/feature/checkout") == "feature/checkout")
+        #expect(WorkspaceSampler.parseHead("3f2a9c81d0e4b5a6c7d8e9f00112233445566778\n") == "3f2a9c8")
+        #expect(WorkspaceSampler.parseHead("") == nil)
+    }
+
+    @Test func branchFollowsAWorktreeGitFile() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("dashbar-git-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let main = dir.appendingPathComponent("main"), tree = dir.appendingPathComponent("tree")
+        let gitDir = main.appendingPathComponent(".git/worktrees/tree")
+        try FileManager.default.createDirectory(at: gitDir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: tree, withIntermediateDirectories: true)
+        try "ref: refs/heads/main\n".write(to: main.appendingPathComponent(".git/HEAD"), atomically: true, encoding: .utf8)
+        try "ref: refs/heads/fix-login\n".write(to: gitDir.appendingPathComponent("HEAD"), atomically: true, encoding: .utf8)
+        try "gitdir: \(gitDir.path)\n".write(to: tree.appendingPathComponent(".git"), atomically: true, encoding: .utf8)
+        #expect(WorkspaceSampler.branch(in: main.path) == "main")
+        #expect(WorkspaceSampler.branch(in: tree.path) == "fix-login")
+        #expect(WorkspaceSampler.branch(in: dir.path) == nil)
+    }
+
+    @Test func versionNamedBinariesTakeTheToolsName() {
+        #expect(WorkspaceSampler.displayName("2.1.318", path: "/Users/me/.local/share/claude/versions/2.1.318") == "claude")
+        #expect(WorkspaceSampler.displayName("node", path: "/opt/homebrew/bin/node") == "node")
+        #expect(WorkspaceSampler.displayName("2.1.318", path: nil) == "2.1.318")
+    }
+
+    @Test func historyKeepsTheLatestSamples() {
+        var h = WorkspaceHistory()
+        for i in 0..<(WorkspaceHistory.length + 5) {
+            h.append(WorkspaceUsage(cpu: Double(i), memory: UInt64(i), watts: i.isMultiple(of: 2) ? Double(i) : nil))
+        }
+        #expect(h.cpu.count == WorkspaceHistory.length)
+        #expect(h.cpu.last == Double(WorkspaceHistory.length + 4))
+        #expect(h.watts.allSatisfy { Int($0).isMultiple(of: 2) })   // missing readings are skipped, not zeroed
+    }
+
+    @Test func energyWords() {
+        #expect(WorkspaceUsage.energyWord(0.02) == "Very low")
+        #expect(WorkspaceUsage.energyWord(1.5) == "Low")
+        #expect(WorkspaceUsage.energyWord(3.1) == "Moderate")
+        #expect(WorkspaceUsage.energyWord(12) == "High")
+    }
+}
