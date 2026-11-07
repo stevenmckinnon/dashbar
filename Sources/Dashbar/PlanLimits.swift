@@ -162,6 +162,48 @@ enum ClaudePlanLimits {
         return kept
     }
 
+    // MARK: Sharing between copies
+
+    /// The last reading and any backoff, shared by every copy of Dashbar on this Mac (the installed release and a
+    /// local build), so only one of them asks Claude. Holds usage percentages and reset times, never the sign-in.
+    struct Shared: Codable {
+        var fetchedAt: Date?
+        var plan: String?
+        var limits: [RateLimit] = []
+        /// No copy asks before this.
+        var retryAt: Date?
+
+        static let defaultURL = homeDir.appendingPathComponent("Library/Caches/Dashbar/claude-plan.json")
+
+        enum Decision: Equatable { case useShared, wait(Date), fetch }
+
+        /// A reading another copy made recently is used as is (the regular check is every 5 minutes, so anything
+        /// younger than 4 is current; Retry and Refresh still accept one under a minute old). A backoff another copy
+        /// is waiting out is waited out here too. Otherwise, ask.
+        func decide(now: Date = Date(), force: Bool) -> Decision {
+            if let retryAt, retryAt > now { return .wait(retryAt) }
+            if let fetchedAt, !limits.isEmpty, now.timeIntervalSince(fetchedAt) < (force ? 60 : 240) { return .useShared }
+            return .fetch
+        }
+
+        func result(stale: Stale? = nil) -> Result {
+            var r = Result(limits: limits, plan: plan, fetchedAt: fetchedAt ?? Date())
+            r.stale = stale
+            return r
+        }
+
+        static func load(from url: URL = defaultURL) -> Shared? {
+            guard let data = try? Data(contentsOf: url) else { return nil }
+            return try? JSONDecoder().decode(Shared.self, from: data)
+        }
+
+        func save(to url: URL = defaultURL) {
+            guard let data = try? JSONEncoder().encode(self) else { return }
+            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? data.write(to: url, options: .atomic)
+        }
+    }
+
     // MARK: Keychain (read-only)
 
     enum Read { case success(Credentials), failure(String) }

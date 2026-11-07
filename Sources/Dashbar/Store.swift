@@ -210,29 +210,64 @@ final class Store: ObservableObject {
         if let retryAt = claudePlanRetryAt, Date() < retryAt { return }
         if !force, let fetched = claudePlan?.fetchedAt, claudePlan?.stale == nil,
            Date().timeIntervalSince(fetched) < 60 { return }
+
+        // Another copy of Dashbar (the release beside a local build) may have just asked, or be waiting out a limit.
+        let shared = ClaudePlanLimits.Shared.load()
+        switch shared?.decide(force: force) {
+        case .useShared?:
+            if let shared, (claudePlan?.fetchedAt ?? .distantPast) < (shared.fetchedAt ?? .distantPast) || claudePlan?.stale != nil {
+                claudePlan = shared.result()
+                claudePlanFailures = 0
+                claudePlanRetryAt = nil
+                checkLimits()
+            }
+            return
+        case .wait(let until)?:
+            if let shared, !shared.limits.isEmpty {
+                claudePlan = shared.result(stale: .rateLimited)
+            } else if claudePlan?.limits.isEmpty ?? true {
+                claudePlan = ClaudePlanLimits.Result(plan: claudePlan?.plan, problem: ClaudePlanLimits.rateLimitedMessage, transient: true)
+            }
+            scheduleClaudeRetry(at: until)
+            return
+        default:
+            break
+        }
+
         claudePlanLoading = true
         Task.detached(priority: .utility) {
             let result = await ClaudePlanLimits.fetch()
             await MainActor.run {
                 self.claudePlanLoading = false
                 guard self.settings.claudeLimits else { return }
+                var record = ClaudePlanLimits.Shared.load() ?? ClaudePlanLimits.Shared()
                 if result.transient {
                     self.claudePlanFailures += 1
                     let wait = ClaudePlanLimits.backoff(failures: self.claudePlanFailures, retryAfter: result.retryAfter)
                     let retryAt = Date().addingTimeInterval(wait)
-                    self.claudePlanRetryAt = retryAt
-                    // Retry when the wait ends, so the countdown means what it says (the regular check is 5 minutes).
-                    DispatchQueue.main.asyncAfter(deadline: .now() + wait + 1) { [weak self] in
-                        guard let self, self.claudePlanRetryAt == retryAt, !self.paused else { return }
-                        self.refreshClaudePlan(force: true)
-                    }
+                    self.scheduleClaudeRetry(at: retryAt)
+                    record.retryAt = retryAt
+                    record.save()
                 } else {
                     self.claudePlanFailures = 0
                     self.claudePlanRetryAt = nil
+                    if result.problem == nil {
+                        record = ClaudePlanLimits.Shared(fetchedAt: result.fetchedAt, plan: result.plan, limits: result.limits)
+                        record.save()
+                    }
                 }
                 self.claudePlan = ClaudePlanLimits.keepingLastGood(self.claudePlan, result)
                 self.checkLimits()
             }
+        }
+    }
+
+    /// Waits until `retryAt`, then tries again, so the countdown means what it says (the regular check is 5 minutes).
+    private func scheduleClaudeRetry(at retryAt: Date) {
+        claudePlanRetryAt = retryAt
+        DispatchQueue.main.asyncAfter(deadline: .now() + max(0, retryAt.timeIntervalSinceNow) + 1) { [weak self] in
+            guard let self, self.claudePlanRetryAt == retryAt, !self.paused else { return }
+            self.refreshClaudePlan(force: true)
         }
     }
 

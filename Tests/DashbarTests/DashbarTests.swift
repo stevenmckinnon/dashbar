@@ -415,6 +415,37 @@ private func session(id: String, root: String = "/dev/app", busy: Bool = false, 
         #expect(ClaudePlanLimits.keepingLastGood(nil, limited, now: now).problem == ClaudePlanLimits.rateLimitedMessage)
     }
 
+    typealias Shared = ClaudePlanLimits.Shared
+    var reading: [RateLimit] { [RateLimit(label: "5-hour", usedPercent: 40, resetsAt: now.addingTimeInterval(3600), window: 5 * 3600)] }
+
+    @Test func anotherCopysRecentReadingIsUsedInsteadOfAsking() {
+        let fresh = Shared(fetchedAt: now.addingTimeInterval(-90), plan: "Pro", limits: reading)
+        #expect(fresh.decide(now: now, force: false) == .useShared)
+        #expect(fresh.decide(now: now, force: true) == .fetch)            // Retry wants newer than 90s
+        let justNow = Shared(fetchedAt: now.addingTimeInterval(-20), plan: "Pro", limits: reading)
+        #expect(justNow.decide(now: now, force: true) == .useShared)
+        let old = Shared(fetchedAt: now.addingTimeInterval(-300), plan: "Pro", limits: reading)
+        #expect(old.decide(now: now, force: false) == .fetch)
+    }
+
+    @Test func anotherCopysBackoffIsWaitedOut() {
+        let waiting = Shared(fetchedAt: now.addingTimeInterval(-600), limits: reading, retryAt: now.addingTimeInterval(120))
+        #expect(waiting.decide(now: now, force: true) == .wait(now.addingTimeInterval(120)))
+        let over = Shared(fetchedAt: now.addingTimeInterval(-600), limits: reading, retryAt: now.addingTimeInterval(-1))
+        #expect(over.decide(now: now, force: false) == .fetch)
+    }
+
+    @Test func theSharedFileRoundTrips() throws {
+        let fx = try Fixture(); defer { fx.remove() }
+        let url = fx.root.appendingPathComponent("caches/claude-plan.json")
+        Shared(fetchedAt: now, plan: "Pro", limits: reading, retryAt: now.addingTimeInterval(60)).save(to: url)
+        let back = try #require(Shared.load(from: url))
+        #expect(back.plan == "Pro")
+        #expect(back.limits.first?.usedPercent == 40)
+        #expect(back.retryAt == now.addingTimeInterval(60))
+        #expect(Shared.load(from: fx.root.appendingPathComponent("missing.json")) == nil)
+    }
+
     @Test func aProblemTheUserMustFixIsNeverHidden() {
         let good = ClaudePlanLimits.Result(limits: [RateLimit(label: "5-hour", usedPercent: 40, resetsAt: now, window: 5 * 3600)])
         let signIn = ClaudePlanLimits.Result(problem: "Claude didn't accept the sign-in.", needsSignIn: true)

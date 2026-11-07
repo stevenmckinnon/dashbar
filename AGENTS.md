@@ -74,7 +74,8 @@ images stay clean.
 - Never add analytics, accounts or network calls. The only allowed requests are Sparkle update checks to
   GitHub and the opt-in Claude plan limits request to `api.anthropic.com`.
 - Never read, print, log or store Claude Code's token. Dashbar only reads its Keychain entry (macOS asks
-  first), makes one read-only request, and never refreshes or saves the sign-in.
+  first), makes one read-only request, and never refreshes or saves the sign-in. The reading it shares between
+  copies (`~/Library/Caches/Dashbar/claude-plan.json`) holds usage percentages, reset times and the plan name only.
 - Clean-up only moves rebuildable folders (`node_modules`, `.next`, build output, DerivedData) to the Trash
   after confirmation. Never delete permanently.
 - Do not scan outside the user's chosen folders and the project's own folder for icons.
