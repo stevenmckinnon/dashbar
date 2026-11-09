@@ -77,7 +77,9 @@ final class AppWindow: NSObject, NSWindowDelegate {
 
     private func makeWindow(store: Store) -> NSWindow {
         let host = NSHostingController(rootView: AppView(model: model).environmentObject(store))
-        host.sizingOptions = []   // the window sets the size, not the content
+        // The window sets the size; the view only sets the minimum (AppView's minWidth and minHeight). With no options
+        // SwiftUI resets the window's minimum to zero, so it could be dragged down to the traffic lights.
+        host.sizingOptions = [.minSize]
         let window = NSWindow(contentViewController: host)
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         window.title = BuildInfo.appName
@@ -86,8 +88,14 @@ final class AppWindow: NSObject, NSWindowDelegate {
         window.isReleasedWhenClosed = false
         window.delegate = self
         window.setContentSize(NSSize(width: 1080, height: 720))
-        window.contentMinSize = Self.minimumSize
         if !window.setFrameAutosaveName("DashbarWindow") { window.center() }
+        // A frame saved while there was no minimum can be smaller than it.
+        let saved = window.contentRect(forFrameRect: window.frame).size
+        if saved.width < Self.minimumSize.width || saved.height < Self.minimumSize.height {
+            window.setContentSize(NSSize(width: max(saved.width, Self.minimumSize.width),
+                                         height: max(saved.height, Self.minimumSize.height)))
+            window.center()
+        }
         return window
     }
 
