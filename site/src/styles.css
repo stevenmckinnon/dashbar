@@ -77,6 +77,9 @@ code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.88em
 
 /* The hero's demo. Its own styles live in demos/dashbar-demo.css. */
 .demo { width: min(100%, 480px); margin-left: auto; }
+/* Where the column is narrower than the demo, it switches to its compact size, which the kit centres with an inline
+   margin; keep it on the right edge with the other demos instead (the stage is absolutely placed in its frame). */
+.demo .ss-stage { margin-left: 0 !important; left: auto; right: 0; transform-origin: 100% 0; }
 .caption { margin: 0; color: var(--muted); max-width: 46ch; }
 .caption-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-top: 14px; }
 @media (hover: hover) { .replay:hover { color: var(--ink); } }
@@ -94,8 +97,9 @@ code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.88em
 .features-head h2 { font-size: var(--step-head); }
 .features-head p { margin-top: 20px; max-width: 28ch; color: var(--muted); }
 .items { grid-column: 6 / -1; display: grid; gap: 88px; }
-/* As wide as the demo cards (the art bleeds 16px each side, to 592), so cards, text and Replay share one right edge. */
-.item { max-width: 560px; }
+/* As wide as the demo cards (the art bleeds 16px each side, to 592), so cards, text and Replay share one right edge,
+   and pushed to the page's right edge, where the hero and window demos end. */
+.item { max-width: 560px; justify-self: end; width: 100%; }
 .item .art { width: min(calc(100% + 32px), 592px); margin-left: -16px; margin-top: -16px; }
 .item .art img { width: 100%; border-radius: 14px; }
 .item h3 { margin-top: 0; }
@@ -104,6 +108,7 @@ code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.88em
   .features { display: block; padding-block: 72px; }
   .features-head { position: static; }
   .items { margin-top: 40px; gap: 56px; }
+  .item { justify-self: start; }
   .item .art { padding: 16px; border-radius: 20px; }
 }
 
