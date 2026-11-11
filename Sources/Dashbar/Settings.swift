@@ -173,7 +173,7 @@ private struct LabsSettings: View {
             Section {
                 Toggle("Show Claude plan limits", isOn: $settings.claudeLimits)
             } footer: {
-                Text("Reads Claude Code's sign-in from your Keychain (macOS asks first) to show your 5-hour and weekly limits. Uses an undocumented endpoint that may change. Never refreshes or saves the sign-in.")
+                Text("Reads Claude Code's sign-in from your Keychain, the same way Claude Code does, to show your 5-hour and weekly limits. Turning this on is the only permission it needs. Uses an undocumented endpoint that may change. Never refreshes or saves the sign-in.")
                     .foregroundStyle(.secondary)
             }
         }

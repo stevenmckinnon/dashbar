@@ -92,7 +92,7 @@ const ITEMS = [
   { name: "Working agents", Demo: AgentsDemo, w: 792, h: 276,
     body: <>Each Claude Code session by project: working or idle, for how long, and how full its context window is. It reads the session files and transcripts under <code>~/.claude</code>, and nothing else.</> },
   { name: "Plan limits, with pace", Demo: LimitsDemo, w: 792, h: 616,
-    body: <>Your 5-hour and weekly limits, with a mark for where an even pace would be and a projection of when you would run out at the current rate. Codex’s limits come from its own logs. Claude’s are experimental and off by default: they read Claude Code’s sign-in from your Keychain, and macOS asks first.</> },
+    body: <>Your 5-hour and weekly limits, with a mark for where an even pace would be and a projection of when you would run out at the current rate. Codex’s limits come from its own logs. Claude’s are experimental and off by default: turn them on and they read Claude Code’s sign-in from your Keychain, the same way Claude Code does.</> },
   { name: "Idle servers", Demo: ServersDemo, w: 792, h: 336,
     body: <>Dev servers grouped under the project that owns them. One that has been up for over an hour and is barely using the CPU is marked, and so is one an agent started.</> },
   { name: "System", Demo: SystemDemo, w: 792, h: 400,

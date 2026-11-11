@@ -55,8 +55,9 @@ The project site is a small React app in `site/` (`npm run dev` inside it), depl
 - **Menu bar stats** (optional, in Settings): CPU, memory, download speed and, with the Labs setting on, what's left of
   your Claude 5-hour or weekly limit, beside the icon.
 - **Plan limits**: Codex's 5-hour and weekly limits from its own logs. Claude's are behind an experimental,
-  off-by-default setting that reads Claude Code's sign-in from the Keychain (macOS asks first) and calls the
-  same undocumented endpoint as Claude Code's `/usage`. It never refreshes or stores the sign-in. Each limit
+  off-by-default setting that reads Claude Code's sign-in from the Keychain the way Claude Code does (with
+  macOS's `security` tool, so macOS doesn't ask again each time Claude Code renews it) and calls the same
+  undocumented endpoint as Claude Code's `/usage`. It never refreshes or stores the sign-in. Each limit
   shows a tick for an even pace and a projection of when it would run out at the current rate. If Claude
   rate-limits the request, Dashbar keeps the last reading and waits before asking again; copies of Dashbar on
   the same Mac share their last reading (`~/Library/Caches/Dashbar/claude-plan.json`, percentages and reset

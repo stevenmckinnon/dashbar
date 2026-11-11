@@ -5,8 +5,8 @@ import Security
 ///
 /// Claude doesn't store these limits on disk. Claude Code's own `/usage` screen fetches them from an
 /// undocumented Anthropic endpoint using its sign-in, which it keeps in the macOS Keychain. With the
-/// user's opt-in, Dashbar reads that sign-in (macOS asks the user first) and makes the same read-only
-/// request. It never refreshes or stores the token: when the sign-in has expired it asks the user to
+/// user's opt-in, Dashbar reads that sign-in the way Claude Code does (with macOS's `security` tool) and
+/// makes the same read-only request. It never refreshes or stores the token: when the sign-in has expired it asks the user to
 /// open Claude Code, which refreshes it, so Claude Code's session is never disturbed.
 enum ClaudePlanLimits {
     static let keychainService = "Claude Code-credentials"
@@ -48,8 +48,8 @@ enum ClaudePlanLimits {
         var service: String? = nil
     }
 
-    // The sign-in is kept in memory while it's valid, so the Keychain (and its permission prompt) is only
-    // touched at launch, when the sign-in expires, or when Claude rejects it.
+    // The sign-in is kept in memory while it's valid, so the Keychain is only read at launch, when the sign-in
+    // expires, or when Claude rejects it.
     private static let lock = NSLock()
     private static var cached: Credentials?
     private static let rememberedServiceKey = "claudeCredentialService"
@@ -221,20 +221,25 @@ enum ClaudePlanLimits {
         var found: [Credentials] = []
         var denied = false
         for service in ordered {
-            let query: [String: Any] = [
-                kSecClass as String: kSecClassGenericPassword,
-                kSecAttrService as String: service,
-                kSecReturnData as String: true,
-                kSecMatchLimit as String: kSecMatchLimitOne,
-            ]
-            var item: CFTypeRef?
-            let status = SecItemCopyMatching(query as CFDictionary, &item)
-            if status == errSecSuccess, let data = item as? Data, var creds = parseCredentials(data) {
+            var data = readWithSecurityTool(service: service)
+            if data.flatMap(parseCredentials) == nil {
+                // Not readable that way (an entry Claude Code didn't write with `security`): read it directly,
+                // which macOS asks about.
+                let query: [String: Any] = [
+                    kSecClass as String: kSecClassGenericPassword,
+                    kSecAttrService as String: service,
+                    kSecReturnData as String: true,
+                    kSecMatchLimit as String: kSecMatchLimitOne,
+                ]
+                var item: CFTypeRef?
+                let status = SecItemCopyMatching(query as CFDictionary, &item)
+                data = status == errSecSuccess ? item as? Data : nil
+                if [errSecUserCanceled, errSecAuthFailed, errSecInteractionNotAllowed].contains(status) { denied = true }
+            }
+            if let data, var creds = parseCredentials(data) {
                 creds.service = service
                 found.append(creds)
                 if service == remembered, (creds.expiresAt ?? .distantFuture) > Date() { break }   // good enough
-            } else if [errSecUserCanceled, errSecAuthFailed, errSecInteractionNotAllowed].contains(status) {
-                denied = true
             }
         }
         if let best = best(of: found) {
@@ -244,6 +249,35 @@ enum ClaudePlanLimits {
         return .failure(denied
             ? "Keychain access wasn't allowed. Turn the setting off and on to be asked again."
             : "Found Claude Code's sign-in but couldn't read it. Its format may have changed.")
+    }
+
+    /// Reads an entry with `/usr/bin/security`, the tool Claude Code itself saves and reads its sign-in with. The entry
+    /// trusts that tool, so macOS doesn't ask. Reading it as Dashbar instead asked again after every sign-in renewal:
+    /// Claude Code rewrites the entry when it renews (about daily), which drops the "Always Allow" given to Dashbar.
+    /// The output goes straight into memory; it is never logged or saved. Nil if the tool fails or takes too long.
+    static func readWithSecurityTool(service: String) -> Data? {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/security")
+        p.arguments = ["find-generic-password", "-s", service, "-w"]
+        let out = Pipe()
+        p.standardOutput = out
+        p.standardError = FileHandle.nullDevice
+        p.standardInput = FileHandle.nullDevice
+        do { try p.run() } catch { return nil }
+        let timeout = DispatchWorkItem { if p.isRunning { p.terminate() } }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 10, execute: timeout)
+        let data = out.fileHandleForReading.readDataToEndOfFile()
+        p.waitUntilExit()
+        timeout.cancel()
+        guard p.terminationReason == .exit, p.terminationStatus == 0 else { return nil }
+        return trimmedOutput(data)
+    }
+
+    /// `security -w` prints the secret followed by a newline.
+    static func trimmedOutput(_ data: Data) -> Data? {
+        var bytes = data
+        while let last = bytes.last, last == 0x0A || last == 0x0D { bytes.removeLast() }
+        return bytes.isEmpty ? nil : bytes
     }
 
     /// Names of every Claude Code sign-in entry. Listing names reads no secrets and needs no permission.

@@ -10,7 +10,7 @@ export const FAQ = [
   { q: "Does it use my tokens or send my data anywhere?",
     a: "Reading sessions, ports and folders happens on your Mac and costs nothing. There is no account and no analytics. The only requests are update checks from GitHub, and, if you turn on plan limits, one read-only request to api.anthropic.com. If that sign-in has expired, the Refresh button runs Claude Code once in the background, which uses a few tokens." },
   { q: "Why are Claude plan limits experimental?",
-    a: "Claude does not save them on your Mac. Dashbar reads them from an undocumented endpoint, using the sign-in Claude Code keeps in your Keychain, so it can change or stop working. It is off by default, macOS asks before the Keychain is read, and Dashbar never refreshes or stores that sign-in. Codex’s limits come from its own logs and need no setup." },
+    a: "Claude does not save them on your Mac. Dashbar reads them from an undocumented endpoint, using the sign-in Claude Code keeps in your Keychain, so it can change or stop working. It is off by default, and turning it on is the only permission it needs: Dashbar reads the sign-in the same way Claude Code does, so macOS doesn’t ask again each time Claude Code renews it. Dashbar never refreshes or stores that sign-in. Codex’s limits come from its own logs and need no setup." },
   { q: "Can Clean-up delete something I need?",
     a: "It only looks for caches you can rebuild: node_modules, .next, build folders and Xcode’s DerivedData. It shows what you would get back and moves items to the Trash only after you confirm, so you can put them back." },
   { q: "How do I update it?",

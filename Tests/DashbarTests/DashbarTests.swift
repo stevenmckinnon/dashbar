@@ -377,6 +377,25 @@ private func session(id: String, root: String = "/dev/app", busy: Bool = false, 
     }
 }
 
+// MARK: - Reading the sign-in with the security tool
+
+@Suite struct SecurityToolOutputTests {
+    @Test func trailingNewlineIsDroppedAndTheSignInParses() {
+        let json = #"{"claudeAiOauth":{"accessToken":"fixture-token","expiresAt":1800000000000,"subscriptionType":"max","rateLimitTier":"default_claude_max_20x"}}"#
+        let out = ClaudePlanLimits.trimmedOutput(Data((json + "\n").utf8))
+        #expect(out == Data(json.utf8))
+        let creds = out.flatMap(ClaudePlanLimits.parseCredentials)
+        #expect(creds?.token == "fixture-token")
+        #expect(creds?.plan == "Max 20x")
+        #expect(creds?.expiresAt == Date(timeIntervalSince1970: 1_800_000_000))
+    }
+
+    @Test func emptyOutputIsNothing() {
+        #expect(ClaudePlanLimits.trimmedOutput(Data("\n".utf8)) == nil)
+        #expect(ClaudePlanLimits.trimmedOutput(Data()) == nil)
+    }
+}
+
 // MARK: - Waiting out plan limit failures
 
 @Suite struct PlanLimitBackoffTests {
