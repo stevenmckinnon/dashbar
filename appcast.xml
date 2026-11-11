@@ -3,6 +3,16 @@
     <channel>
         <title>Dashbar</title>
         <item>
+            <title>0.6.2</title>
+            <pubDate>Wed, 11 Nov 2026 17:55:58 +0000</pubDate>
+            <sparkle:version>54</sparkle:version>
+            <sparkle:shortVersionString>0.6.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[- Claude plan limits no longer ask for your Keychain password every day. Claude Code rewrites its sign-in each time it renews it, which undid "Always Allow"; Dashbar now reads the sign-in the same way Claude Code does, so macOS doesn't ask. Turning the setting on is the only permission it needs
+]]></description>
+            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.6.2/Dashbar-0.6.2.dmg" length="5188127" type="application/octet-stream" sparkle:edSignature="EnsQPcSnF7nTBfbMFfV9DZeGNgezdAveJ2jtmLY/nrCMKucsaQ5swnz0lmMtzUk/qLM1NmMe0SiqJk0O3O0JBQ=="/>
+        </item>
+        <item>
             <title>0.6.1</title>
             <pubDate>Mon, 09 Nov 2026 23:06:05 +0000</pubDate>
             <sparkle:version>52</sparkle:version>
@@ -25,18 +35,6 @@
 - The window shows the checked-out git branch for each workspace
 ]]></description>
             <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.6.0/Dashbar-0.6.0.dmg" length="5180957" type="application/octet-stream" sparkle:edSignature="RTmQ9dU16X1BT+CF/6AIg4De+w2u924oipP+rNh51ve2rYL91ywjQZwrh+p/bsJcLbTqsmKo8nyHxrNEBmwmAQ=="/>
-        </item>
-        <item>
-            <title>0.5.2</title>
-            <pubDate>Sat, 07 Nov 2026 14:07:34 +0000</pubDate>
-            <sparkle:version>43</sparkle:version>
-            <sparkle:shortVersionString>0.5.2</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[- "At this rate, runs out at…" is now amber, a heads-up rather than an error, and waits until a quarter of the window has passed so an early burst doesn't raise a false alarm
-- When Claude rate-limits plan usage, the panel says "Updated 2m ago · trying again in 3m" and keeps counting
-- Copies of Dashbar on the same Mac share their last Claude reading, so only one of them asks
-]]></description>
-            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.5.2/Dashbar-0.5.2.dmg" length="4717195" type="application/octet-stream" sparkle:edSignature="/864DK+lcxeR3Tsoucr9Tk1fcnKSUDKN/QIN75VsKOx6QGGVtFHm9zJN3FGu2W2kZL6iWsgoPhFP1/gVlbF5Dw=="/>
         </item>
     </channel>
 </rss>
