@@ -60,6 +60,38 @@ final class Store: ObservableObject {
         permissionRequests.first { $0.sessionId == session.id }
     }
 
+    /// An account beyond the default with its own plan history: its name, its key (the series' account) and its limits now.
+    struct HistoryAccount: Identifiable {
+        var id: String { key }
+        let label: String
+        let key: String
+        let limits: [RateLimit]
+    }
+
+    /// The accounts beyond the default whose plan history the History page shows, each as its own card.
+    func historyAccounts(_ provider: PlanHistory.Provider) -> [HistoryAccount] {
+        switch provider {
+        case .claude:
+            // Only added accounts are in `claudeAccountLimits`; their key is the hash of the folder.
+            return claudeAccountLimits.map {
+                HistoryAccount(label: $0.label, key: AgentAccounts.hash($0.path), limits: $0.problem == nil ? $0.limits : [])
+            }
+        case .codex:
+            return codexAccountLimits.compactMap { a in
+                guard let key = codexAccounts.first(where: { $0.path == a.path })?.key else { return nil }   // nil: the default
+                return HistoryAccount(label: a.label, key: key, limits: a.limits)
+            }
+        }
+    }
+
+    /// The default account's name on the History page, only while there is more than one account of that kind.
+    func defaultAccountLabel(_ provider: PlanHistory.Provider) -> String? {
+        switch provider {
+        case .claude: return claudeDefaultLabel
+        case .codex: return codexAccounts.count > 1 ? codexAccounts.first?.label : nil
+        }
+    }
+
     /// Which account a permission request came from, only while more than one Claude Code account is read.
     func accountLabel(for request: PermissionRequest) -> String? {
         if let label = sessions.first(where: { $0.id == request.sessionId })?.account { return label }
@@ -335,6 +367,16 @@ final class Store: ObservableObject {
         }
         if let plan = claudePlan, plan.problem == nil, !plan.limits.isEmpty {
             changed = planRecorder.record(plan.limits, provider: .claude, at: plan.fetchedAt) || changed
+        }
+        // Every other account as its own series, keyed by its folder (`ResolvedAccount.key`).
+        for other in claudeAccountLimits where other.problem == nil && !other.limits.isEmpty {
+            guard let at = other.fetchedAt, let key = claudeAccounts.first(where: { $0.path == other.path })?.key else { continue }
+            changed = planRecorder.record(other.limits, provider: .claude, account: key, at: at) || changed
+        }
+        for other in codexAccountLimits where !other.limits.isEmpty {
+            // The default account's limits are `codexLimits`, recorded above.
+            guard let at = other.fetchedAt, let key = codexAccounts.first(where: { $0.path == other.path })?.key else { continue }
+            changed = planRecorder.record(other.limits, provider: .codex, account: key, at: at) || changed
         }
         if changed || planHistory.isEmpty && !planRecorder.history.isEmpty { planHistory = planRecorder.history }
     }
@@ -720,7 +762,8 @@ final class Worker: @unchecked Sendable {
         if codexRuns.count > 1, codexFound.count > 1 {
             result.codexAccounts = codexFound.map { AccountUsage(label: $0.account.label, summary: $0.summary) }
             result.codexAccountLimits = codexFound.map {
-                AccountLimits(label: $0.account.label, path: $0.account.path, limits: $0.scanner.limits)
+                AccountLimits(label: $0.account.label, path: $0.account.path, limits: $0.scanner.limits,
+                              fetchedAt: $0.scanner.limitsStamp > .distantPast ? $0.scanner.limitsStamp : nil)
             }
         }
         if lastSave.map({ Date().timeIntervalSince($0) > 30 }) ?? true { save() }

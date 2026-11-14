@@ -69,6 +69,53 @@ import Testing
         #expect(try Data(contentsOf: url).count < 50 * 50)   // about 40 bytes a reading
     }
 
+    @Test func eachAccountIsItsOwnSeries() {
+        var h = PlanHistory()
+        let reset = t0.addingTimeInterval(5 * hour)
+        h.record([fiveHour(10, reset: reset)], provider: .claude, at: t0)
+        h.record([fiveHour(70, reset: reset)], provider: .claude, account: "1a2b3c4d", at: t0)
+        h.record([fiveHour(80, reset: reset)], provider: .claude, account: "1a2b3c4d", at: t0.addingTimeInterval(hour))
+        let mine = PlanHistory.Series(.claude, .fiveHour), work = PlanHistory.Series(.claude, .fiveHour, account: "1a2b3c4d")
+        #expect(h.current(mine, now: t0.addingTimeInterval(hour)).map(\.used) == [10])
+        #expect(h.current(work, now: t0.addingTimeInterval(hour)).map(\.used) == [70, 80])
+        let windows = h.windows()
+        #expect(windows.count == 2)
+        #expect(Set(windows.map(\.id)).count == 2)
+        #expect(h.accounts(.claude) == [nil, "1a2b3c4d"])
+        #expect(h.accounts(.codex).isEmpty)
+    }
+
+    @Test func otherAccountsAreSavedBesideTheDefaultFileWhichKeepsItsFormat() throws {
+        let fx = try Fixture(); defer { fx.remove() }
+        let url = try fx.dir("support").appendingPathComponent("plan-history.json")
+        // A file from before accounts: it is the default account's.
+        let old = #"{"version":1,"samples":[["c5",1800000000,12.5,1800018000]],"windows":[]}"#
+        try Data(old.utf8).write(to: url)
+        var h = try #require(PlanHistory.load(from: url))
+        #expect(h.samples.first?.series == .init(.claude, .fiveHour))
+        h.record([fiveHour(40, reset: t0.addingTimeInterval(5 * hour))], provider: .claude, account: "1a2b3c4d", at: t0.addingTimeInterval(600))
+        h.record([RateLimit(label: "7d window", usedPercent: 3, resetsAt: t0.addingTimeInterval(86400), window: 7 * 86400)],
+                 provider: .codex, account: "99aa00ff", at: t0)
+        h.save(to: url)
+
+        // The default file holds only the default account, in the old compact form.
+        let main = try String(contentsOf: url, encoding: .utf8)
+        #expect(main.contains(#"["c5",1800000000,12.5,1800018000]"#))
+        #expect(!main.contains("40"))
+        let work = PlanHistory.url(for: "1a2b3c4d", base: url)
+        #expect(work.lastPathComponent == "plan-history-1a2b3c4d.json")
+        #expect(try String(contentsOf: work, encoding: .utf8).contains(#""c5""#))
+        #expect(!(try String(contentsOf: work, encoding: .utf8).contains("1a2b3c4d")))
+
+        let loaded = try #require(PlanHistory.load(from: url))
+        #expect(Set(loaded.samples.map(\.series.account)) == [nil, "1a2b3c4d", "99aa00ff"])
+        #expect(loaded.samples.first { $0.series.account == "1a2b3c4d" }?.used == 40)
+        #expect(loaded.samples.first { $0.series.account == "99aa00ff" }?.series.provider == .codex)
+        // Something else beside it is not an account.
+        try Data(old.utf8).write(to: url.deletingLastPathComponent().appendingPathComponent("plan-history-backup.json"))
+        #expect(PlanHistory.load(from: url)?.samples.count == loaded.samples.count)
+    }
+
     @Test func mergingAnotherCopysHistoryDoesNotDuplicate() {
         var a = PlanHistory(), b = PlanHistory()
         let reset = t0.addingTimeInterval(5 * hour)

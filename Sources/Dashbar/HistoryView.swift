@@ -11,7 +11,8 @@ struct HistoryPage: View {
         if let warning = store.formatWarning { NoticeBanner(text: warning, dismiss: nil) }
         HistoryHeading(text: "Plan limits")
         if settings.showsClaudeLimits || store.planHistory.windows().contains(where: { $0.series.provider == .claude }) {
-            PlanHistoryCard(provider: .claude, current: store.claudePlan?.problem == nil ? store.claudePlan?.limits ?? [] : [])
+            PlanHistoryCard(provider: .claude, label: store.defaultAccountLabel(.claude),
+                            current: store.claudePlan?.problem == nil ? store.claudePlan?.limits ?? [] : [])
         } else {
             HStack(alignment: .firstTextBaseline) {
                 Text("Claude doesn't save plan limits on your Mac. Once Dashbar reads them from Claude Code's status line, it keeps their history here.")
@@ -23,8 +24,15 @@ struct HistoryPage: View {
             }
             .padding(UI.cardPadding).surface()
         }
+        // With more than one account, each has its own card after the default one, in the order of Settings → Accounts.
+        ForEach(store.historyAccounts(.claude)) { a in
+            PlanHistoryCard(provider: .claude, account: a.key, label: a.label, current: a.limits)
+        }
         if store.codex.found || !store.codexLimits.isEmpty {
-            PlanHistoryCard(provider: .codex, current: store.codexLimits)
+            PlanHistoryCard(provider: .codex, label: store.defaultAccountLabel(.codex), current: store.codexLimits)
+        }
+        ForEach(store.historyAccounts(.codex)) { a in
+            PlanHistoryCard(provider: .codex, account: a.key, label: a.label, current: a.limits)
         }
         HistoryHeading(text: "Usage, last 30 days").padding(.top, 10)
         UsageHistorySection(claude: store.claude.history, codex: store.codex.found ? store.codex.history : nil,
@@ -51,11 +59,14 @@ extension PlanHistory.Provider {
 private struct PlanHistoryCard: View {
     @EnvironmentObject var store: Store
     let provider: PlanHistory.Provider
+    /// The account's key (nil: the default) and, with more than one account, its name.
+    var account: String? = nil
+    var label: String? = nil
     let current: [RateLimit]
 
     var body: some View {
         let windows = store.planHistory.windows()
-        Card(title: provider.title, icon: provider.icon, tint: provider.tint, count: nil, trailing: "Kept for 90 days") {
+        Card(title: provider.title + (label.map { " · " + $0 } ?? ""), icon: provider.icon, tint: provider.tint, count: nil, trailing: "Kept for 90 days") {
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .top, spacing: 24) { columns(windows) }
                 VStack(alignment: .leading, spacing: 18) { columns(windows) }
@@ -65,7 +76,7 @@ private struct PlanHistoryCard: View {
 
     @ViewBuilder private func columns(_ windows: [PlanHistory.Window]) -> some View {
         ForEach(PlanHistory.Kind.allCases, id: \.self) { kind in
-            let series = PlanHistory.Series(provider, kind)
+            let series = PlanHistory.Series(provider, kind, account: account)
             WindowHistory(series: series,
                           limit: current.first { PlanHistory.kind(of: $0) == kind },
                           samples: store.planHistory.current(series),

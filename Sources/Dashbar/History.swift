@@ -20,9 +20,14 @@ struct PlanHistory: Codable, Equatable {
     struct Series: Hashable, Codable {
         var provider: Provider
         var kind: Kind
+        /// Which account (`ResolvedAccount.key`); nil for the default one. Each account is saved in its own file
+        /// (`PlanHistory.url(for:base:)`), so the saved form never carries it and older copies read the default file as before.
+        var account: String? = nil
         /// "c5", "cw", "x5", "xw": the compact form samples are saved with.
         var code: String { (provider == .claude ? "c" : "x") + (kind == .fiveHour ? "5" : "w") }
-        init(_ provider: Provider, _ kind: Kind) { self.provider = provider; self.kind = kind }
+        /// Sorts and tells series apart in memory, account included.
+        var key: String { code + (account.map { "-" + $0 } ?? "") }
+        init(_ provider: Provider, _ kind: Kind, account: String? = nil) { self.provider = provider; self.kind = kind; self.account = account }
         init?(code: String) {
             guard code.count == 2 else { return nil }
             switch code.first { case "c": provider = .claude; case "x": provider = .codex; default: return nil }
@@ -73,7 +78,7 @@ struct PlanHistory: Codable, Equatable {
         /// A later window began before this one's reset time: the plan was reset early.
         var endedEarly = false
 
-        var id: String { series.code + String(Int((resetsAt ?? firstSeen).timeIntervalSince1970)) }
+        var id: String { series.key + String(Int((resetsAt ?? firstSeen).timeIntervalSince1970)) }
         /// When it began: its length before the reset, or the first reading when the reset isn't known.
         var start: Date { resetsAt.map { min(firstSeen, $0.addingTimeInterval(-series.kind.length)) } ?? firstSeen }
         var end: Date { resetsAt ?? lastSeen }
@@ -109,12 +114,12 @@ struct PlanHistory: Codable, Equatable {
     /// Adds a reading of each 5-hour and weekly limit taken at `at`. Returns whether anything changed.
     /// Readings for a window that had already reset by `at` are left out: their numbers no longer applied.
     @discardableResult
-    mutating func record(_ limits: [RateLimit], provider: Provider, at: Date) -> Bool {
+    mutating func record(_ limits: [RateLimit], provider: Provider, account: String? = nil, at: Date) -> Bool {
         var changed = false
         for limit in limits {
             guard let kind = Self.kind(of: limit) else { continue }
             if let reset = limit.resetsAt, reset <= at { continue }
-            let s = Sample(series: Series(provider, kind), at: at, used: min(max(limit.usedPercent, 0), 100), resetsAt: limit.resetsAt)
+            let s = Sample(series: Series(provider, kind, account: account), at: at, used: min(max(limit.usedPercent, 0), 100), resetsAt: limit.resetsAt)
             if let i = samples.lastIndex(where: { $0.series == s.series }) {
                 let last = samples[i]
                 if last.at == s.at { continue }   // the same reading again
@@ -165,7 +170,7 @@ struct PlanHistory: Codable, Equatable {
     /// Every window on record, oldest first per series, with early resets marked.
     func windows() -> [Window] {
         var all = Self.mergeWindows(archived, Self.group(samples))
-        all.sort { ($0.series.code, $0.firstSeen) < ($1.series.code, $1.firstSeen) }
+        all.sort { ($0.series.key, $0.firstSeen) < ($1.series.key, $1.firstSeen) }
         for i in all.indices.dropLast() where all[i + 1].series == all[i].series {
             if let reset = all[i].resetsAt, all[i + 1].firstSeen < reset.addingTimeInterval(-Self.sameReset) {
                 all[i].endedEarly = true
@@ -289,23 +294,64 @@ struct PlanHistory: Codable, Equatable {
     }
     static let version = 1
 
-    static func load(from url: URL) -> PlanHistory? {
+    /// The default account's history is `base` (plan-history.json, as it always was); each other account's sits beside
+    /// it as plan-history-<key>.json, in the same format.
+    static func url(for account: String?, base: URL) -> URL {
+        guard let account else { return base }
+        let name = base.deletingPathExtension().lastPathComponent
+        return base.deletingLastPathComponent().appendingPathComponent("\(name)-\(account).\(base.pathExtension)")
+    }
+
+    /// The account a file beside `base` belongs to: nil for `base` itself, its key for plan-history-<key>.json.
+    private static func account(ofFile name: String, base: URL) -> String?? {
+        if name == base.lastPathComponent { return .some(nil) }
+        let prefix = base.deletingPathExtension().lastPathComponent + "-", suffix = "." + base.pathExtension
+        guard name.hasPrefix(prefix), name.hasSuffix(suffix) else { return nil }
+        let key = String(name.dropFirst(prefix.count).dropLast(suffix.count))
+        guard !key.isEmpty, key.count <= 64, key.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }) else { return nil }
+        return .some(key)
+    }
+
+    /// Every account's history: `base` and the account files beside it. Nil when there are none.
+    static func load(from base: URL) -> PlanHistory? {
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: base.deletingLastPathComponent().path)) ?? []
+        var h = PlanHistory(), found = false
+        for name in names {
+            guard let account = account(ofFile: name, base: base),
+                  let one = loadFile(base.deletingLastPathComponent().appendingPathComponent(name)) else { continue }
+            found = true
+            h.samples += one.samples.map { var s = $0; s.series.account = account; return s }
+            h.archived += one.windows.map { var w = $0; w.series.account = account; return w }
+        }
+        return found ? h : nil
+    }
+
+    private static func loadFile(_ url: URL) -> Envelope? {
         guard let data = try? Data(contentsOf: url) else { return nil }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .secondsSince1970
         guard let env = try? decoder.decode(Envelope.self, from: data), env.version == version else { return nil }
-        var h = PlanHistory()
-        h.samples = env.samples
-        h.archived = env.windows
-        return h
+        return env
     }
 
-    func save(to url: URL) {
+    /// Writes each account's series to its own file (see `url(for:base:)`).
+    func save(to base: URL) {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .secondsSince1970
-        guard let data = try? encoder.encode(Envelope(version: Self.version, samples: samples, windows: archived)) else { return }
-        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? data.write(to: url, options: .atomic)
+        let accounts = Set(samples.map(\.series.account) + archived.map(\.series.account)).union([nil])
+        try? FileManager.default.createDirectory(at: base.deletingLastPathComponent(), withIntermediateDirectories: true)
+        for account in accounts {
+            let mine = samples.filter { $0.series.account == account }.map { var s = $0; s.series.account = nil; return s }
+            let windows = archived.filter { $0.series.account == account }.map { var w = $0; w.series.account = nil; return w }
+            guard let data = try? encoder.encode(Envelope(version: Self.version, samples: mine, windows: windows)) else { continue }
+            try? data.write(to: Self.url(for: account, base: base), options: .atomic)
+        }
+    }
+
+    /// The accounts with anything on record (nil is the default account).
+    func accounts(_ provider: Provider) -> Set<String?> {
+        Set(samples.filter { $0.series.provider == provider }.map(\.series.account)
+            + archived.filter { $0.series.provider == provider }.map(\.series.account))
     }
 }
 
@@ -326,8 +372,8 @@ final class PlanHistoryRecorder {
     init(url: URL = PlanHistory.defaultURL) { self.url = url }
 
     /// Records the readings; returns whether the history changed (so the store republishes it only then).
-    func record(_ limits: [RateLimit], provider: PlanHistory.Provider, at: Date, now: Date = Date()) -> Bool {
-        guard history.record(limits, provider: provider, at: at) else { return false }
+    func record(_ limits: [RateLimit], provider: PlanHistory.Provider, account: String? = nil, at: Date, now: Date = Date()) -> Bool {
+        guard history.record(limits, provider: provider, account: account, at: at) else { return false }
         dirty = true
         if now.timeIntervalSince(lastSave) >= Self.saveEvery { save(now: now) }
         return true

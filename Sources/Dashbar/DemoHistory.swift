@@ -44,6 +44,14 @@ extension DemoData {
         Self.simulate(&history, provider: .codex, now: now, days: millions, rng: &rng,
                       current5h: (21, now.addingTimeInterval(3.4 * 3600)), currentWeek: (34, now.addingTimeInterval(4.1 * 86400)),
                       windowsPerDay: 1, peakScale: 0.35)
+        // DASHBAR_DEMO_ACCOUNTS=2: the Work account's Claude windows, as their own series.
+        for other in store.claudeAccountLimits {
+            let five = other.limits.first { PlanHistory.kind(of: $0) == .fiveHour }, week = other.limits.first { PlanHistory.kind(of: $0) == .weekly }
+            guard let five, let week, let r5 = five.resetsAt, let rw = week.resetsAt else { continue }
+            Self.simulate(&history, provider: .claude, now: now, days: millions.map { $0 * 3 / 2 }, rng: &rng,
+                          current5h: (five.usedPercent, r5), currentWeek: (week.usedPercent, rw),
+                          windowsPerDay: 2, peakScale: 0.6, account: AgentAccounts.hash(other.path))
+        }
         history.compact(now: now)
         store.planHistory = history
     }
@@ -57,7 +65,7 @@ extension DemoData {
     /// Readings every 10 minutes through each 5-hour window on busy days; the weekly window rises with them.
     private static func simulate(_ history: inout PlanHistory, provider: PlanHistory.Provider, now: Date, days: [Int],
                                  rng: inout DemoRandom, current5h: (Double, Date), currentWeek: (Double, Date),
-                                 windowsPerDay: Int, peakScale: Double) {
+                                 windowsPerDay: Int, peakScale: Double, account: String? = nil) {
         let cal = Calendar.current
         let today = cal.startOfDay(for: now)
         let fiveHours = PlanHistory.Kind.fiveHour.length, week = PlanHistory.Kind.weekly.length
@@ -110,7 +118,7 @@ extension DemoData {
                 let f = t.timeIntervalSince(start) / stop.timeIntervalSince(start)
                 let used = min(100, peak * min(1, pow(f, 0.9) * (peak >= 100 ? 1.15 : 1)))
                 history.record(limits(used, start.addingTimeInterval(fiveHours), min(100, base + used * scale), resetW),
-                               provider: provider, at: t)
+                               provider: provider, account: account, at: t)
                 t.addTimeInterval(600)
             }
             weekUsed[resetW] = base + peak * scale
@@ -128,10 +136,10 @@ extension DemoData {
         while t < now {
             let f = t.timeIntervalSince(currentStart) / now.timeIntervalSince(currentStart)
             let used = current5h.0 * min(1, f + 0.08 * sin(f * 9))
-            history.record(limits(max(0, used), current5h.1, base + (currentWeek.0 - base) * f, currentWeek.1), provider: provider, at: t)
+            history.record(limits(max(0, used), current5h.1, base + (currentWeek.0 - base) * f, currentWeek.1), provider: provider, account: account, at: t)
             t.addTimeInterval(600)
         }
-        history.record(limits(current5h.0, current5h.1, currentWeek.0, currentWeek.1), provider: provider, at: now.addingTimeInterval(-40))
+        history.record(limits(current5h.0, current5h.1, currentWeek.0, currentWeek.1), provider: provider, account: account, at: now.addingTimeInterval(-40))
     }
 }
 
