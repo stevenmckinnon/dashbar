@@ -72,6 +72,8 @@ enum StatusLineBridge {
         /// Which account this is for (`ResolvedAccount.key`): nil for the default account, which keeps the original
         /// file names and command, so a bridge added before accounts existed carries on as it was.
         var account: String? = nil
+        /// How backups of the settings file are named in `backups` (the Antigravity CLI bridge reuses this editing).
+        var backupPrefix = "claude-settings-"
 
         var script: URL { support.appendingPathComponent(StatusLineBridge.scriptName) }
         var record: URL { support.appendingPathComponent(account.map { "claude-statusline-install-\($0).json" } ?? "claude-statusline-install.json") }
@@ -328,9 +330,9 @@ enum StatusLineBridge {
         f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "yyyyMMdd-HHmmss"
         try? fm.createDirectory(at: paths.backups, withIntermediateDirectories: true)
-        try? Data(text.utf8).write(to: paths.backups.appendingPathComponent("claude-settings-\(f.string(from: now)).json"))
+        try? Data(text.utf8).write(to: paths.backups.appendingPathComponent("\(paths.backupPrefix)\(f.string(from: now)).json"))
         let old = ((try? fm.contentsOfDirectory(atPath: paths.backups.path)) ?? [])
-            .filter { $0.hasPrefix("claude-settings-") }.sorted().dropLast(5)
+            .filter { $0.hasPrefix(paths.backupPrefix) }.sorted().dropLast(5)
         for name in old { try? fm.removeItem(at: paths.backups.appendingPathComponent(name)) }
     }
 

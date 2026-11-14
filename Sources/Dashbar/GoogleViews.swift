@@ -1,0 +1,167 @@
+import SwiftUI
+import AppKit
+
+// MARK: - Usage
+
+enum GoogleUsage {
+    /// The usage card's title: whichever of Google's tools the usage came from.
+    static func title(_ sources: [SessionAgent]) -> String {
+        switch (sources.contains(.geminiCLI), sources.contains(.antigravityCLI)) {
+        case (true, true): return "Gemini CLI · Antigravity"
+        case (false, true): return "Antigravity CLI"
+        default: return "Gemini CLI"
+        }
+    }
+
+    static func costNote(_ sources: [SessionAgent]) -> String? {
+        sources.contains(.antigravityCLI) ? "The Antigravity CLI's sessions use its own cost estimate." : nil
+    }
+}
+
+// MARK: - Plan limits
+
+/// Antigravity's quota in the plan limits card: each model group's windows, from its CLI's status line.
+struct AntigravityLimitsBlock: View {
+    let limits: AntigravityLimits?
+    let connected: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: UI.googleSymbol).font(.system(size: UI.Size.caption, weight: .bold)).foregroundStyle(UI.google)
+                    .accessibilityHidden(true)
+                Text(["Antigravity", limits?.planTier].compactMap { $0 }.joined(separator: " · "))
+                    .font(.system(size: UI.Size.body, weight: .medium))
+            }
+            if let problem = limits?.problem {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(UI.textDanger).accessibilityHidden(true)
+                    Text(problem).fixedSize(horizontal: false, vertical: true)
+                }
+                .font(.system(size: UI.Size.caption))
+            } else if let limits, !limits.isEmpty {
+                ForEach(limits.flattened) { LimitBar(limit: $0, tint: UI.google) }
+                if let fetched = limits.fetchedAt {
+                    TimelineView(.periodic(from: .now, by: 30)) { ctx in
+                        if let line = Self.ageLine(writtenAt: fetched, now: ctx.date) {
+                            HStack(spacing: 5) {
+                                Image(systemName: "clock").accessibilityHidden(true)
+                                Text(line).fixedSize(horizontal: false, vertical: true)
+                            }
+                            .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+                        }
+                    }
+                }
+            } else if connected {
+                Text("Limits appear after your next Antigravity CLI session.")
+                    .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text("No limits reported yet.").font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+            }
+        }
+    }
+
+    /// "Updated 25m ago · refreshes when the Antigravity CLI next updates". Nil while recent.
+    static func ageLine(writtenAt: Date, now: Date) -> String? {
+        guard now.timeIntervalSince(writtenAt) >= 5 * 60 else { return nil }
+        return "Updated \(Fmt.ago(writtenAt, now: now)) ago · refreshes when the Antigravity CLI next updates"
+    }
+}
+
+// MARK: - Settings
+
+/// Whether Dashbar's bridge is in the Antigravity CLI's status line. Like the Claude one it mirrors the CLI's settings
+/// file rather than being a preference, so it's re-read at launch, every few minutes and when Settings opens.
+@MainActor
+final class AntigravitySettings: ObservableObject {
+    static let shared = AntigravitySettings()
+    @Published private(set) var status: AntigravityBridge.Status = .absent
+
+    private init() {
+        if CommandLine.arguments.contains("--demo"), ProcessInfo.processInfo.environment["DASHBAR_DEMO_GOOGLE"] != nil {
+            status = .installed(previous: nil)
+        }
+    }
+
+    func refresh(paths: AntigravityBridge.Paths = .default()) {
+        guard !CommandLine.arguments.contains("--demo") else { return }
+        let s = AntigravityBridge.status(paths)
+        if s.isInstalled { try? AntigravityBridge.writeScript(paths) }
+        if s != status { status = s }
+    }
+
+    /// Adds or removes the bridge. Returns what went wrong, phrased for the user.
+    func set(_ on: Bool, paths: AntigravityBridge.Paths = .default()) -> String? {
+        var problem: String?
+        do { on ? try AntigravityBridge.install(paths) : try AntigravityBridge.uninstall(paths) }
+        catch { problem = error.localizedDescription }
+        refresh(paths: paths)
+        return problem
+    }
+}
+
+/// Labs → Antigravity: add or remove the status line bridge. Shown only when the Antigravity CLI is installed (its
+/// settings folder exists) or the bridge is in.
+struct AntigravityLabsSection: View {
+    @ObservedObject private var settings = AntigravitySettings.shared
+    @State private var problem: String?
+
+    var body: some View {
+        if settings.status != .absent {
+            Section {
+                row
+                if let problem {
+                    Label(problem, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption).foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } header: {
+                Text("Antigravity CLI")
+            } footer: {
+                Text(explanation).settingsFooter()
+            }
+        }
+    }
+
+    @ViewBuilder private var row: some View {
+        switch settings.status {
+        case .installed(let previous):
+            LabeledContent {
+                Button("Remove") { problem = settings.set(false) }
+            } label: {
+                Text("In the Antigravity CLI's status line")
+                Text(previous.map { "Your status line (\(Self.short($0))) still shows." } ?? "Updates as the CLI works.")
+            }
+        case .notInstalled(let current):
+            LabeledContent {
+                Button("Add to Status Line") { problem = settings.set(true) }
+            } label: {
+                Text("Read limits and usage from its status line")
+                Text(current.map { "Your status line (\(Self.short($0))) keeps showing." } ?? "Off until you add it. Sends nothing.")
+            }
+        case .unreadable(let message):
+            LabeledContent {
+                Button("Check Again") { problem = nil; settings.refresh() }
+            } label: {
+                Text("Read limits and usage from its status line")
+                Text(message)
+            }
+        case .absent:
+            EmptyView()
+        }
+    }
+
+    static func short(_ command: String) -> String {
+        command.count > 48 ? String(command.prefix(47)) + "…" : command
+    }
+
+    private var explanation: String {
+        let file = Fmt.tilde(AntigravityBridge.Paths.default().settings.path)
+        return "The Antigravity CLI passes its quota, token totals and estimated cost to its status line as it works. "
+            + "Adding Dashbar changes one setting, statusLine in \(file), to a small script that saves just those numbers, "
+            + "the session's folder, model and state to files on this Mac, then runs the status line you had, so it looks the "
+            + "same. It never saves your email or conversations. A backup of the file is kept; Remove puts your previous "
+            + "status line back exactly."
+    }
+}

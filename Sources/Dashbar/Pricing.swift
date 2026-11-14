@@ -9,6 +9,7 @@ import Foundation
 ///   Long context pricing)
 /// - OpenAI: https://developers.openai.com/api/docs/pricing (Standard, short and long context) and the model pages
 ///   under https://developers.openai.com/api/docs/models/ for the Codex models no longer on the pricing page
+/// - Google: https://ai.google.dev/gemini-api/docs/pricing (Standard, paid tier; text prices)
 enum Pricing {
     static let asOf = "14 Nov 2026"
 
@@ -108,6 +109,31 @@ enum Pricing {
         "o3": openai(2, 8, 0.50),
     ]
 
+    // MARK: Google (Gemini CLI logs report input, cached input, output and thinking; output prices include thinking)
+
+    private static func gemini(_ i: Double, _ o: Double, _ cached: Double, long: (Double, Double, Double)? = nil) -> ModelPrice {
+        let rates = Rates(input: i, output: o, cacheWrite5m: i, cacheWrite1h: i, cacheRead: cached)
+        guard let long else { return ModelPrice(rates: rates) }
+        // Long context: prompts over 200K tokens.
+        return ModelPrice(rates: rates, longAbove: 200_000,
+                          longRates: Rates(input: long.0, output: long.1, cacheWrite5m: long.0, cacheWrite1h: long.0, cacheRead: long.2))
+    }
+
+    private static let google: [String: ModelPrice] = [
+        "gemini-4-carbon": gemini(2, 10, 0.10),            // promotional until 30 Nov 2026, then $4 / $20 / $0.20
+        "gemini-4-argon": gemini(2, 10, 0.10),             // promotional until 30 Nov 2026, then $4 / $20 / $0.20
+        "gemini-4-hydrogen": gemini(1.50, 7.50, 0.075),
+        "gemini-3.8-flash": gemini(0.75, 3.75, 0.075),     // until 31 Dec 2026, then $1.50 / $7.50 / $0.15
+        "gemini-3.6-flash": gemini(0.75, 3.75, 0.075),     // until 31 Dec 2026, then $1.50 / $7.50 / $0.15
+        "gemini-3.5-flash-lite": gemini(0.30, 2.50, 0.03),
+        "gemini-3.1-pro-preview": gemini(2, 12, 0.20, long: (4, 18, 0.40)),
+        "gemini-3.1-flash-lite": gemini(0.25, 1.50, 0.025),
+        "gemini-3-flash-preview": gemini(0.50, 3, 0.05),
+        "gemini-2.5-pro": gemini(1.25, 10, 0.125, long: (2.50, 15, 0.25)),
+        "gemini-2.5-flash": gemini(0.30, 2.50, 0.03),
+        "gemini-2.5-flash-lite": gemini(0.10, 0.40, 0.01),
+    ]
+
     /// Reduces a logged model id to its table key: lower case, no provider prefix ("us.anthropic.", "openai/"),
     /// no "[1m]"-style tag, no date or Bedrock version suffix. Matching is exact after this, so
     /// "gpt-5-codex-mini" never borrows the price of "gpt-5-codex".
@@ -128,7 +154,18 @@ enum Pricing {
 
     static func price(for model: String) -> ModelPrice? {
         let key = normalize(model)
-        return anthropic[key] ?? openAI[key]
+        return anthropic[key] ?? openAI[key] ?? google[key]
+    }
+
+    /// The Antigravity CLI names models for people ("Gemini 4 Argon (Medium)", "Claude Sonnet 5.5 (Thinking)"):
+    /// the id they most likely stand for ("gemini-4-argon", "claude-sonnet-5-5"), for pricing when the CLI gave no cost.
+    static func normalize(displayName: String) -> String {
+        var s = displayName
+        if let paren = s.firstIndex(of: "(") { s = String(s[..<paren]) }
+        s = s.trimmingCharacters(in: .whitespaces).lowercased()
+            .split(whereSeparator: { $0 == " " }).joined(separator: "-")
+        if s.hasPrefix("claude-") { s = s.replacingOccurrences(of: ".", with: "-") }
+        return s
     }
 
     /// Cost in US dollars of `t` on `model`, or nil when the model has no known price.

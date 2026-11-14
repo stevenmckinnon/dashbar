@@ -34,8 +34,13 @@ struct HistoryPage: View {
         ForEach(store.historyAccounts(.codex)) { a in
             PlanHistoryCard(provider: .codex, account: a.key, label: a.label, current: a.limits)
         }
+        // Antigravity: a card per model group ("Antigravity · Gemini"), only once its CLI's status line has reported.
+        ForEach(store.historyAccounts(.antigravity)) { a in
+            PlanHistoryCard(provider: .antigravity, account: a.key, label: a.label, current: a.limits)
+        }
         HistoryHeading(text: "Usage, last 30 days").padding(.top, 10)
         UsageHistorySection(claude: store.claude.history, codex: store.codex.found ? store.codex.history : nil,
+                            google: store.google.found ? store.google.history : nil, googleName: GoogleUsage.title(store.googleSources),
                             loading: store.usageLoading)
     }
 }
@@ -48,9 +53,23 @@ private struct HistoryHeading: View {
 }
 
 extension PlanHistory.Provider {
-    var title: String { self == .claude ? "Claude" : "Codex" }
-    var icon: String { self == .claude ? "asterisk" : "chevron.left.forwardslash.chevron.right" }
-    var tint: Color { self == .claude ? UI.claude : .teal }
+    var title: String {
+        switch self { case .claude: return "Claude"; case .codex: return "Codex"; case .antigravity: return "Antigravity" }
+    }
+    var icon: String {
+        switch self { case .claude: return "asterisk"; case .codex: return "chevron.left.forwardslash.chevron.right"; case .antigravity: return UI.googleSymbol }
+    }
+    var tint: Color {
+        switch self { case .claude: return UI.claude; case .codex: return .teal; case .antigravity: return UI.google }
+    }
+    /// Under a window with no reading yet: when one arrives.
+    var noReadingYet: String {
+        switch self {
+        case .claude: return "No reading for this window yet. One arrives with your next Claude Code reply."
+        case .codex: return "No reading for this window yet. One arrives with your next Codex session."
+        case .antigravity: return "No reading for this window yet. One arrives with your next Antigravity CLI session."
+        }
+    }
 }
 
 // MARK: - Plan limits
@@ -190,8 +209,7 @@ private struct WindowHistory: View {
                 Legend(items: [("Used", tint, false), ("Even pace", Color.primary.opacity(0.45), true)])
             }
         } else {
-            Text(series.provider == .claude ? "No reading for this window yet. One arrives with your next Claude Code reply."
-                                            : "No reading for this window yet. One arrives with your next Codex session.")
+            Text(series.provider.noReadingYet)
                 .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
                 .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
         }
@@ -325,6 +343,8 @@ private struct Legend: View {
 private struct UsageHistorySection: View {
     let claude: UsageHistory
     let codex: UsageHistory?
+    var google: UsageHistory? = nil
+    var googleName = "Gemini CLI"
     let loading: Bool
     @State private var selected: Date?
 
@@ -340,16 +360,20 @@ private struct UsageHistorySection: View {
     private var bars: [Bar] {
         var out = claude.days.map { Bar(key: $0.key, date: $0.date, agent: "Claude Code", tokens: $0.tokens, cost: $0.cost) }
         if let codex { out += codex.days.map { Bar(key: $0.key, date: $0.date, agent: "Codex", tokens: $0.tokens, cost: $0.cost) } }
+        if let google { out += google.days.map { Bar(key: $0.key, date: $0.date, agent: googleName, tokens: $0.tokens, cost: $0.cost) } }
         return out
     }
 
-    private var scale: KeyValuePairs<String, Color> { ["Claude Code": UI.claude, "Codex": .teal] }
+    /// The agents shown, with their colours, in order.
+    private var agents: [(String, Color)] {
+        [("Claude Code", UI.claude)] + (codex == nil ? [] : [("Codex", Color.teal)]) + (google == nil ? [] : [(googleName, UI.google)])
+    }
 
     var body: some View {
         if loading {
             HStack { ProgressView().controlSize(.small); Text("Scanning transcripts…").font(.caption).foregroundStyle(UI.textSecondary) }
                 .padding(UI.cardPadding).frame(maxWidth: .infinity, alignment: .leading).surface()
-        } else if claude.totals.total == 0 && (codex?.totals.total ?? 0) == 0 {
+        } else if claude.totals.total == 0 && (codex?.totals.total ?? 0) == 0 && (google?.totals.total ?? 0) == 0 {
             EmptyRow(text: "No Claude Code or Codex usage in the last 30 days.").padding(UI.cardPadding).surface()
         } else {
             let bars = bars
@@ -359,21 +383,24 @@ private struct UsageHistorySection: View {
                     chart(bars, title: "Tokens", value: { Double($0.tokens) }, label: { Fmt.tokens(Int($0)) })
                     chart(bars, title: "Estimated cost at API prices", value: \.cost, label: { Fmt.usd($0) })
                     HStack(spacing: 10) {
-                        Legend(items: [("Claude Code", UI.claude, false)] + (codex == nil ? [] : [("Codex", Color.teal, false)]))
+                        Legend(items: agents.map { ($0.0, $0.1, false) })
                         Spacer()
                         Text("Hover a day for its figures").font(.system(size: UI.Size.micro)).foregroundStyle(UI.textSecondary)
                     }
                 }
             }
             HStack(alignment: .top, spacing: UI.gap) {
-                Card(title: "Projects", icon: "folder", count: nil, trailing: "tokens · est. cost") { ProjectRanks(claude: claude, codex: codex) }
+                Card(title: "Projects", icon: "folder", count: nil, trailing: "tokens · est. cost") {
+                    ProjectRanks(claude: claude, codex: codex, google: google)
+                }
                     .frame(maxHeight: .infinity, alignment: .top)
-                Card(title: "Models", icon: "cpu", count: nil, trailing: "tokens · est. cost") { ModelRanks(claude: claude, codex: codex) }
+                Card(title: "Models", icon: "cpu", count: nil, trailing: "tokens · est. cost") { ModelRanks(claude: claude, codex: codex, google: google) }
                     .frame(maxHeight: .infinity, alignment: .top)
             }
             .fixedSize(horizontal: false, vertical: true)
             Text("Costs are estimates of what these tokens would cost on the pay-as-you-go API, at list prices from \(Pricing.asOf). "
-                 + "On a Claude or ChatGPT plan you pay the plan's price, not this."
+                 + "On a Claude, ChatGPT or Google AI plan you pay the plan's price, not this."
+                 + (google == nil ? "" : " Antigravity CLI costs are its own estimates.")
                  + (unpriced.isEmpty ? "" : " No price is known for \(unpriced.joined(separator: ", ")), so its tokens are left out of the cost.")
                  + " Dashbar reads the last 30 days of logs and keeps totals by day, project and model, not by session.")
                 .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
@@ -387,7 +414,7 @@ private struct UsageHistorySection: View {
         Binding(get: { selected }, set: { if Snapshot.store == nil { selected = $0 } })
     }
 
-    private var unpriced: [String] { Array(Set(claude.unpriced + (codex?.unpriced ?? []))).sorted() }
+    private var unpriced: [String] { Array(Set(claude.unpriced + (codex?.unpriced ?? []) + (google?.unpriced ?? []))).sorted() }
 
     /// The period's totals, or the hovered day's.
     private func figures(_ bars: [Bar]) -> some View {
@@ -399,7 +426,8 @@ private struct UsageHistorySection: View {
         let busiest = totalsByDay.max { $0.value < $1.value }
         let busiestDate = busiest.flatMap { b in bars.first { $0.key == b.key }?.date }
         let active = totalsByDay.values.filter { $0 > 0 }.count
-        let claudeShare = Double(claude.totals.total) / Double(max(1, claude.totals.total + (codex?.totals.total ?? 0)))
+        let claudeShare = Double(claude.totals.total)
+            / Double(max(1, claude.totals.total + (codex?.totals.total ?? 0) + (google?.totals.total ?? 0)))
         return HStack(alignment: .top, spacing: 22) {
             figure(day.map { $0.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)) } ?? "Tokens, 30 days", Fmt.tokens(tokens))
             figure("Estimated cost", "\u{2248} " + Fmt.usd(cost))
@@ -408,7 +436,7 @@ private struct UsageHistorySection: View {
                     (busiestDate?.formatted(.dateTime.day().month(.abbreviated)) ?? "") + " · " + Fmt.tokens(b.value)
                 } ?? "–")
                 figure("Days with use", "\(active) of \(UsageHistory.days)")
-                if codex != nil { figure("Claude Code share", "\(Int((claudeShare * 100).rounded()))%") }
+                if codex != nil || google != nil { figure("Claude Code share", "\(Int((claudeShare * 100).rounded()))%") }
             } else {
                 ForEach(shown) { b in figure(b.agent, Fmt.tokens(b.tokens) + " · " + Fmt.usd(b.cost)) }
             }
@@ -432,7 +460,7 @@ private struct UsageHistorySection: View {
                     .opacity(selected.map { Calendar.current.isDate($0, inSameDayAs: b.date) ? 1 : 0.45 } ?? 1)
                     .cornerRadius(1.5)
             }
-            .chartForegroundStyleScale(scale)
+            .chartForegroundStyleScale(domain: agents.map(\.0), range: agents.map(\.1))
             .chartLegend(.hidden)
             .chartXSelection(value: hover)
             .chartYAxis {
@@ -455,14 +483,16 @@ private struct UsageHistorySection: View {
 private struct ProjectRanks: View {
     let claude: UsageHistory
     let codex: UsageHistory?
+    var google: UsageHistory? = nil
 
     private struct Row: Identifiable {
         var id: String { name }
         let name: String
         var claude = 0
         var codex = 0
+        var google = 0
         var cost: Double?
-        var total: Int { claude + codex }
+        var total: Int { claude + codex + google }
     }
 
     private var rows: [Row] {
@@ -479,6 +509,12 @@ private struct ProjectRanks: View {
             if let c = p.cost { r.cost = (r.cost ?? 0) + c }
             byName[p.name] = r
         }
+        for p in google?.projects ?? [] {
+            var r = byName[p.name] ?? Row(name: p.name)
+            r.google += p.value
+            if let c = p.cost { r.cost = (r.cost ?? 0) + c }
+            byName[p.name] = r
+        }
         return byName.values.sorted { ($0.total, $1.name) > ($1.total, $0.name) }.prefix(6).map { $0 }
     }
 
@@ -491,6 +527,7 @@ private struct ProjectRanks: View {
                     HStack(spacing: 0) {
                         if r.claude > 0 { Rectangle().fill(UI.claude.opacity(0.7)).frame(width: width * Double(r.claude) / top) }
                         if r.codex > 0 { Rectangle().fill(Color.teal.opacity(0.7)).frame(width: width * Double(r.codex) / top) }
+                        if r.google > 0 { Rectangle().fill(UI.google.opacity(0.7)).frame(width: width * Double(r.google) / top) }
                     }
                     .frame(width: max(3, width * Double(r.total) / max(top, 1)), alignment: .leading)
                     .clipShape(Capsule())
@@ -503,9 +540,11 @@ private struct ProjectRanks: View {
 private struct ModelRanks: View {
     let claude: UsageHistory
     let codex: UsageHistory?
+    var google: UsageHistory? = nil
 
     var body: some View {
-        let rows = (claude.models.map { ($0, UI.claude) } + (codex?.models ?? []).map { ($0, Color.teal) })
+        let rows = (claude.models.map { ($0, UI.claude) } + (codex?.models ?? []).map { ($0, Color.teal) }
+                    + (google?.models ?? []).map { ($0, UI.google) })
             .sorted { $0.0.value > $1.0.value }.prefix(6)
         let top = Double(rows.first?.0.value ?? 1)
         VStack(alignment: .leading, spacing: 8) {

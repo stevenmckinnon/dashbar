@@ -324,7 +324,7 @@ private struct IslandRow: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(verbatim: session.name).font(.system(size: 12, weight: .medium)).foregroundStyle(.white)
                         .lineLimit(1).truncationMode(.tail)
-                    Text(verbatim: [session.project, HostApp.info(for: session)?.name, session.account].compactMap { $0 }.joined(separator: " · "))
+                    Text(verbatim: [session.project, session.agent.isGoogle ? session.agent.name : nil, HostApp.info(for: session)?.name, session.account].compactMap { $0 }.joined(separator: " · "))
                         .font(.system(size: 11)).foregroundStyle(.white.opacity(0.55)).lineLimit(1)
                 }
                 Spacer(minLength: 8)

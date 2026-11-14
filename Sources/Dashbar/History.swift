@@ -10,7 +10,9 @@ import Foundation
 /// Claude Code or Codex is in use, so a typical file is a few tens of kilobytes; even with all four series read
 /// around the clock it stays under about 350 KB.
 struct PlanHistory: Codable, Equatable {
-    enum Provider: String, Codable, CaseIterable { case claude, codex }
+    /// Antigravity's series are always saved under an account key (one per model group), so they never land in the
+    /// default file that copies of Dashbar from before Antigravity read (see `AntigravityLimits.historyKey`).
+    enum Provider: String, Codable, CaseIterable { case claude, codex, antigravity }
 
     enum Kind: String, Codable, CaseIterable {
         case fiveHour, weekly
@@ -23,14 +25,18 @@ struct PlanHistory: Codable, Equatable {
         /// Which account (`ResolvedAccount.key`); nil for the default one. Each account is saved in its own file
         /// (`PlanHistory.url(for:base:)`), so the saved form never carries it and older copies read the default file as before.
         var account: String? = nil
-        /// "c5", "cw", "x5", "xw": the compact form samples are saved with.
-        var code: String { (provider == .claude ? "c" : "x") + (kind == .fiveHour ? "5" : "w") }
+        /// "c5", "cw", "x5", "xw", "a5", "aw": the compact form samples are saved with.
+        var code: String {
+            let p: String
+            switch provider { case .claude: p = "c"; case .codex: p = "x"; case .antigravity: p = "a" }
+            return p + (kind == .fiveHour ? "5" : "w")
+        }
         /// Sorts and tells series apart in memory, account included.
         var key: String { code + (account.map { "-" + $0 } ?? "") }
         init(_ provider: Provider, _ kind: Kind, account: String? = nil) { self.provider = provider; self.kind = kind; self.account = account }
         init?(code: String) {
             guard code.count == 2 else { return nil }
-            switch code.first { case "c": provider = .claude; case "x": provider = .codex; default: return nil }
+            switch code.first { case "c": provider = .claude; case "x": provider = .codex; case "a": provider = .antigravity; default: return nil }
             switch code.last { case "5": kind = .fiveHour; case "w": kind = .weekly; default: return nil }
         }
     }
@@ -115,6 +121,7 @@ struct PlanHistory: Codable, Equatable {
     /// Readings for a window that had already reset by `at` are left out: their numbers no longer applied.
     @discardableResult
     mutating func record(_ limits: [RateLimit], provider: Provider, account: String? = nil, at: Date) -> Bool {
+        if provider == .antigravity && account == nil { return false }   // would break older copies' default file
         var changed = false
         for limit in limits {
             guard let kind = Self.kind(of: limit) else { continue }

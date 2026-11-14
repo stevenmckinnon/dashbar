@@ -480,12 +480,14 @@ private struct LabsSettings: View {
             } footer: {
                 Text(permissionsExplanation).settingsFooter()
             }
+            AntigravityLabsSection()
         }
         .formStyle(.grouped)
         .fixedSize(horizontal: false, vertical: true)
         .onAppear {
             settings.refreshClaudeStatusLine()
             settings.refreshClaudePermissions()
+            AntigravitySettings.shared.refresh()
         }
     }
 

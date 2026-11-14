@@ -52,6 +52,27 @@ extension DemoData {
                           current5h: (five.usedPercent, r5), currentWeek: (week.usedPercent, rw),
                           windowsPerDay: 2, peakScale: 0.6, account: AgentAccounts.hash(other.path))
         }
+        // DASHBAR_DEMO_GOOGLE=1: Antigravity's model groups, each its own series, and Google's usage.
+        for group in store.antigravityLimits?.groups ?? [] {
+            let five = group.limits.first { PlanHistory.kind(of: $0) == .fiveHour }, week = group.limits.first { PlanHistory.kind(of: $0) == .weekly }
+            guard let five, let week, let r5 = five.resetsAt, let rw = week.resetsAt else { continue }
+            Self.simulate(&history, provider: .antigravity, now: now, days: millions.map { $0 / 2 }, rng: &rng,
+                          current5h: (five.usedPercent, r5), currentWeek: (week.usedPercent, rw),
+                          windowsPerDay: 1, peakScale: group.key == "gemini" ? 0.5 : 0.3, account: AntigravityLimits.historyKey(group.key))
+        }
+        if store.google.found {
+            var google = UsageBook()
+            for (i, m) in millions.enumerated() where m > 50 && rng.next() < 0.6 {
+                guard let day = cal.date(byAdding: .day, value: i - (millions.count - 1), to: today) else { continue }
+                let t = Self.split(Double(m) * 1_000_000 / 12, messages: m / 5)
+                google.add(t, at: day.addingTimeInterval(15 * 3600), model: "gemini-3.8-flash", project: "docs-site",
+                           cost: Pricing.cost(t, model: "gemini-3.8-flash"))
+                let a = TokenTotals(input: m * 9_000, output: m * 2_500, messages: m / 8)
+                google.add(a, at: day.addingTimeInterval(16 * 3600), model: "Gemini 4 Argon (Medium)", project: "ml-notebooks",
+                           cost: Double(m) * 0.012)
+            }
+            store.google.history = google.history(now: now)
+        }
         history.compact(now: now)
         store.planHistory = history
     }

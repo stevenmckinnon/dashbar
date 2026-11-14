@@ -431,6 +431,10 @@ private struct AgentsPage: View {
             UsageCard(title: "Codex", icon: "chevron.left.forwardslash.chevron.right", tint: .teal, summary: store.codex, loading: false,
                       accounts: store.codexAccountUsage)
         }
+        if store.google.found {
+            UsageCard(title: GoogleUsage.title(store.googleSources), icon: UI.googleSymbol, tint: UI.google, summary: store.google,
+                      loading: false, costNote: GoogleUsage.costNote(store.googleSources))
+        }
     }
 }
 

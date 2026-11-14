@@ -96,7 +96,7 @@ struct Card<Content: View>: View {
 struct IconChip: View {
     let symbol: String
     let tint: Color
-    private var namesAnAgent: Bool { symbol == "asterisk" || symbol.hasPrefix("chevron.left.forwardslash") }
+    private var namesAnAgent: Bool { symbol == "asterisk" || symbol.hasPrefix("chevron.left.forwardslash") || symbol == UI.googleSymbol }
     var body: some View {
         Image(systemName: symbol)
             .font(.system(size: UI.Size.body, weight: .semibold))

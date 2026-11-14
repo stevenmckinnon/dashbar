@@ -109,6 +109,16 @@ images stay clean.
   `/usr/bin/security` as Claude Code does (the entry trusts that tool, so macOS doesn't ask; reading it directly
   asked again after every renewal, since Claude Code rewrites the entry), keeps it in memory, makes one read-only request, and never refreshes or saves the sign-in. The reading it shares between
   copies (`~/Library/Caches/Dashbar/claude-plan.json`) holds usage percentages, reset times and the plan name only.
+- Google's tools (`Google.swift`, `GeminiCLI.swift`, `AntigravityApp.swift`, `AntigravityBridge.swift`): never read
+  `~/.gemini/oauth_creds.json` or any sign-in, and never keep message text. The Antigravity CLI bridge saves an allow-list
+  of fields (quota, plan tier, and per session: folder, model, token totals, cost, state, confirmation pending), never the
+  email, conversation title or transcript path in its input; add a field only by naming it in the script. It edits only
+  `statusLine` in `~/.gemini/antigravity-cli/settings.json`, on Add, after a backup, reusing `StatusLineBridge`'s editing,
+  and tests run it in temp folders only. The Antigravity app's `conversation_summaries.db` is opened read-only and only
+  its status columns are selected (never `title`, `preview`, `raw_summary` or the `conversations_fts` tables); a schema
+  without those columns shows a warning. Antigravity plan history is always saved under a hex group key
+  (`AntigravityLimits.historyKey`), never in `plan-history.json`, which older copies must still be able to read.
+  Everything Google stays hidden for someone who doesn't use these tools. Colour: indigo (`UI.google`) is Google's agents.
 - Clean-up only moves rebuildable folders (`node_modules`, `.next`, build output, DerivedData) to the Trash
   after confirmation. Never delete permanently.
 - Do not scan outside the user's chosen folders and the project's own folder for icons.
@@ -124,7 +134,7 @@ images stay clean.
 **Design (app and site)**
 - Colour carries meaning. Green means a working agent, amber means something needs your attention soon (an agent
   waiting for you, a limit on course to run out; `UI.attention`), orange is Claude, teal is Codex, red is a problem
-  (an error, a limit used up).
+  (an error, a limit used up). Indigo is Google's agents (Gemini CLI, Antigravity), `UI.google`.
   Do not add decorative tints, gradients or coloured icon tiles. Workspace tiles show the project's own icon
   or a neutral monogram.
 - Demo and screenshot data is invented (`Demo.swift`). Never put a real project name, path or token in
