@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { RotateCw } from "lucide-react";
+import { ArrowDownToLine, Check, Copy, RotateCw } from "lucide-react";
 import { FAQ } from "./faq";
 import { RELEASE_NOTES, LATEST_VERSION, inline } from "./releases";
 import { DashbarDemo } from "./demos/DashbarDemo";
@@ -47,15 +47,51 @@ function useDark() {
   return dark;
 }
 
-function Hero() {
-  const dark = useDark();
-  const [run, setRun] = useState(0);
+/** Copies the Homebrew command, and says so for a moment. */
+function useCopy(text) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch { /* clipboard blocked */ }
+  };
+  return [copied, copy];
+}
+
+function BrewCommand({ className = "" }) {
+  const [copied, copy] = useCopy(BREW);
   return (
-    <header className="wrap">
-      <nav className="nav" aria-label="Primary">
+    <div className={`brew-cmd ${className}`}>
+      <code><span className="prompt" aria-hidden="true">$ </span>{BREW}</code>
+      <button type="button" className="copy" onClick={copy} aria-label={copied ? "Copied" : "Copy the Homebrew command"}>
+        {copied ? <Check size={16} strokeWidth={2} aria-hidden="true" /> : <Copy size={16} strokeWidth={1.75} aria-hidden="true" />}
+      </button>
+      <span className="sr" role="status">{copied ? "Command copied" : ""}</span>
+    </div>
+  );
+}
+
+function DownloadButton({ className = "" }) {
+  return (
+    <a className={`btn ${className}`} href={DOWNLOAD}>
+      <ArrowDownToLine size={19} strokeWidth={2} aria-hidden="true" />Download for macOS
+    </a>
+  );
+}
+
+function NavBar() {
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const on = () => setScrolled(window.scrollY > 8);
+    on();
+    window.addEventListener("scroll", on, { passive: true });
+    return () => window.removeEventListener("scroll", on);
+  }, []);
+  return (
+    <div className="navbar" data-scrolled={scrolled || undefined}>
+      <nav className="nav wrap" aria-label="Primary">
         <a className="brand" href="#top"><Mark /> Dashbar</a>
         <ul>
           <li><a href="#features">Features</a></li>
+          <li><a href="#window">Window</a></li>
           <li><a href="#pace">Pace</a></li>
           <li><a href="#privacy">Privacy</a></li>
           <li><a href="#faq">FAQ</a></li>
@@ -63,23 +99,31 @@ function Hero() {
           <li><a className="btn small" href="#install">Install</a></li>
         </ul>
       </nav>
-      <div className="hero">
-        <div className="hero-copy">
-          <h1 id="top">Your agents, in the menu bar</h1>
-          <p className="lede">Dashbar shows which <b>Claude Code</b> and <b>Codex</b> sessions are working, how much of your plan is left, and which dev servers are idling. Free and open source.</p>
-          <div className="actions">
-            <a className="btn" href={DOWNLOAD}>Download for macOS</a>
-            <span className="note">Open source under the MIT licence. Needs macOS 14 or later. Notarised by Apple.</span>
-          </div>
+    </div>
+  );
+}
+
+function Hero() {
+  const dark = useDark();
+  const [run, setRun] = useState(0);
+  return (
+    <header className="wrap hero">
+      <div className="hero-copy">
+        <h1 id="top">Your agents, in the menu bar</h1>
+        <p className="lede">Dashbar shows which <b>Claude Code</b> and <b>Codex</b> sessions are working, how much of your plan is left, and which dev servers are idling. Free and open source.</p>
+        <div className="actions">
+          <DownloadButton />
+          <BrewCommand />
         </div>
-        <div className="demo">
-          <div role="img" aria-label="A short animation of Dashbar's panel, opened from the menu bar. It shows the dev servers, two of them marked barely used, then the plan limits, where the 5-hour limit is on pace to last until it resets.">
-            <div aria-hidden="true"><DashbarDemo key={run} dark={dark} /></div>
-          </div>
-          <div className="caption-row">
-            <p className="caption">In your menu bar you see the icon and how many agents are working. Click it to open the panel.</p>
-            <button className="replay-pill" type="button" onClick={() => setRun((n) => n + 1)}><RotateCw size={14} strokeWidth={2} aria-hidden="true" />Replay<span className="sr-only"> the demo</span></button>
-          </div>
+        <p className="note">{LATEST_VERSION ? <>Version {LATEST_VERSION}. </> : null}Needs macOS 14 or later. Notarised by Apple. MIT licence.</p>
+      </div>
+      <div className="demo" data-ss-fill="">
+        <div role="img" aria-label="A short animation of Dashbar's panel, opened from the menu bar. It shows the dev servers, two of them marked barely used, then the plan limits, where the 5-hour limit is on pace to last until it resets.">
+          <div aria-hidden="true"><DashbarDemo key={run} dark={dark} /></div>
+        </div>
+        <div className="caption-row">
+          <p className="caption">In your menu bar you see the icon and how many agents are working. Click it to open the panel.</p>
+          <button className="replay-pill" type="button" onClick={() => setRun((n) => n + 1)}><RotateCw size={14} strokeWidth={2} aria-hidden="true" />Replay<span className="sr-only"> the demo</span></button>
         </div>
       </div>
     </header>
@@ -103,38 +147,36 @@ const ITEMS = [
     body: <>Finds <code>node_modules</code>, <code>.next</code>, build folders and Xcode’s DerivedData, shows what you would get back, and moves them to the Trash only after you confirm.</> },
 ];
 
-function FeatureArt({ Demo, name }) {
+function Feature({ Demo, name, body }) {
   const dark = useDark();
   const [run, setRun] = useState(0);
   return (
-    <>
-      <div className="art" role="img" aria-label={`A short animation of the ${name.toLowerCase()} view.`}>
-        <div aria-hidden="true"><Demo key={run} dark={dark} /></div>
-      </div>
-      <div className="item-head">
+    <article className="feature">
+      <div className="feature-text">
         <h3>{name}</h3>
+        <p>{body}</p>
         <button className="replay-pill" type="button" onClick={() => setRun((n) => n + 1)}>
           <RotateCw size={14} strokeWidth={2} aria-hidden="true" />Replay<span className="sr-only"> the {name.toLowerCase()} demo</span>
         </button>
       </div>
-    </>
+      <div className="feature-art" data-ss-fill="">
+        <div className="art" role="img" aria-label={`A short animation of the ${name.toLowerCase()} view.`}>
+          <div aria-hidden="true"><Demo key={run} dark={dark} /></div>
+        </div>
+      </div>
+    </article>
   );
 }
 
 function Features() {
   return (
     <section className="wrap features" id="features" aria-labelledby="features-h">
-      <div className="features-head">
+      <div className="section-head">
         <h2 id="features-h">What it shows</h2>
         <p>Everything an agent-heavy day throws at your Mac, in one small panel.</p>
       </div>
-      <div className="items">
-        {ITEMS.map((it) => (
-          <article className="item" key={it.name}>
-            <FeatureArt Demo={it.Demo} name={it.name} />
-            <p>{it.body}</p>
-          </article>
-        ))}
+      <div className="feature-list">
+        {ITEMS.map((it) => <Feature key={it.name} {...it} />)}
       </div>
     </section>
   );
@@ -147,7 +189,7 @@ function WindowSection() {
   const [run, setRun] = useState(0);
   return (
     <section className="wrap window" id="window" aria-labelledby="window-h">
-      <div className="window-head">
+      <div className="section-head window-head">
         <h2 id="window-h">Or a whole window</h2>
         <p>Press <kbd>⌃⌥D</kbd>, or the arrow at the top of the panel, and Dashbar opens as a window. Its pages and every running workspace sit in a sidebar. A workspace’s page adds up what it is using right now, its dev servers, its agents and everything they started, and shows the processes behind the numbers. You can stop a server, quit a process or move the workspace’s caches to the Trash from there. History shows 30 days of usage and estimated cost, and how full each plan window got.</p>
       </div>
@@ -289,7 +331,7 @@ function Privacy() {
             <li>If you turn on the experimental way of reading Claude plan limits: one request to <code>api.anthropic.com</code> with Claude Code’s own sign-in. Dashbar never refreshes or stores that sign-in. The status line way sends nothing.</li>
             <li>Update checks, from version 0.3.0: a small feed fetched from GitHub to see whether a newer version exists.</li>
           </ul>
-          <p style={{ marginTop: 14 }}>The code is <a href={REPO}>on GitHub</a> if you want to check.</p>
+          <p className="check">The code is <a href={REPO}>on GitHub</a> if you want to check.</p>
         </div>
       </div>
     </section>
@@ -299,26 +341,24 @@ function Privacy() {
 /* ---------- Install ---------- */
 
 function Install() {
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    try { await navigator.clipboard.writeText(BREW); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch { /* clipboard blocked */ }
-  };
   return (
     <section className="wrap install" id="install" aria-labelledby="install-h">
-      <h2 id="install-h">Install</h2>
-      <div className="how">
-        <h3>Download</h3>
-        <p>Open the DMG and drag Dashbar to Applications. It is signed and notarised by Apple, and needs macOS 14 or later.</p>
-        <a className="btn" href={DOWNLOAD}>Download for macOS</a>
-      </div>
-      <div className="how brew">
-        <h3>Homebrew</h3>
-        <p>One command. <code>brew upgrade</code> keeps it current.</p>
-        <div className="cmd">
-          <code>{BREW}</code>
-          <button className="btn small" type="button" onClick={copy}>{copied ? "Copied" : "Copy"}</button>
+      <div className="install-inner">
+        <Mark size={56} />
+        <h2 id="install-h">Put your agents in the menu bar</h2>
+        <p className="install-lede">Free and open source. There is no account and no analytics.</p>
+        <div className="ways">
+          <div className="how">
+            <h3>Download</h3>
+            <p>Open the DMG and drag Dashbar to Applications. It is signed and notarised by Apple, and needs macOS 14 or later.</p>
+            <DownloadButton />
+          </div>
+          <div className="how brew">
+            <h3>Homebrew</h3>
+            <p>One command. <code>brew upgrade</code> keeps it current.</p>
+            <BrewCommand className="block" />
+          </div>
         </div>
-        <span className="sr" role="status">{copied ? "Command copied" : ""}</span>
       </div>
     </section>
   );
@@ -329,25 +369,30 @@ function Install() {
 function Footer() {
   return (
     <footer className="footer">
-      <div className="footer-inner">
+      <div className="footer-inner wrap">
         <div className="who">
           <a className="brand" href="#top"><Mark /> Dashbar</a>
-          <p>Made by <a href="https://steve.mn">Steve McKinnon</a>. Free and open source under the MIT licence.</p>
-          <p>Dashbar is not affiliated with Anthropic or OpenAI. Claude and Codex are their trademarks.</p>
+          <p>A menu bar app for Claude Code and Codex. Made by <a href="https://steve.mn">Steve McKinnon</a>.</p>
         </div>
-        <ul className="links">
+        <ul className="links" aria-label="On this page">
           <li><a href="#features">Features</a></li>
-          <li><a href={REPO}>GitHub</a></li>
+          <li><a href="#window">Window</a></li>
           <li><a href="#pace">Pace</a></li>
-          <li><a href={`${REPO}/releases`}>Releases</a></li>
           <li><a href="#privacy">Privacy</a></li>
           <li><a href="#whats-new">What’s new</a></li>
           <li><a href="#faq">FAQ</a></li>
-          <li><a href={`${REPO}/issues`}>Issues</a></li>
           <li><a href="#install">Install</a></li>
+        </ul>
+        <ul className="links" aria-label="Project">
+          <li><a href={REPO}>GitHub</a></li>
+          <li><a href={`${REPO}/releases`}>Releases</a></li>
+          <li><a href={`${REPO}/issues`}>Issues</a></li>
           <li><a href={`${REPO}/blob/main/LICENSE`}>Licence</a></li>
         </ul>
-        <p className="last">© 2026 Steve McKinnon.</p>
+        <div className="last">
+          <p>© 2026 Steve McKinnon. Free and open source under the MIT licence.</p>
+          <p>Dashbar is not affiliated with Anthropic or OpenAI. Claude and Codex are their trademarks.</p>
+        </div>
       </div>
     </footer>
   );
@@ -356,6 +401,7 @@ function Footer() {
 export default function App() {
   return (
     <>
+      <NavBar />
       <Hero />
       <main>
         <Features />
