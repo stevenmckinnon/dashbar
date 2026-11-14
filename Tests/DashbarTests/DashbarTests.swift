@@ -377,6 +377,35 @@ private func session(id: String, root: String = "/dev/app", busy: Bool = false, 
     }
 }
 
+// MARK: - The app a session runs in
+
+@Suite struct HostAppTests {
+    @Test func anAppsOwnExecutableIsItsBundleAndAHelperInsideAnotherAppIsNot() {
+        #expect(HostApp.mainBundle(of: "/Applications/T3 Code (Beta).app/Contents/MacOS/T3 Code (Beta)") == "/Applications/T3 Code (Beta).app")
+        #expect(HostApp.mainBundle(of: "/Applications/T3 Code (Beta).app/Contents/Frameworks/T3 Code (Beta) Helper.app/Contents/MacOS/T3 Code (Beta) Helper") == nil)
+        #expect(HostApp.mainBundle(of: "/Users/me/.local/share/claude/versions/2.1.318") == nil)
+        #expect(HostApp.mainBundle(of: "/bin/zsh") == nil)
+    }
+
+    @Test func theNearestAppAboveTheSessionWins() {
+        // claude in T3 Code: the CLI, run by T3 Code's helper, run by T3 Code
+        #expect(HostApp.nearest(in: [
+            "/Users/me/.local/share/claude/versions/2.1.318",
+            "/Applications/T3 Code (Beta).app/Contents/Frameworks/T3 Code (Beta) Helper.app/Contents/MacOS/T3 Code (Beta) Helper",
+            "/Applications/T3 Code (Beta).app/Contents/MacOS/T3 Code (Beta)",
+        ]) == "/Applications/T3 Code (Beta).app")
+        // claude in VS Code's terminal, where VS Code itself was started from Ghostty
+        #expect(HostApp.nearest(in: [
+            "/Users/me/.local/share/claude/versions/2.1.318", "/bin/zsh",
+            "/Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Plugin).app/Contents/MacOS/Code Helper (Plugin)",
+            "/Applications/Visual Studio Code.app/Contents/MacOS/Electron",
+            "/Applications/Ghostty.app/Contents/MacOS/ghostty",
+        ]) == "/Applications/Visual Studio Code.app")
+        // under tmux: no app at all
+        #expect(HostApp.nearest(in: ["/Users/me/.local/share/claude/versions/2.1.318", "/bin/zsh", "/opt/homebrew/bin/tmux"]) == nil)
+    }
+}
+
 // MARK: - Reading the sign-in with the security tool
 
 @Suite struct SecurityToolOutputTests {

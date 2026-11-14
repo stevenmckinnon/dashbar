@@ -246,6 +246,68 @@ enum Launcher {
     }
 }
 
+// MARK: - The app a session runs in
+
+/// Which app a Claude session lives in (T3 Code, a terminal, VS Code, the Desktop app), so clicking its notification
+/// goes back there instead of to the default editor. Found by walking up the session's parent processes to the nearest
+/// app bundle's own executable; helpers nested inside another app (Electron's "… Helper.app") are skipped.
+enum HostApp {
+    /// The bundle of the nearest app above `pid`, or nil (e.g. under tmux, whose server has no app). The session's own
+    /// process is never its host: the Desktop app runs Claude Code from a `claude.app` of its own.
+    static func find(for pid: pid_t) -> String? {
+        var chain: [String] = []
+        var seen: Set<pid_t> = [pid]
+        var current = parent(of: pid)
+        while let p = current, p > 1, seen.insert(p).inserted {
+            if let path = Proc.path(p) { chain.append(path) }
+            current = parent(of: p)
+        }
+        return nearest(in: chain)
+    }
+
+    /// The short BSD info works for other users' processes too, such as the root-owned `login` between a terminal and
+    /// its shell, where the full info is refused.
+    private static func parent(of pid: pid_t) -> pid_t? {
+        var info = proc_bsdshortinfo()
+        let size = Int32(MemoryLayout<proc_bsdshortinfo>.size)
+        guard proc_pidinfo(pid, PROC_PIDT_SHORTBSDINFO, 0, &info, size) == size else { return nil }
+        return pid_t(info.pbsi_ppid)
+    }
+
+    /// The first app bundle in executable paths ordered from the process up to its oldest parent.
+    static func nearest(in chain: [String]) -> String? {
+        chain.lazy.compactMap(mainBundle(of:)).first
+    }
+
+    /// "/Applications/T3 Code (Beta).app/Contents/MacOS/T3 Code (Beta)" → "/Applications/T3 Code (Beta).app". Nil for
+    /// anything that isn't an app's own executable, including a helper app inside another app's Contents.
+    static func mainBundle(of path: String) -> String? {
+        guard let r = path.range(of: ".app/Contents/MacOS/") else { return nil }
+        let bundle = String(path[..<r.lowerBound]) + ".app"
+        return bundle.contains(".app/Contents/") ? nil : bundle
+    }
+
+    /// Brings the session back: an editor opens the project (which picks out its window), any other app comes forward.
+    /// Without a host app, falls back to the chosen editor, then Finder.
+    static func open(_ bundle: String?, root: String) {
+        if let bundle, FileManager.default.fileExists(atPath: bundle) {
+            let url = URL(fileURLWithPath: bundle)
+            let id = Bundle(url: url)?.bundleIdentifier
+            if let id, Launcher.editorCandidates.contains(where: { $0.id == id }) {
+                Launcher.open(root, in: Launcher.App(url: url, name: url.deletingPathExtension().lastPathComponent))
+            } else {
+                let config = NSWorkspace.OpenConfiguration()
+                config.activates = true
+                NSWorkspace.shared.openApplication(at: url, configuration: config)
+            }
+        } else if let editor = Launcher.editor {
+            Launcher.open(root, in: editor)
+        } else {
+            Launcher.reveal(root)
+        }
+    }
+}
+
 // MARK: - Notifications: agent finished, plan limit running low
 
 final class Notifier: NSObject, UNUserNotificationCenterDelegate {
@@ -271,7 +333,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         content.title = s.name
         content.body = "Claude finished in \(s.project) after \(Fmt.ago(Date().addingTimeInterval(-duration)))"
         content.sound = .default
-        content.userInfo = ["root": s.root]
+        content.userInfo = userInfo(for: s)
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: s.id + "-\(Date().timeIntervalSince1970)", content: content, trigger: nil))
     }
 
@@ -281,8 +343,15 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         content.title = s.name
         content.body = "\(s.waitingSentence) in \(s.project)."
         content.sound = .default
-        content.userInfo = ["root": s.root]
+        content.userInfo = userInfo(for: s)
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: s.id + "-waiting-\(Date().timeIntervalSince1970)", content: content, trigger: nil))
+    }
+
+    /// The project, and the app the session runs in, found now while its process is still there.
+    private func userInfo(for s: LiveSession) -> [String: Any] {
+        var info: [String: Any] = ["root": s.root]
+        if let host = HostApp.find(for: s.pid) { info["hostApp"] = host }
+        return info
     }
 
     func limit(_ alert: LimitAlert) {
@@ -305,9 +374,8 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         if response.notification.request.content.userInfo["limits"] as? Bool == true {
             DispatchQueue.main.async { [weak self] in self?.openLimits?() }
         } else if let root = response.notification.request.content.userInfo["root"] as? String {
-            DispatchQueue.main.async {
-                if let editor = Launcher.editor { Launcher.open(root, in: editor) } else { Launcher.reveal(root) }
-            }
+            let host = response.notification.request.content.userInfo["hostApp"] as? String
+            DispatchQueue.main.async { HostApp.open(host, root: root) }
         }
         completionHandler()
     }
