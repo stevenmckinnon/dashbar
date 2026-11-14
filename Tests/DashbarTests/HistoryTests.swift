@@ -188,9 +188,11 @@ import Testing
     @Test func thirtyDaysOfTokensAndCostByDayWithTopProjectsAndModels() {
         var book = UsageBook()
         let now = Date()
+        // Calendar days back, not multiples of 86,400 s: after a clock change a day is 23 or 25 hours, and late in the
+        // evening "now - 2 × 86,400" lands on the wrong day.
         func add(_ daysAgo: Int, _ out: Int, model: String, project: String, cost: Double?) {
             let t = TokenTotals(output: out, messages: 1)
-            book.add(t, at: now.addingTimeInterval(-Double(daysAgo) * 86_400), model: model, project: project, cost: cost)
+            book.add(t, at: Calendar.current.date(byAdding: .day, value: -daysAgo, to: now)!, model: model, project: project, cost: cost)
         }
         add(0, 100, model: "Opus", project: "a", cost: 1.5)
         add(0, 50, model: "Sonnet", project: "b", cost: 0.25)
@@ -211,5 +213,38 @@ import Testing
         #expect(h.models.first?.name == "Opus" && h.models.first?.cost == 5.5)
         #expect(h.unpriced == ["mystery"])
         #expect(book.summary(found: true).history == h)
+    }
+
+    /// Each calendar day gets its own bar across a clock change, late in the evening and just after midnight. Pinned
+    /// to the local time zone's own transitions (a zone without them still runs the check on plain days).
+    @Test func bucketsByCalendarDayAcrossAClockChange() throws {
+        let cal = Calendar.current
+        var transitions: [Date] = []
+        var probe = Date(timeIntervalSince1970: 1_790_000_000)   // late September 2026
+        for _ in 0..<2 {
+            guard let next = TimeZone.current.nextDaylightSavingTimeTransition(after: probe) else { break }
+            transitions.append(next)
+            probe = next.addingTimeInterval(3600)
+        }
+        if transitions.isEmpty { transitions = [Date(timeIntervalSince1970: 1_793_000_000)] }
+        for change in transitions {
+            // 23:30 three days after the change, so the 30 days reach back across it.
+            let day = try #require(cal.date(byAdding: .day, value: 3, to: cal.startOfDay(for: change)))
+            let now = try #require(cal.date(bySettingHour: 23, minute: 30, second: 0, of: day))
+            var book = UsageBook()
+            for back in 0..<UsageHistory.days {
+                let midnight = try #require(cal.date(byAdding: .day, value: -back, to: cal.startOfDay(for: now)))
+                let late = try #require(cal.date(bySettingHour: 23, minute: 15, second: 0, of: midnight))
+                book.add(TokenTotals(output: 10, messages: 1), at: late, model: "Opus", project: "a")
+                book.add(TokenTotals(output: 1, messages: 1), at: midnight.addingTimeInterval(20 * 60), model: "Opus", project: "a")
+            }
+            let h = book.history(now: now)
+            #expect(h.days.count == UsageHistory.days)
+            #expect(h.days.allSatisfy { $0.tokens == 11 }, "every day holds its own two readings around \(change)")
+            #expect(h.days.last.map { cal.isDate($0.date, inSameDayAs: now) } == true)
+            for (a, b) in zip(h.days, h.days.dropFirst()) {
+                #expect(cal.dateComponents([.day], from: a.date, to: b.date).day == 1)
+            }
+        }
     }
 }
