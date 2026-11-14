@@ -18,6 +18,8 @@ struct LiveSession: Identifiable, Equatable {
     var account: String? = nil
     /// The account's configuration folder, where its transcripts are. Nil means the default.
     var configDir: String? = nil
+    /// When this Claude Code process started, so subagents left from an earlier run of a resumed session aren't shown.
+    var startedAt: Date? = nil
 
     var project: String { URL(fileURLWithPath: root).lastPathComponent }
     var isBusy: Bool { status == "busy" }
@@ -91,7 +93,8 @@ enum ClaudeSessions {
                 since: Date(timeIntervalSince1970: ms / 1000),
                 entrypoint: o["entrypoint"] as? String ?? "",
                 root: cwd.isEmpty ? homeDir.path : Fmt.root(fromCwd: cwd),
-                waitingFor: o["waitingFor"] as? String)
+                waitingFor: o["waitingFor"] as? String,
+                startedAt: (o["startedAt"] as? Double).map { Date(timeIntervalSince1970: $0 / 1000) })
         }
         let unreadable = parsed > 0 && recognised == 0 || !sessions.isEmpty && withStatus == 0
         return Reading(sessions: sessions.sorted { ($0.urgency, $1.since) < ($1.urgency, $0.since) },

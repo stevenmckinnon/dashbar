@@ -98,9 +98,15 @@ private struct PromptButton: View {
 /// A session's row, with its permission prompt under it while one is waiting.
 struct SessionBlock: View {
     @EnvironmentObject var store: Store
+    @Environment(\.inWindow) private var inWindow
     let session: LiveSession
     var body: some View {
         SessionLine(session: session, context: store.contexts[session.id])
+        let agents = store.subagents(for: session)
+        if !agents.isEmpty {
+            // The window lists each one; the panel says how many, and opens into the list.
+            if inWindow { SubagentList(agents: agents) } else { SubagentSummary(agents: agents).padding(.leading, 1) }
+        }
         if let request = store.permissionRequest(for: session) {
             PermissionPrompt(request: request).padding(.bottom, 4)
         }

@@ -3,6 +3,9 @@ import Foundation
 /// Invented data for screenshots, so README and website images never show real projects or sessions.
 @MainActor
 enum DemoData {
+    /// DASHBAR_DEMO_SUBAGENTS_OPEN=1 renders the panel's subagent line opened into its list.
+    nonisolated static var subagentsOpen: Bool { ProcessInfo.processInfo.environment["DASHBAR_DEMO_SUBAGENTS_OPEN"] != nil }
+
     static func apply(to store: Store) {
         let now = Date()
         func minutes(_ m: Double) -> Date { now.addingTimeInterval(-m * 60) }
@@ -41,6 +44,18 @@ enum DemoData {
             if let s = sessions.first(where: { $0.id == pair.key }) { out[s.id] = pair.value }
         }
         store.otherAgents = [AgentProcess(name: "Codex", count: 1)]
+        // storefront-web's session has handed work to subagents: three running (one in the background), one just done.
+        store.subagents = ["s1": [
+            Subagent(id: "a1", description: "Write webhook signature tests", type: "general-purpose", model: "Opus 5.5",
+                     background: false, started: minutes(3.2), lastActivity: now, finished: false, tokens: 1_840_000),
+            Subagent(id: "a2", description: "Find every place prices are rounded", type: "Explore", model: "Sonnet 5.5",
+                     background: false, started: minutes(2.1), lastActivity: now, finished: false, tokens: 620_000),
+            Subagent(id: "a3", description: "Review the checkout diff", type: "code-reviewer", model: "Opus 5.5",
+                     background: true, started: minutes(1.4), lastActivity: now, finished: false, tokens: 410_000),
+            Subagent(id: "a4", description: "Look up Stripe's retry rules", type: "general-purpose", model: "Sonnet 5.5",
+                     background: false, started: minutes(3.9), lastActivity: minutes(0.5), finished: true,
+                     finishedAt: minutes(0.5), tokens: 280_000),
+        ]].filter { id, _ in sessions.contains { $0.id == id } }
 
         // Servers
         func server(_ pid: Int32, _ port: Int, _ cmd: String, _ root: String?, mb: UInt64, upMinutes: Double,
@@ -144,6 +159,10 @@ enum DemoData {
         func period(_ t: TokenTotals, _ f: Double) -> PeriodUsage { priced(t, claude.topModels, claude.topProjects, f) }
         var fortnight = TokenTotals(); fortnight.input = 9_800_000; fortnight.output = 5_400_000; fortnight.cacheRead = 1_240_000_000; fortnight.cacheWrite = 21_000_000; fortnight.messages = 4_700
         claude.periods = [period(today, 1), period(week, 4.5), period(fortnight, 8.5)]
+        for i in claude.periods.indices {   // about a quarter of it from subagents
+            claude.periods[i].subagentTokens = claude.periods[i].totals.total * 27 / 100
+            claude.periods[i].subagentCost = claude.periods[i].cost * 0.24
+        }
         store.claude = claude
 
         var codex = UsageSummary()

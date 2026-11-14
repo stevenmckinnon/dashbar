@@ -53,6 +53,10 @@ final class Store: ObservableObject {
     @Published var notice: String?
     /// Set when Claude Code's session files exist but can't be read (see `ClaudeSessions.readChecked`).
     @Published var sessionsWarning: String?
+    /// Each live session's subagents (running, and finished in the last minute or so), keyed by session ID.
+    @Published var subagents: [String: [Subagent]] = [:]
+    /// Set when subagent files exist but can't be read (see `SubagentReader`).
+    @Published var subagentsWarning: String?
     /// Claude Code permission prompts waiting for an answer in Dashbar (only while the permission hook is added).
     @Published var permissionRequests: [PermissionRequest] = []
 
@@ -114,7 +118,9 @@ final class Store: ObservableObject {
     }
 
     /// A log or session format Dashbar can no longer read. Shown instead of quietly reporting nothing.
-    var formatWarning: String? { claude.warning ?? codex.warning ?? sessionsWarning }
+    var formatWarning: String? { claude.warning ?? codex.warning ?? sessionsWarning ?? subagentsWarning }
+
+    func subagents(for session: LiveSession) -> [Subagent] { subagents[session.id] ?? [] }
 
     var busyCount: Int { sessions.filter(\.isBusy).count }
     var waitingCount: Int { sessions.filter(\.isWaiting).count }
@@ -580,6 +586,8 @@ final class Store: ObservableObject {
             applyPermissions(permissionRequests)   // marks their sessions, and drops prompts answered in the terminal
         }
         update(\.sessionsWarning, r.sessionsWarning)
+        update(\.subagents, r.subagents.bySession)
+        update(\.subagentsWarning, r.subagents.warning)
         update(\.contexts, r.contexts)
         if let a = r.agents { update(\.otherAgents, a) }
         if let sys = r.system {
@@ -629,6 +637,7 @@ final class Worker: @unchecked Sendable {
     struct LiveResult {
         var sessions: [LiveSession] = []
         var sessionsWarning: String?
+        var subagents = SubagentReader.Reading()
         var contexts: [String: ContextInfo] = [:]
         var agents: [AgentProcess]?
         var system: SystemSnapshot?
@@ -668,6 +677,7 @@ final class Worker: @unchecked Sendable {
     private var claudeScanners: [String: ClaudeUsageScanner] = [:]
     private var codexScanners: [String: CodexUsageScanner] = [:]
     private let contextReader = ContextReader()
+    private let subagentReader = SubagentReader()
     private let sampler = SystemSampler()
     private let serverActivity = ServerActivity()
     private let workspaceSampler = WorkspaceSampler()
@@ -710,6 +720,8 @@ final class Worker: @unchecked Sendable {
         r.sessions = reading.sessions
         r.sessionsWarning = reading.warning
         r.contexts = contextReader.read(r.sessions)
+        // Closed, only which subagents run (a folder listing and changed metadata); open, their transcripts' new lines too.
+        r.subagents = subagentReader.read(r.sessions, transcript: { self.contextReader.transcript(for: $0) }, detail: req.panel)
         if req.system { r.system = sampler.sample() }
         if req.servers {
             var listeners = Listeners.read()

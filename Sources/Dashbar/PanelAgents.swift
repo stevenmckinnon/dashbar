@@ -40,6 +40,7 @@ struct UsageCard: View {
                         MiniStat(label: "Cache write", value: usage.totals.cacheWrite)
                     }
                     if showCost && usage.totals.total > 0 { CostLine(usage: usage) }
+                    if usage.subagentTokens > 0 { SubagentShare(usage: usage, showCost: showCost) }
                     HStack {
                         Text(period == .today ? "By hour, last 24 hours" : "By day, last \(period.days) days")
                             .font(.system(size: UI.Size.caption, weight: .medium)).foregroundStyle(UI.textSecondary)
@@ -161,6 +162,28 @@ struct CostLine: View {
         .help("An estimate of what these tokens would cost on the pay-as-you-go API, at list prices from \(Pricing.asOf). "
               + "On a Claude or ChatGPT plan you pay the plan's price, not this."
               + (missing.isEmpty ? "" : " Usage on models without a known price is left out."))
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// "Of which subagents 41M · ≈ $12 · 27%": their share, already inside the totals above.
+struct SubagentShare: View {
+    let usage: PeriodUsage
+    let showCost: Bool
+
+    var body: some View {
+        let share = Int((Double(usage.subagentTokens) / Double(max(usage.totals.total, 1)) * 100).rounded())
+        HStack(spacing: 5) {
+            Image(systemName: "arrow.triangle.branch").font(.system(size: UI.Size.micro, weight: .semibold)).accessibilityHidden(true)
+            Text(([("Of which subagents " + Fmt.tokens(usage.subagentTokens)),
+                   showCost && usage.subagentCost > 0 ? "\u{2248} " + Fmt.usd(usage.subagentCost) : nil,
+                   "\(share)%"] as [String?]).compactMap { $0 }.joined(separator: " · "))
+                .monospacedDigit()
+            Spacer(minLength: 0)
+        }
+        .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+        .help("Tokens used by subagents (Agent and Task tool runs). They are part of the totals above, counted once, "
+              + "in the project each subagent worked in.")
         .accessibilityElement(children: .combine)
     }
 }

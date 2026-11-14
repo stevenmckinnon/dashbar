@@ -103,6 +103,12 @@ final class ContextReader {
         return out
     }
 
+    /// The session's transcript, `<projects>/<project>/<sessionId>.jsonl`, when it has been found.
+    func transcript(for s: LiveSession, now: Date = Date()) -> URL? {
+        let projects = s.configDir.map { URL(fileURLWithPath: $0).appendingPathComponent("projects") } ?? self.projects
+        return path(for: s.id, in: projects, now: now)
+    }
+
     private func path(for id: String, in projects: URL, now: Date) -> URL? {
         if let u = paths[id] { return u }
         if let missed = misses[id], now.timeIntervalSince(missed) < missRetry { return nil }

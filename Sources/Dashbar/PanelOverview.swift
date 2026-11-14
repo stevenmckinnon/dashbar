@@ -22,6 +22,11 @@ struct NowCard: View {
                 ForEach(workspace.sessions.prefix(2)) { s in
                     NowSessionLine(session: s, context: store.contexts[s.id],
                                    extra: s.id == workspace.sessions.first?.id ? max(0, workspace.sessions.count - 2) : 0)
+                    let agents = store.subagents(for: s)
+                    if !agents.isEmpty {
+                        SubagentSummary(agents: agents, startsExpanded: DemoData.subagentsOpen)
+                            .padding(.leading, 33)   // under the session's name, past its tile
+                    }
                 }
             }
             ForEach(workspace.sessions.compactMap(store.permissionRequest(for:))) { PermissionPrompt(request: $0) }
