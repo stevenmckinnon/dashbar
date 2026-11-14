@@ -157,7 +157,8 @@ final class ClaudePlanMonitor: ObservableObject {
             failures = 0
             retryAt = nil
             if result.problem == nil {
-                deps.saveShared(ClaudePlanLimits.Shared(fetchedAt: result.fetchedAt, plan: result.plan, limits: result.limits))
+                deps.saveShared(ClaudePlanLimits.Shared(fetchedAt: result.fetchedAt, plan: result.plan, limits: result.limits,
+                                                        service: result.keychainService))
             }
         }
         endpointResult = ClaudePlanLimits.keepingLastGood(endpointResult, result)

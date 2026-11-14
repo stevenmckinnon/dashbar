@@ -30,6 +30,8 @@ enum ClaudePlanLimits {
         var stale: Stale?
         /// Where the reading came from.
         var source: Source = .endpoint
+        /// The Keychain entry whose sign-in was used (a name, not a secret), to say which account the limits are for.
+        var keychainService: String? = nil
     }
 
     enum Source: Equatable {
@@ -104,6 +106,12 @@ enum ClaudePlanLimits {
     }
 
     private static func request(with read: Read) async -> (result: Result, rejected: Bool) {
+        var out = await untaggedRequest(with: read)
+        if case .success(let c) = read { out.result.keychainService = c.service }
+        return out
+    }
+
+    private static func untaggedRequest(with read: Read) async -> (result: Result, rejected: Bool) {
         let creds: Credentials
         switch read {
         case .failure(let message): return (Result(problem: message), false)
@@ -182,6 +190,8 @@ enum ClaudePlanLimits {
         var limits: [RateLimit] = []
         /// No copy asks before this.
         var retryAt: Date?
+        /// Which Keychain entry the reading used, so the account's name survives being shared.
+        var service: String?
 
         static let defaultURL = homeDir.appendingPathComponent("Library/Caches/Dashbar/claude-plan.json")
 
@@ -199,6 +209,7 @@ enum ClaudePlanLimits {
         func result(stale: Stale? = nil) -> Result {
             var r = Result(limits: limits, plan: plan, fetchedAt: fetchedAt ?? Date())
             r.stale = stale
+            r.keychainService = service
             return r
         }
 

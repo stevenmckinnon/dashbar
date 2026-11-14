@@ -15,16 +15,21 @@ import Foundation
 enum StatusLineBridge {
     static let scriptName = "claude-statusline-bridge.sh"
 
-    /// The script. `$1` is the user's previous status line command, if any. `DASHBAR_STATUSLINE_DIR` overrides where
-    /// the reading goes (tests use it). Saving the reading can fail without affecting the status line.
+    /// The script. `$1` is the user's previous status line command, if any, after an optional `--account=<key>` naming
+    /// which Claude Code account (config folder) it runs for, so each account's reading goes to its own file.
+    /// `DASHBAR_STATUSLINE_DIR` overrides where the reading goes (tests use it). Saving the reading can fail without
+    /// affecting the status line.
     static let script = #"""
     #!/bin/sh
-    # Dashbar's Claude Code status line bridge (version 1). Dashbar added it with your consent.
+    # Dashbar's Claude Code status line bridge (version 2). Dashbar added it with your consent.
     # Claude Code runs this after each reply with the session's details as JSON on stdin. It saves only the
     # rate_limits part (your plan usage percentages and reset times) and the time to a file Dashbar reads, then
     # runs the status line you had before, if any, with the same input. It sends nothing anywhere.
     # Remove it in Dashbar's Settings, which puts your previous status line back.
     out_dir="${DASHBAR_STATUSLINE_DIR:-$HOME/Library/Caches/Dashbar}"
+    account=
+    case $1 in --account=*) account=$(printf '%s' "${1#--account=}" | /usr/bin/tr -cd 'a-f0-9'); shift ;; esac
+    reading="$out_dir/claude-statusline${account:+-$account}.json"
     input=$(/bin/cat)
 
     save() {
@@ -39,7 +44,7 @@ enum StatusLineBridge {
       if [ -n "$api" ] && [ -f "$marker" ] && [ "$(/bin/cat "$marker")" = "$api" ]; then return 0; fi
       tmp="$out_dir/.claude-statusline.$$"
       if printf '{"version":1,"written_at":%s,"rate_limits":%s}\n' "$(/bin/date +%s)" "$limits" >"$tmp" &&
-        /bin/mv -f "$tmp" "$out_dir/claude-statusline.json"; then
+        /bin/mv -f "$tmp" "$reading"; then
         printf '%s' "$api" >"$marker"
       else
         /bin/rm -f "$tmp"
@@ -64,10 +69,21 @@ enum StatusLineBridge {
         var support: URL
         /// Where the bridge saves readings (only used here to tidy up on removal).
         var readings: URL = ClaudeStatusLine.defaultURL.deletingLastPathComponent()
+        /// Which account this is for (`ResolvedAccount.key`): nil for the default account, which keeps the original
+        /// file names and command, so a bridge added before accounts existed carries on as it was.
+        var account: String? = nil
 
         var script: URL { support.appendingPathComponent(StatusLineBridge.scriptName) }
-        var record: URL { support.appendingPathComponent("claude-statusline-install.json") }
+        var record: URL { support.appendingPathComponent(account.map { "claude-statusline-install-\($0).json" } ?? "claude-statusline-install.json") }
         var backups: URL { support.appendingPathComponent("Backups") }
+        /// The file this account's bridge writes.
+        var reading: URL { readings.appendingPathComponent(ClaudeStatusLine.fileName(account: account)) }
+
+        /// One account's settings.json, and its own reading and record.
+        static func forAccount(_ account: ResolvedAccount) -> Paths {
+            Paths(settings: account.settingsFile, support: homeDir.appendingPathComponent("Library/Application Support/Dashbar"),
+                  account: account.key)
+        }
 
         /// `~/.claude/settings.json`, or the folder `CLAUDE_CONFIG_DIR` names when Dashbar was started with it.
         static func `default`(environment: [String: String] = ProcessInfo.processInfo.environment) -> Paths {
@@ -143,7 +159,7 @@ enum StatusLineBridge {
             }
             let previousCommand = entry["command"] as? String
             entry["type"] = "command"
-            entry["command"] = bridgeCommand(script: paths.script, previous: previousCommand)
+            entry["command"] = bridgeCommand(script: paths.script, previous: previousCommand, account: paths.account)
             try Record(settingsPath: paths.settings.path, previousStatusLine: existing?.raw, installedAt: now).save(paths.record)
             return doc.setting("statusLine", to: try json(entry))
         }
@@ -172,8 +188,12 @@ enum StatusLineBridge {
         }
         let fm = FileManager.default
         try? fm.removeItem(at: paths.record)
+        try? fm.removeItem(at: paths.reading)
+        // The script and the reply markers are shared: they go only with the last account's bridge.
+        let others = ((try? fm.contentsOfDirectory(atPath: paths.support.path)) ?? [])
+            .filter { $0.hasPrefix("claude-statusline-install") && $0.hasSuffix(".json") }
+        guard others.isEmpty else { return }
         try? fm.removeItem(at: paths.script)
-        try? fm.removeItem(at: paths.readings.appendingPathComponent("claude-statusline.json"))
         try? fm.removeItem(at: paths.readings.appendingPathComponent("claude-statusline-sessions"))
     }
 
@@ -195,8 +215,9 @@ enum StatusLineBridge {
     /// `/bin/sh '<script>' '<previous command>'`. Running it through `/bin/sh` means it works even if the script
     /// loses its executable bit, and the previous command travels as an argument, so settings.json alone says
     /// what to put back.
-    static func bridgeCommand(script: URL, previous: String?) -> String {
+    static func bridgeCommand(script: URL, previous: String?, account: String? = nil) -> String {
         var command = "/bin/sh " + shellQuote(script.path)
+        if let account { command += " --account=" + account }
         if let previous, !previous.isEmpty { command += " " + shellQuote(previous) }
         return command
     }
@@ -204,7 +225,8 @@ enum StatusLineBridge {
     static func isBridge(_ command: String) -> Bool { command.contains(scriptName) }
 
     static func previousCommand(inBridgeCommand command: String) -> String? {
-        let words = shellWords(command)
+        var words = shellWords(command)
+        if words.count >= 3, words[2].hasPrefix("--account=") { words.remove(at: 2) }
         guard words.count >= 3, words[1].hasSuffix(scriptName) else { return nil }
         return words[2].isEmpty ? nil : words[2]
     }
@@ -473,6 +495,16 @@ enum StatusLineBridge {
 enum ClaudeStatusLine {
     /// Shared by every copy of Dashbar (the release and a local build), like `claude-plan.json`.
     static let defaultURL = homeDir.appendingPathComponent("Library/Caches/Dashbar/claude-statusline.json")
+
+    /// "claude-statusline.json" for the default account, "claude-statusline-<key>.json" for another.
+    static func fileName(account: String?) -> String {
+        account.map { "claude-statusline-\($0).json" } ?? "claude-statusline.json"
+    }
+
+    /// Where an account's bridge saves its reading.
+    static func url(for account: ResolvedAccount) -> URL {
+        defaultURL.deletingLastPathComponent().appendingPathComponent(fileName(account: account.key))
+    }
 
     static let unrecognisedMessage = "Claude Code's status line data had no limits Dashbar recognises. Its format may have changed."
 

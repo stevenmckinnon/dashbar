@@ -21,6 +21,7 @@ final class AppSettings: ObservableObject {
         static let menuNetwork = "menuNetwork"
         static let menuLimit = "menuClaudeLimit"
         static let claudeLimits = "claudeLimitsExperimental"
+        static let accounts = "agentAccounts"
     }
 
     private let defaults = UserDefaults.standard
@@ -48,6 +49,72 @@ final class AppSettings: ObservableObject {
     @Published private(set) var claudeStatusLine = false
     @Published private(set) var claudeStatusLineStatus: StatusLineBridge.Status = .notInstalled(current: nil)
 
+    /// Claude Code and Codex folders the user added (other accounts), and names given to any account, default included.
+    @Published var accounts: [AgentAccount] { didSet { Self.saveAccounts(accounts, to: defaults) } }
+    /// Whether Dashbar's bridge is in each added Claude account's status line, by folder. The default account's is
+    /// `claudeStatusLineStatus`.
+    @Published private(set) var accountStatusLines: [String: StatusLineBridge.Status] = [:]
+
+    /// Every Claude Code account Dashbar reads: the default first.
+    var claudeAccounts: [ResolvedAccount] { AgentAccounts.resolve(.claude, saved: accounts) }
+    var codexAccounts: [ResolvedAccount] { AgentAccounts.resolve(.codex, saved: accounts) }
+
+    nonisolated static func loadAccounts(from defaults: UserDefaults) -> [AgentAccount] {
+        guard let data = defaults.data(forKey: Key.accounts) else { return [] }
+        return (try? JSONDecoder().decode([AgentAccount].self, from: data)) ?? []
+    }
+
+    nonisolated static func saveAccounts(_ accounts: [AgentAccount], to defaults: UserDefaults) {
+        if accounts.isEmpty { defaults.removeObject(forKey: Key.accounts); return }
+        if let data = try? JSONEncoder().encode(accounts) { defaults.set(data, forKey: Key.accounts) }
+    }
+
+    /// Adds a folder as an account, or renames one. An empty name falls back to one made from the folder.
+    func setAccount(_ kind: AgentKind, path: String, label: String) {
+        let p = AgentAccounts.normalise(path)
+        if let i = accounts.firstIndex(where: { $0.kind == kind && AgentAccounts.normalise($0.path) == p }) {
+            accounts[i].label = label
+        } else {
+            accounts.append(AgentAccount(kind: kind, path: p, label: label))
+        }
+    }
+
+    /// Stops reading an added account. Its status line bridge, if any, is taken out first, so nothing is left behind.
+    func removeAccount(_ account: ResolvedAccount) -> String? {
+        var problem: String?
+        if account.kind == .claude, accountStatusLines[account.path]?.isInstalled == true {
+            problem = setStatusLine(false, account: account)
+            if problem != nil { return problem }
+        }
+        accounts.removeAll { $0.kind == account.kind && AgentAccounts.normalise($0.path) == account.path }
+        accountStatusLines[account.path] = nil
+        return nil
+    }
+
+    /// Re-reads whether the bridge is in each added Claude account's settings.json.
+    func refreshAccountStatusLines() {
+        guard !CommandLine.arguments.contains("--demo") else { return }
+        var out: [String: StatusLineBridge.Status] = [:]
+        for account in claudeAccounts where !account.isDefault {
+            let paths = StatusLineBridge.Paths.forAccount(account)
+            let status = StatusLineBridge.status(paths)
+            if status.isInstalled { try? StatusLineBridge.writeScript(paths) }
+            out[account.path] = status
+        }
+        if out != accountStatusLines { accountStatusLines = out }
+    }
+
+    /// Adds or removes the bridge in one account's status line: the Labs setting for the default, Accounts for the rest.
+    func setStatusLine(_ on: Bool, account: ResolvedAccount) -> String? {
+        if account.isDefault { return setClaudeStatusLine(on) }
+        let paths = StatusLineBridge.Paths.forAccount(account)
+        var problem: String?
+        do { on ? try StatusLineBridge.install(paths) : try StatusLineBridge.uninstall(paths) }
+        catch { problem = error.localizedDescription }
+        refreshAccountStatusLines()
+        return problem
+    }
+
     var showsMenuBarStats: Bool { menuCPU || menuMemory || menuNetwork }
     /// Either way of reading Claude plan limits is on.
     var showsClaudeLimits: Bool { claudeLimits || claudeStatusLine }
@@ -59,6 +126,7 @@ final class AppSettings: ObservableObject {
         if status.isInstalled { try? StatusLineBridge.writeScript(paths) }
         if status != claudeStatusLineStatus { claudeStatusLineStatus = status }
         if status.isInstalled != claudeStatusLine { claudeStatusLine = status.isInstalled }
+        refreshAccountStatusLines()
     }
 
     /// Adds or removes Dashbar's bridge in Claude Code's status line. Returns what went wrong, phrased for the user.
@@ -76,6 +144,7 @@ final class AppSettings: ObservableObject {
             Notifier.defaultsKey: true,
         ])
         scanRoots = defaults.stringArray(forKey: Key.scanRoots) ?? Cleanup.defaultRoots
+        accounts = Self.loadAccounts(from: defaults)
         editorID = defaults.string(forKey: Key.editorID) ?? ""
         terminalID = defaults.string(forKey: Key.terminalID) ?? ""
         refreshSeconds = defaults.double(forKey: Key.refreshSeconds)
@@ -97,7 +166,7 @@ final class AppSettings: ObservableObject {
 /// Settings' tabs. The selected one is saved under `key`, which is how every "Settings…" link opens Settings at a tab.
 enum SettingsTab: String {
     static let key = "settingsTab"
-    case general, menuBar, folders, labs, about
+    case general, menuBar, folders, accounts, labs, about
 }
 
 /// The one way to open Settings at a tab. Settings opens through SwiftUI's `openSettings`, which only works from a view
@@ -145,6 +214,7 @@ struct SettingsView: View {
             GeneralSettings().tabItem { Label("General", systemImage: "gearshape") }.tag(SettingsTab.general)
             MenuBarSettings().tabItem { Label("Menu Bar", systemImage: "menubar.rectangle") }.tag(SettingsTab.menuBar)
             FolderSettings().tabItem { Label("Folders", systemImage: "folder") }.tag(SettingsTab.folders)
+            AccountSettings().tabItem { Label("Accounts", systemImage: "person.2") }.tag(SettingsTab.accounts)
             LabsSettings().tabItem { Label("Labs", systemImage: "flask") }.tag(SettingsTab.labs)
             AboutSettings().tabItem { Label("About", systemImage: "info.circle") }.tag(SettingsTab.about)
         }
@@ -380,6 +450,130 @@ private struct FolderSettings: View {
         for url in panel.urls where !settings.scanRoots.contains(url.path) {
             settings.scanRoots.append(url.path)
         }
+    }
+}
+
+/// Other Claude Code and Codex accounts: the folders `CLAUDE_CONFIG_DIR` or `CODEX_HOME` point at.
+private struct AccountSettings: View {
+    @ObservedObject private var settings = AppSettings.shared
+    @State private var problem: String?
+    @State private var suggestions: [AgentKind: [String]] = [:]
+
+    var body: some View {
+        Form {
+            section(.claude)
+            section(.codex)
+            if let problem {
+                Label(problem, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption).foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .formStyle(.grouped)
+        .fixedSize(horizontal: false, vertical: true)
+        .onAppear {
+            settings.refreshClaudeStatusLine()
+            findSuggestions()
+        }
+    }
+
+    private func accounts(_ kind: AgentKind) -> [ResolvedAccount] {
+        kind == .claude ? settings.claudeAccounts : settings.codexAccounts
+    }
+
+    @ViewBuilder private func section(_ kind: AgentKind) -> some View {
+        Section {
+            ForEach(accounts(kind)) { row($0) }
+            ForEach(suggestions[kind] ?? [], id: \.self) { path in
+                LabeledContent {
+                    Button("Add") { add(kind, path) }
+                } label: {
+                    Text("Found \(Fmt.tilde(path))")
+                    Text("It has \(kind.name) logs.")
+                }
+            }
+            Button("Add Folder…") { addFolder(kind) }
+        } header: {
+            Text("\(kind.name) accounts")
+        } footer: {
+            Text(kind == .claude
+                 ? "Each account is a folder you run Claude Code with, set by CLAUDE_CONFIG_DIR (for example ~/.claude-work). Dashbar reads its sessions and usage, and names them by account once there's more than one. Plan limits come from each account's own status line."
+                 : "Each account is a folder you run Codex with, set by CODEX_HOME. Dashbar reads its sessions for usage and limits.")
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder private func row(_ account: ResolvedAccount) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                TextField("Name", text: Binding(
+                    get: { settings.accounts.first { $0.kind == account.kind && AgentAccounts.normalise($0.path) == account.path }?.label ?? "" },
+                    set: { settings.setAccount(account.kind, path: account.path, label: $0) }),
+                          prompt: Text(account.label))
+                    .labelsHidden()
+                    .textFieldStyle(.plain)
+                    .font(.body.weight(.medium))
+                Text(Fmt.tilde(account.path) + (account.isDefault ? " · default" : ""))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .lineLimit(1).truncationMode(.middle)
+                    .help(account.path)
+            }
+            Spacer(minLength: 8)
+            if account.kind == .claude { statusLineButton(account) }
+            if !account.isDefault {
+                Button {
+                    problem = settings.removeAccount(account)
+                    findSuggestions()
+                } label: {
+                    Image(systemName: "minus.circle")
+                }
+                .buttonStyle(.borderless)
+                .help("Stop reading this account. Its files are left alone.")
+                .accessibilityLabel("Remove \(account.label)")
+            }
+        }
+    }
+
+    @ViewBuilder private func statusLineButton(_ account: ResolvedAccount) -> some View {
+        let status = account.isDefault ? settings.claudeStatusLineStatus : settings.accountStatusLines[account.path]
+        switch status {
+        case .installed?:
+            Button("Remove from Status Line") { problem = settings.setStatusLine(false, account: account) }
+                .help("Puts this account's previous status line back exactly.")
+        case .unreadable(let message)?:
+            Button("Check Again") { problem = nil; settings.refreshClaudeStatusLine() }
+                .help(message)
+        default:
+            Button("Add to Status Line") { problem = settings.setStatusLine(true, account: account) }
+                .help("Reads this account's plan limits after each Claude Code reply. Changes statusLine in \(Fmt.tilde(account.settingsFile.path)), after a backup.")
+        }
+    }
+
+    private func add(_ kind: AgentKind, _ path: String) {
+        settings.setAccount(kind, path: path, label: "")
+        findSuggestions()
+    }
+
+    private func addFolder(_ kind: AgentKind) {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.showsHiddenFiles = true
+        panel.prompt = "Add"
+        panel.message = "Choose the folder \(kind.variable) points at"
+        panel.directoryURL = homeDir
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        add(kind, url.path)
+    }
+
+    /// `.claude-*` and `.codex-*` folders at the top of the home folder that have logs and aren't added yet.
+    private func findSuggestions() {
+        var found: [AgentKind: [String]] = [:]
+        for kind in AgentKind.allCases {
+            found[kind] = AgentAccounts.suggestions(kind, known: accounts(kind).map(\.path))
+        }
+        suggestions = found
     }
 }
 

@@ -85,7 +85,8 @@ final class ContextReader {
     func read(_ sessions: [LiveSession], now: Date = Date()) -> [String: ContextInfo] {
         var out: [String: ContextInfo] = [:]
         for s in sessions {
-            guard let url = path(for: s.id, now: now) else { continue }
+            let projects = s.configDir.map { URL(fileURLWithPath: $0).appendingPathComponent("projects") } ?? self.projects
+            guard let url = path(for: s.id, in: projects, now: now) else { continue }
             let rv = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
             let size = UInt64(rv?.fileSize ?? 0), mtime = rv?.contentModificationDate ?? .distantPast
             if let hit = cached[s.id], hit.size == size, hit.mtime == mtime {
@@ -102,7 +103,7 @@ final class ContextReader {
         return out
     }
 
-    private func path(for id: String, now: Date) -> URL? {
+    private func path(for id: String, in projects: URL, now: Date) -> URL? {
         if let u = paths[id] { return u }
         if let missed = misses[id], now.timeIntervalSince(missed) < missRetry { return nil }
         let dirs = (try? FileManager.default.contentsOfDirectory(at: projects, includingPropertiesForKeys: nil)) ?? []
@@ -415,6 +416,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         let content = UNMutableNotificationContent()
         content.title = s.name
         content.body = "Claude finished in \(s.project) after \(Fmt.ago(Date().addingTimeInterval(-duration)))"
+            + (s.account.map { " · \($0)" } ?? "")
         content.sound = .default
         content.userInfo = userInfo(for: s)
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: s.id + "-\(Date().timeIntervalSince1970)", content: content, trigger: nil))
@@ -424,7 +426,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         guard available, UserDefaults.standard.bool(forKey: Self.waitingKey) else { return }
         let content = UNMutableNotificationContent()
         content.title = s.name
-        content.body = "\(s.waitingSentence) in \(s.project)."
+        content.body = "\(s.waitingSentence) in \(s.project)." + (s.account.map { " (\($0))" } ?? "")
         content.sound = .default
         content.userInfo = userInfo(for: s)
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: s.id + "-waiting-\(Date().timeIntervalSince1970)", content: content, trigger: nil))
