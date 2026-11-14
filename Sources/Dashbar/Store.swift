@@ -20,6 +20,10 @@ final class Store: ObservableObject {
     @Published var codexAccountLimits: [AccountLimits] = []
     /// The default Claude account's name, only while there is more than one account.
     @Published var claudeDefaultLabel: String?
+    /// When Codex reported `codexLimits`.
+    var codexLimitsAt = Date.distantPast
+    /// Readings of the plan windows over time, for the History page. Republished only when a reading adds to it.
+    @Published var planHistory = PlanHistory()
     @Published var listeners: [Listener] = []
     /// What each agent session started, keyed by the session's process ID.
     @Published var spawned: [Int32: SpawnedProcesses] = [:]
@@ -110,6 +114,7 @@ final class Store: ObservableObject {
     private var panelVisible: Bool { surfaces.anyVisible }
     /// Demo stores hold invented data and never collect anything.
     private var isDemo = false
+    private let planRecorder = PlanHistoryRecorder()
 
     /// `demo` fills the store with invented data and starts nothing: no scanning, timers, watchers or
     /// Keychain access. Used for README and website screenshots (`Dashbar --snapshot out.png --demo`).
@@ -146,7 +151,10 @@ final class Store: ObservableObject {
             .sink { [weak self] _ in Task { @MainActor in self?.refreshAccountLimits() } }
             .store(in: &subscriptions)
         NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.worker.saveNow() }
+            MainActor.assumeIsolated {
+                self?.worker.saveNow()
+                self?.planRecorder.save()
+            }
         }
         settings.$refreshSeconds.dropFirst().removeDuplicates()
             .sink { [weak self] _ in Task { @MainActor in self?.startTimer() } }
@@ -258,6 +266,7 @@ final class Store: ObservableObject {
     /// Notifies when a plan limit is nearly used, on course to run out, or used up (once per window).
     private func checkLimits() {
         guard !isDemo, !paused else { return }
+        recordPlanHistory()
         var alerts = LimitAlerts.check(provider: "Codex", limits: codexLimits, sent: sentLimitAlerts)
         for other in codexAccountLimits.dropFirst() {   // the first is the default account's, `codexLimits`
             alerts += LimitAlerts.check(provider: "Codex (\(other.label))", limits: other.limits, sent: sentLimitAlerts)
@@ -275,6 +284,19 @@ final class Store: ObservableObject {
         }
         sentLimitAlerts = LimitAlerts.prune(sentLimitAlerts)
         UserDefaults.standard.set(Array(sentLimitAlerts), forKey: "limitAlertsSent")
+    }
+
+    /// Adds the latest readings to the plan history, as of when each source took them. Kept limits from an earlier
+    /// reading (stale) are recorded at their own time, so a wait never invents a flat line.
+    private func recordPlanHistory() {
+        var changed = false
+        if !codexLimits.isEmpty, codexLimitsAt > .distantPast {
+            changed = planRecorder.record(codexLimits, provider: .codex, at: codexLimitsAt) || changed
+        }
+        if let plan = claudePlan, plan.problem == nil, !plan.limits.isEmpty {
+            changed = planRecorder.record(plan.limits, provider: .claude, at: plan.fetchedAt) || changed
+        }
+        if changed || planHistory.isEmpty && !planRecorder.history.isEmpty { planHistory = planRecorder.history }
     }
 
     /// Each window reports on its own, so closing one doesn't pause updates for the other.
@@ -407,6 +429,7 @@ final class Store: ObservableObject {
         update(\.claudeAccountUsage, r.claudeAccounts)
         update(\.codexAccountUsage, r.codexAccounts)
         update(\.codexAccountLimits, r.codexAccountLimits)
+        codexLimitsAt = r.codexLimitsAt
         checkLimits()
     }
 }
@@ -445,6 +468,8 @@ final class Worker: @unchecked Sendable {
         var claudeAccounts: [AccountUsage] = []
         var codexAccounts: [AccountUsage] = []
         var codexAccountLimits: [AccountLimits] = []
+        /// When Codex reported `codexLimits` (the default account's).
+        var codexLimitsAt = Date.distantPast
     }
 
     private let liveQueue = DispatchQueue(label: "dashbar.live", qos: .utility)
@@ -552,7 +577,8 @@ final class Worker: @unchecked Sendable {
         }
         var result = UsageResult(claude: Self.combined(claudeRuns.map { ($0.book, $0.summary) }),
                                  codex: Self.combined(codexRuns.map { ($0.scanner.currentBook, $0.summary) }),
-                                 codexLimits: codexRuns.first?.scanner.limits ?? [])
+                                 codexLimits: codexRuns.first?.scanner.limits ?? [],
+                                 codexLimitsAt: codexRuns.first?.scanner.limitsStamp ?? .distantPast)
         if claudeRuns.count > 1 {
             result.claudeAccounts = claudeRuns.map { AccountUsage(label: $0.account.label, summary: $0.summary) }
         }

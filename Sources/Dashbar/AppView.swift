@@ -24,7 +24,7 @@ struct AppView: View {
         .onAppear { store.setPanelVisible(true, surface: "window") }
         .onDisappear { store.setPanelVisible(false, surface: "window") }
         .environment(\.inWindow, true)
-        // ⌘1…⌘5 and ⌘K are items in the app's Go menu (WindowCommands); ⌘K arrives here as a request.
+        // ⌘1…⌘6 and ⌘K are items in the app's Go menu (WindowCommands); ⌘K arrives here as a request.
         .onChange(of: model.filterRequests) { _, _ in searchFocused = true }
     }
 }
@@ -39,6 +39,8 @@ struct WindowCommands: Commands {
                 Button(t.title) { AppWindow.shared.go(to: .tab(t)) }
                     .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command)
             }
+            Button("History") { AppWindow.shared.go(to: .history) }
+                .keyboardShortcut(KeyEquivalent(Character("\(PanelTab.allCases.count + 1)")), modifiers: .command)
             Divider()
             Button("Filter Workspaces") { AppWindow.shared.focusFilter() }
                 .keyboardShortcut("k")
@@ -64,6 +66,7 @@ private struct AppSidebar: View {
                         .badge(badge(t))
                         .tag(AppPage.tab(t))
                 }
+                Label("History", systemImage: "chart.bar.xaxis").tag(AppPage.history)
             }
             Section("Workspaces") {
                 ForEach(workspaces) { w in
@@ -217,7 +220,7 @@ private struct AppDetail: View {
 
     private var maxWidth: CGFloat {
         switch page {
-        case .tab(.overview), .tab(.agents), .workspace: return 1080
+        case .tab(.overview), .tab(.agents), .history, .workspace: return 1080
         case .tab: return 760
         }
     }
@@ -227,6 +230,8 @@ private struct AppDetail: View {
             switch page {
             case .tab(let t):
                 Text(t.title).font(.system(size: 20, weight: .semibold))
+            case .history:
+                Text("History").font(.system(size: 20, weight: .semibold))
             case .workspace(let root):
                 if let w = store.workspaces.first(where: { $0.root == root }) {
                     WorkspaceIdentity(workspace: w, usage: store.workspaceUsage[root])
@@ -251,6 +256,7 @@ private struct AppDetail: View {
         case .tab(.servers): ServersCard(query: query, includeProjects: true)
         case .tab(.system): SystemPage(query: query)
         case .tab(.cleanup): CleanupCard(query: query)
+        case .history: HistoryPage()
         case .workspace(let root):
             if let w = store.workspaces.first(where: { $0.root == root }) {
                 WorkspacePage(workspace: w)

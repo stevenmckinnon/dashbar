@@ -1609,6 +1609,7 @@ struct CleanupRow: View {
 // MARK: - Usage
 
 struct UsageCard: View {
+    @EnvironmentObject var store: Store
     let title: String
     var icon: String? = nil
     let tint: Color
@@ -1650,6 +1651,15 @@ struct UsageCard: View {
                             Text("· \(summary.sessions24) sessions").font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
                         }
                         Spacer()
+                        Button { AppWindow.shared.show(store: store, page: .history) } label: {
+                            HStack(spacing: 2) {
+                                Text("History")
+                                Image(systemName: "chevron.right").font(.system(size: UI.Size.micro - 1, weight: .semibold))
+                            }
+                        }
+                        .buttonStyle(PressStyle())
+                        .font(.system(size: UI.Size.caption, weight: .medium)).foregroundStyle(UI.textInfo)
+                        .help("Open the History page: 30 days of usage and how full each plan window got")
                     }
                     if period == .today { hourly } else { daily(Array(summary.last14.suffix(period.days))) }
                     if !usage.projects.isEmpty {

@@ -115,7 +115,7 @@ enum Snapshot {
                 // The Dashbar window at 1100×760, laid out by AppKit so the sidebar list draws.
                 // DASHBAR_APP_PAGE picks the page: a tab ("agents") or a workspace's name.
                 let name = ProcessInfo.processInfo.environment["DASHBAR_APP_PAGE"] ?? "overview"
-                let page: AppPage = PanelTab(rawValue: name).map { .tab($0) }
+                let page: AppPage = name == "history" ? .history : PanelTab(rawValue: name).map { .tab($0) }
                     ?? .workspace(store.workspaces.first { $0.name == name }?.root ?? name)
                 // Hosted the way AppWindow hosts it (a hosting controller), so the window chrome matches the app's.
                 let controller = NSHostingController(rootView: AppView(model: AppWindowModel(page: page), snapshot: true)
@@ -126,7 +126,9 @@ enum Snapshot {
                 window.titlebarAppearsTransparent = true
                 window.titleVisibility = .hidden
                 window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
-                window.setContentSize(NSSize(width: 1100, height: 760))
+                // DASHBAR_APP_HEIGHT renders a taller window, to see a long page whole.
+                let height = Double(ProcessInfo.processInfo.environment["DASHBAR_APP_HEIGHT"] ?? "") ?? 760
+                window.setContentSize(NSSize(width: 1100, height: height))
                 let host = controller.view
                 if CommandLine.arguments.contains("--onscreen") {
                     // On screen and active for 8 seconds, for `screencapture -l` to catch what only the window server
