@@ -152,3 +152,178 @@
 }
 
 .fd .fd-fill { padding-bottom: 18px; }
+
+.fd {
+  & .dd-verdict[data-attention] { color: var(--ss-warning-text); }
+
+  /* ---------- A permission prompt under its session ---------- */
+  .fd-ask {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition: grid-template-rows 0.45s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.3s ease;
+  }
+  .fd-ask[data-open] {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+  .fd-ask-in { min-height: 0; overflow: hidden; }
+  .fd-ask-box {
+    margin-top: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--ss-warning) 9%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ss-warning) 45%, transparent);
+  }
+  .fd-ask-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--ss-warning-text);
+  }
+  .fd-ask-head b {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ss-text-strong);
+  }
+  .fd-ask-head .dd-faint { font-variant-numeric: tabular-nums; }
+  .fd-ask-code {
+    margin-top: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--ss-ink-2);
+    color: var(--ss-text-strong);
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+  .fd-ask-why {
+    display: block;
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--ss-text);
+  }
+  .fd-ask-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .fd-ask-btn {
+    display: inline-flex;
+    align-items: center;
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 999px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ss-text-strong);
+    background: var(--ss-ink-2);
+  }
+  .fd-ask-allow { background: color-mix(in srgb, var(--ss-text-strong) 82%, transparent); color: var(--ss-canvas); }
+  .fd-ask-open {
+    margin-left: auto;
+    font-size: 12.5px;
+    color: var(--ss-text);
+    white-space: nowrap;
+  }
+
+  /* ---------- Usage and the cost estimate ---------- */
+  .fd-usage-head .dd-faint { margin-left: auto; }
+  .fd-tokens {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .fd-tokens div {
+    display: grid;
+    gap: 1px;
+    padding: 6px 9px;
+    border-radius: 9px;
+    background: var(--ss-ink-2);
+  }
+  .fd-tokens small { font-size: 11px; color: var(--ss-text); white-space: nowrap; }
+  .fd-tokens b { font-size: 13px; font-weight: 600; color: var(--ss-text-strong); font-variant-numeric: tabular-nums; }
+  .fd-cost {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--ss-text);
+  }
+  .fd-cost strong {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ss-text-strong);
+    font-variant-numeric: tabular-nums;
+  }
+  .fd-hours-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--ss-text);
+  }
+  .fd-hours-head i { font-style: normal; }
+  .fd-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-weight: 600;
+    color: var(--ss-accent-text);
+  }
+  .fd-hours {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 54px;
+    margin-top: 8px;
+  }
+  .fd-hours i {
+    flex: 1;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--dd-claude) 75%, transparent);
+    transition: height 0.7s cubic-bezier(0.25, 0.8, 0.25, 1);
+  }
+  .fd-hours i:last-child { background: var(--dd-claude); }
+  .fd-hours i[data-zero] { background: var(--ss-ink-3); }
+  .fd-ranks {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    margin-top: 12px;
+  }
+  .fd-box[data-layout="compact"] .fd-ranks { grid-template-columns: 1fr; }
+  .fd-box[data-layout="compact"] .fd-tokens { grid-template-columns: 1fr 1fr; }
+  .fd-rank { display: grid; gap: 6px; align-content: start; }
+  .fd-rank-title { font-size: 11px; font-weight: 600; color: var(--ss-text); }
+  .fd-rank-line {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 12.5px;
+  }
+  .fd-rank-line b { font-weight: 500; color: var(--ss-text-strong); white-space: nowrap; }
+  .fd-rank-line .dd-faint { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .fd-rank-bar {
+    display: block;
+    height: 3px;
+    margin-top: 3px;
+    border-radius: 2px;
+  }
+  .fd-rank-bar i {
+    display: block;
+    height: 100%;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--dd-claude) 80%, transparent);
+    transition: width 0.8s cubic-bezier(0.25, 0.8, 0.25, 1);
+  }
+}
+
+/* Grid items may shrink below their content, so a long server command is cut off rather than widening the card */
+.fd .fd-box > *,
+.fd .fd-clip > * { min-width: 0; }
+.fd .fd-box[data-layout="compact"] .dd-now-top small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

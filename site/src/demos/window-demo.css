@@ -269,6 +269,10 @@
   .wd-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .wd-pair .dd-srv { padding: 9px 0; }
   .wd-agent { margin-top: 6px; }
+  /* The agent row leads with its status dot, as in the window */
+  .wd-agent-dot { flex: none; width: 8px; height: 8px; margin: 0 4px 0 2px; border-radius: 50%; background: var(--ss-success); }
+  /* A server row's open and stop buttons stay visible in the window */
+  .wd-row-actions { display: flex; gap: 12px; margin-left: 6px; color: var(--ss-icon); }
   .wd-mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-weight: 500 !important; font-size: 13px !important; }
   .wd-proc {
     display: grid;

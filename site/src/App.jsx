@@ -3,7 +3,7 @@ import { RotateCw } from "lucide-react";
 import { FAQ } from "./faq";
 import { RELEASE_NOTES, LATEST_VERSION, inline } from "./releases";
 import { DashbarDemo } from "./demos/DashbarDemo";
-import { AgentsDemo, LimitsDemo, ServersDemo, SystemDemo, CleanupDemo } from "./demos/FeatureDemos";
+import { AgentsDemo, LimitsDemo, UsageDemo, ServersDemo, SystemDemo, CleanupDemo } from "./demos/FeatureDemos";
 import { WindowDemo } from "./demos/WindowDemo";
 
 const REPO = "https://github.com/stevenmckinnon/dashbar";
@@ -89,15 +89,17 @@ function Hero() {
 /* ---------- What it shows ---------- */
 
 const ITEMS = [
-  { name: "Working agents", Demo: AgentsDemo, w: 792, h: 276,
-    body: <>Each Claude Code session by project: working or idle, for how long, and how full its context window is. It reads the session files and transcripts under <code>~/.claude</code>, and nothing else.</> },
-  { name: "Plan limits, with pace", Demo: LimitsDemo, w: 792, h: 616,
+  { name: "Agents, and when they need you", Demo: AgentsDemo,
+    body: <>Each Claude Code session by project: working, idle or waiting for you, for how long, and how full its context window is. Click one to go back to the app it runs in. Turn on permission prompts in Settings and a request shows up under its session with Allow once and Deny. The terminal still asks too, and Dashbar never answers by itself.</> },
+  { name: "Plan limits, with pace", Demo: LimitsDemo,
     body: <>Your 5-hour and weekly limits, with a mark for where an even pace would be and a projection of when you would run out at the current rate. Codex’s limits come from its own logs. Claude’s come from Claude Code’s status line: add Dashbar to it in Settings and your usage updates after each Claude Code reply, with no network request.</> },
-  { name: "Idle servers", Demo: ServersDemo, w: 792, h: 336,
+  { name: "Usage and estimated cost", Demo: UsageDemo,
+    body: <>Tokens by hour, project and model for Claude Code and Codex, and what they would cost at public API list prices. It is a guide, not your bill, and Settings can hide it. History, in the Dashbar window, keeps 30 days of usage and how full each plan window got.</> },
+  { name: "Idle servers", Demo: ServersDemo,
     body: <>Dev servers grouped under the project that owns them. One that has been up for over an hour and is barely using the CPU is marked, and so is one an agent started.</> },
-  { name: "System", Demo: SystemDemo, w: 792, h: 400,
+  { name: "System", Demo: SystemDemo,
     body: <>CPU, memory, GPU, network and battery, and the busiest apps right now. None of it is new; it is just in the same place as everything else.</> },
-  { name: "Clean-up", Demo: CleanupDemo, w: 792, h: 580,
+  { name: "Clean-up", Demo: CleanupDemo,
     body: <>Finds <code>node_modules</code>, <code>.next</code>, build folders and Xcode’s DerivedData, shows what you would get back, and moves them to the Trash only after you confirm.</> },
 ];
 
@@ -147,10 +149,10 @@ function WindowSection() {
     <section className="wrap window" id="window" aria-labelledby="window-h">
       <div className="window-head">
         <h2 id="window-h">Or a whole window</h2>
-        <p>Press <kbd>⌃⌥D</kbd>, or the arrow at the top of the panel, and Dashbar opens as a window. Its pages and every running workspace sit in a sidebar. A workspace’s page adds up what it is using right now, its dev servers, its agents and everything they started, and shows the processes behind the numbers.</p>
+        <p>Press <kbd>⌃⌥D</kbd>, or the arrow at the top of the panel, and Dashbar opens as a window. Its pages and every running workspace sit in a sidebar. A workspace’s page adds up what it is using right now, its dev servers, its agents and everything they started, and shows the processes behind the numbers. You can stop a server, quit a process or move the workspace’s caches to the Trash from there. History shows 30 days of usage and estimated cost, and how full each plan window got.</p>
       </div>
       <div className="window-demo">
-        <div role="img" aria-label="A short animation of the Dashbar window. It opens on Overview, with a card for each workspace. Clicking storefront-web opens its page: uptime 52 minutes, CPU 12%, memory 1.19 GB and energy 3.1 watts, its dev server on port 3000, its Claude Code session at 34% context, and the processes behind the numbers.">
+        <div role="img" aria-label="A short animation of the Dashbar window. It opens on Overview, with a card for each workspace. Clicking storefront-web opens its page: uptime 52 minutes, CPU 12%, memory 1.11 GB and energy 3.1 watts, its dev server on port 3000, its Claude Code session at 34% context, and the processes behind the numbers.">
           <div aria-hidden="true"><WindowDemo key={run} dark={dark} /></div>
         </div>
         <div className="caption-row">
@@ -273,9 +275,11 @@ function Privacy() {
           <ul>
             <li>Claude Code’s session files and transcripts: <code>~/.claude/sessions</code> and <code>~/.claude/projects</code></li>
             <li>Codex’s session logs: <code>~/.codex/sessions</code></li>
+            <li>The same folders for any other Claude Code or Codex account you add in Settings</li>
             <li>The listening ports on your Mac and the processes behind them, through the system’s own process API</li>
             <li>The folders you choose, to size the caches in clean-up</li>
             <li>If you add Dashbar to Claude Code’s status line: the plan usage Claude Code passes it after each reply. Dashbar changes only that one setting, keeps a backup, and puts your previous status line back when you remove it.</li>
+            <li>If you turn on answering permission prompts: what Claude Code is about to ask you (the command, file or address), through a hook Dashbar adds to Claude Code’s settings. File contents and edits are left out, and nothing leaves your Mac.</li>
           </ul>
         </div>
         <div className="sends">
