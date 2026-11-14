@@ -35,14 +35,14 @@ struct DayUsage: Codable {
     var byProject: [String: Int] = [:]
 }
 
-struct DayPoint: Identifiable {
+struct DayPoint: Identifiable, Equatable {
     let id: String
     let date: Date
     let tokens: Int
     let isToday: Bool
 }
 
-struct HourPoint: Identifiable {
+struct HourPoint: Identifiable, Equatable {
     let id: Date
     let tokens: Int
     let messages: Int
@@ -50,7 +50,7 @@ struct HourPoint: Identifiable {
     var date: Date { id }
 }
 
-struct Ranked: Identifiable {
+struct Ranked: Identifiable, Equatable {
     var id: String { name }
     let name: String
     let value: Int
@@ -64,13 +64,13 @@ enum UsagePeriod: Int, CaseIterable, Identifiable {
     var days: Int { [1, 7, 14][rawValue] }
 }
 
-struct PeriodUsage {
+struct PeriodUsage: Equatable {
     var totals = TokenTotals()
     var models: [Ranked] = []
     var projects: [Ranked] = []
 }
 
-struct UsageSummary {
+struct UsageSummary: Equatable {
     var found = false
     /// Indexed by `UsagePeriod.rawValue`. Empty means only the single-day fields below are known.
     var periods: [PeriodUsage] = []
@@ -397,7 +397,7 @@ struct FormatHealth {
 
 // MARK: - Codex
 
-struct RateLimit: Identifiable, Codable {
+struct RateLimit: Identifiable, Codable, Equatable {
     var id: String { label }
     let label: String
     let usedPercent: Double

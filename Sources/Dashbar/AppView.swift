@@ -284,7 +284,7 @@ private struct OverviewPage: View {
 
     var body: some View {
         let workspaces = store.workspaces.filter { $0.matches(query) }
-        if let warning = store.claude.warning ?? store.codex.warning { NoticeBanner(text: warning, dismiss: nil) }
+        if let warning = store.formatWarning { NoticeBanner(text: warning, dismiss: nil) }
         TileRow { select(.tab($0)) }
         SectionTitle(text: "Workspaces", count: workspaces.count).padding(.top, 10)
         if workspaces.isEmpty {
@@ -377,7 +377,7 @@ private struct AgentsPage: View {
     let query: String
 
     var body: some View {
-        if let warning = store.claude.warning ?? store.codex.warning { NoticeBanner(text: warning, dismiss: nil) }
+        if let warning = store.formatWarning { NoticeBanner(text: warning, dismiss: nil) }
         // Two columns when there's room for the cards at their panel width or more, one otherwise.
         ViewThatFits(in: .horizontal) {
             HStack(alignment: .top, spacing: UI.gap) {
