@@ -49,6 +49,7 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
   pressure), network up/down, GPU utilisation, disk, battery with time remaining, and the busiest apps right
   now with their icons. Recent samples show as small bar charts.
 - **Dashbar window**: the arrow button in the panel header, or ⌃⌥D from anywhere, opens Dashbar as a full window: the panel's pages and every running workspace in a sidebar. A workspace's page shows its uptime, CPU, memory and energy (its servers, agents, what they started and anything else working in its folder), its dev servers and agents, and the processes behind the numbers. There's a pin to keep it on top; ⌃⌥D again closes it.
+- **First run**: a short welcome window says what Dashbar reads and lets you turn on notifications, open at login and Claude plan limits. macOS asks about notifications only when you turn one on. It's in the gear menu as Welcome… later.
 - **Notifications** (each can be turned off in Settings): when an agent finishes a stretch of work, when it needs you, and when a plan limit runs low: at 80%, when it's on course to run out before it resets, and when it's used up, once per window.
 - **Tabs**: Overview · Agents · Servers · System · Clean-up (⌘1–⌘5). Overview tiles jump to their tab.
 - **Menu bar stats** (optional, in Settings): CPU, memory, download speed and, with Claude plan limits on, what's left
@@ -73,12 +74,10 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
 
 The menu bar shows the number of working Claude sessions beside the icon, and the icon's bar fills while any are working.
 
-The menu bar shows the number of working Claude sessions beside the icon, and the icon's bar fills while any are working.
-
 ## How it differs
 
 - **Local only.** It reads the session logs Claude Code and Codex already write on your Mac, lists listening ports with libproc and measures folders. No browser cookies, no Full Disk Access, no account, no analytics.
-- **Nothing is sent**, except Sparkle's update checks to GitHub and, if you turn it on, the opt-in Claude plan-limits request to `api.anthropic.com` (the same read-only call Claude Code's `/usage` makes).
+- **Nothing is sent**, except Sparkle's update checks to GitHub and, if you turn it on, the experimental Claude plan-limits request to `api.anthropic.com` (the same read-only call Claude Code's `/usage` makes). The recommended way to see Claude plan limits sends nothing: only when you press Add does Dashbar change the `statusLine` setting in Claude Code's `settings.json` (after a backup), so a local script saves your usage percentages to a file on your Mac.
 - **One app for the whole picture.** Agents (working, idle, waiting for you), plan limits with a pace mark and a projected run-out time, dev servers grouped by project, what each workspace's processes use, system stats and a clean-up of rebuildable caches, in the panel or in a window.
 
 ## Settings

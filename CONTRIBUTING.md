@@ -57,7 +57,8 @@ proportions (`Sources/Dashbar/Brand.swift`) as a template image; its bar fills u
 ## Rules for changes
 
 **Privacy and safety.** Dashbar's promise is that it sends nothing.
-- No analytics, accounts or new network calls. The only allowed requests are Sparkle update checks to GitHub and the opt-in Claude plan-limits request to `api.anthropic.com`.
+- No analytics, accounts or new network calls. The only allowed requests are Sparkle update checks to GitHub and the opt-in, experimental Claude plan-limits request to `api.anthropic.com`.
+- Claude plan limits come first from Claude Code's status line (`StatusLineBridge.swift`). Dashbar edits Claude Code's settings only when the user presses Add (or Remove), only the `statusLine` key, after a backup, and refuses invalid JSON. The bridge script saves only `rate_limits` and a timestamp, always runs the user's previous status line unchanged, and sends nothing. Tests and development never touch the real `~/.claude`: the installer takes the settings path as a parameter.
 - Never read, print, log or store Claude Code's token. Dashbar reads its Keychain entry with `/usr/bin/security`, as Claude Code does, keeps it in memory, makes one read-only request, and never refreshes or saves the sign-in.
 - Clean-up only moves rebuildable folders (`node_modules`, `.next`, build output, DerivedData) to the Trash after confirmation. Never delete permanently.
 - Do not scan outside the user's chosen folders and the project's own folder for icons.
