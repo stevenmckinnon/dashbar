@@ -272,7 +272,8 @@ private struct IslandScene: View {
     let style: IslandStyle
     let dark: Bool
     let notch: CGSize
-    let size = CGSize(width: 960, height: 320)
+    /// `DASHBAR_ISLAND_HEIGHT=900` for a tall list (with `DASHBAR_DEMO_WORST=1`), which 320 would crop.
+    let size = CGSize(width: 960, height: ProcessInfo.processInfo.environment["DASHBAR_ISLAND_HEIGHT"].flatMap(Double.init) ?? 320)
 
     var body: some View {
         let ink: Color = dark ? .white : .black

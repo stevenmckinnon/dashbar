@@ -54,6 +54,7 @@ struct UsageCard: View {
                             HStack(spacing: 2) {
                                 Text("History")
                                 Image(systemName: "chevron.right").font(.system(size: UI.Size.micro - 1, weight: .semibold))
+                                    .accessibilityHidden(true)
                             }
                         }
                         .buttonStyle(PressStyle())
@@ -138,6 +139,7 @@ struct MiniStat: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 7).padding(.vertical, 5)
         .background(RoundedRectangle(cornerRadius: UI.innerRadius, style: .continuous).fill(Color.primary.opacity(0.05)))
+        .accessibilityElement(children: .combine)   // the label with its number
     }
 }
 
@@ -234,7 +236,9 @@ struct RankList: View {
                             .frame(width: max(3, g.size.width * Double(item.value) / max(maxV, 1)))
                     }
                     .frame(height: 3)
+                    .accessibilityHidden(true)
                 }
+                .accessibilityElement(children: .combine)   // one stop: the name with its figure
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -383,7 +387,7 @@ struct PlanLimitsCard: View {
                 Image(systemName: "asterisk").font(.system(size: UI.Size.caption, weight: .bold)).foregroundStyle(UI.claude)
                     .accessibilityHidden(true)
                 Text(["Claude", store.claudePlanLabel, store.claudePlan?.plan].compactMap { $0 }.joined(separator: " · "))
-                    .font(.system(size: UI.Size.body, weight: .medium))
+                    .font(.system(size: UI.Size.body, weight: .medium)).accessibilityAddTraits(.isHeader)
                 if store.claudePlan.map({ $0.source == .endpoint }) ?? (!settings.claudeStatusLine && settings.claudeLimits) {
                     Text("Experimental").font(.system(size: UI.Size.micro, weight: .semibold))
                         .padding(.horizontal, 5).padding(.vertical, 1)
@@ -474,7 +478,7 @@ struct PlanLimitsCard: View {
             HStack(spacing: 6) {
                 Image(systemName: "chevron.left.forwardslash.chevron.right").font(.system(size: UI.Size.caption, weight: .bold))
                     .foregroundStyle(.teal).accessibilityHidden(true)
-                Text(["Codex", label].compactMap { $0 }.joined(separator: " · ")).font(.system(size: UI.Size.body, weight: .medium))
+                Text(["Codex", label].compactMap { $0 }.joined(separator: " · ")).font(.system(size: UI.Size.body, weight: .medium)).accessibilityAddTraits(.isHeader)
             }
             if limits.isEmpty {
                 Text("Codex hasn't reported limits yet. They appear after your next Codex session.")
@@ -495,7 +499,7 @@ struct ClaudeAccountLimitsView: View {
             HStack(spacing: 6) {
                 Image(systemName: "asterisk").font(.system(size: UI.Size.caption, weight: .bold)).foregroundStyle(UI.claude)
                     .accessibilityHidden(true)
-                Text(["Claude", account.label, account.plan].compactMap { $0 }.joined(separator: " · ")).font(.system(size: UI.Size.body, weight: .medium))
+                Text(["Claude", account.label, account.plan].compactMap { $0 }.joined(separator: " · ")).font(.system(size: UI.Size.body, weight: .medium)).accessibilityAddTraits(.isHeader)
             }
             if let problem = account.problem {
                 HStack(alignment: .top, spacing: 6) {

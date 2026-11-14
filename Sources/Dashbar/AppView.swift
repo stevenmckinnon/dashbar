@@ -109,8 +109,13 @@ private struct WorkspaceSidebarRow: View {
             Monogram(name: workspace.name, root: workspace.root, active: false, size: 18)
             Text(workspace.name).lineLimit(1).truncationMode(.middle)
             Spacer(minLength: 4)
-            if workspace.isWaiting || workspace.isBusy {
-                StatusDot(active: !workspace.isWaiting && workspace.isBusy, waiting: workspace.isWaiting, size: 6)
+            if workspace.isWaiting {
+                // A shape, not only a colour, as on the menu bar item: the hand for "needs you", the dot for working.
+                Image(systemName: "hand.raised.fill").font(.system(size: 9, weight: .semibold)).foregroundStyle(UI.attention)
+                    .frame(width: 12, height: 12)
+                    .accessibilityHidden(true)
+            } else if workspace.isBusy {
+                StatusDot(active: true, size: 6)
                     .frame(width: 12, height: 12)
             } else if let port = workspace.ports.first {
                 Text(verbatim: ":" + String(port)).font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
@@ -229,9 +234,9 @@ private struct AppDetail: View {
         HStack(spacing: 12) {
             switch page {
             case .tab(let t):
-                Text(t.title).font(.system(size: 20, weight: .semibold))
+                Text(t.title).font(.system(size: 20, weight: .semibold)).accessibilityAddTraits(.isHeader)
             case .history:
-                Text("History").font(.system(size: 20, weight: .semibold))
+                Text("History").font(.system(size: 20, weight: .semibold)).accessibilityAddTraits(.isHeader)
             case .workspace(let root):
                 if let w = store.workspaces.first(where: { $0.root == root }) {
                     WorkspaceIdentity(workspace: w, usage: store.workspaceUsage[root])
@@ -344,7 +349,7 @@ private struct SectionTitle: View {
     var count: Int?
     var body: some View {
         HStack(spacing: 6) {
-            Text(text).font(.system(size: UI.Size.emphasis, weight: .semibold))
+            Text(text).font(.system(size: UI.Size.emphasis, weight: .semibold)).accessibilityAddTraits(.isHeader)
             if let count, count > 0 {
                 Text("\(count)").font(.system(size: UI.Size.emphasis).monospacedDigit()).foregroundStyle(UI.textSecondary)
             }
@@ -371,6 +376,7 @@ private struct WorkspaceCard: View {
                     }
                     Spacer(minLength: 6)
                     Image(systemName: "chevron.right").font(.system(size: UI.Size.micro, weight: .semibold)).foregroundStyle(UI.textSecondary)
+                        .accessibilityHidden(true)
                 }
                 HStack(spacing: 14) {
                     figure("CPU", usage.map { UsageText.percent($0.cpu) + "%" })

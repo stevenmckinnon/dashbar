@@ -22,6 +22,9 @@ struct CleanupCard: View {
                     ProgressView().controlSize(.small)
                     Text("Measuring cache folders…").font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
                 }
+            } else if store.cleanup.isEmpty && AppSettings.shared.scanRoots.isEmpty {
+                // Nothing was scanned, so "nothing worth cleaning" wouldn't be true.
+                EmptyRow(text: "No folders to scan. Add your projects' folders in Settings, under Folders.")
             } else if store.cleanup.isEmpty {
                 EmptyRow(text: "Nothing worth cleaning")
             } else if matching.isEmpty {

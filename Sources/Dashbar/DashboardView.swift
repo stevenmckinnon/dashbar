@@ -48,6 +48,7 @@ struct DashboardView: View {
     /// Snapshots pass the tab to render directly.
     var forcedTab: PanelTab? = nil
     @FocusState private var searchFocused: Bool
+    @Namespace private var focusScope
 
     /// One height for every tab. Letting the panel follow each tab's content made the menu bar window
     /// lag behind on tab switches and reopen at a stale size, leaving unpainted space around the panel.
@@ -80,12 +81,21 @@ struct DashboardView: View {
             BottomBar(query: $query, prompt: tab.filterPrompt, focused: $searchFocused)
         }
         .frame(width: UI.panelWidth)
+        // With Keyboard navigation on, a waiting prompt on Overview is where focus starts (see `PermissionPrompt`).
+        .focusScope(focusScope)
+        .environment(\.promptFocusScope, (forcedTab ?? tab) == .overview ? focusScope : nil)
         .background {
-            Button("") { searchFocused = true }.keyboardShortcut("k").opacity(0)
-            // ⌘1…⌘5 switch tabs.
-            ForEach(Array(PanelTab.allCases.enumerated()), id: \.offset) { i, t in
-                Button("") { tab = t }.keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command).opacity(0)
+            // Invisible carriers for the shortcuts: kept out of the Tab order and away from VoiceOver, which would
+            // otherwise land on six empty buttons. The tabs and the filter field say their shortcut themselves.
+            Group {
+                Button("") { searchFocused = true }.keyboardShortcut("k").opacity(0)
+                // ⌘1…⌘5 switch tabs.
+                ForEach(Array(PanelTab.allCases.enumerated()), id: \.offset) { i, t in
+                    Button("") { tab = t }.keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command).opacity(0)
+                }
             }
+            .focusable(false)
+            .accessibilityHidden(true)
         }
         // A workspace's page lives in the Dashbar window, which takes over from the panel.
         .environment(\.openWorkspace) { root in
@@ -159,7 +169,16 @@ struct InWindowKey: EnvironmentKey {
     static let defaultValue = false
 }
 
+/// Set by the panel on Overview: the focus scope in which the oldest waiting prompt takes the default focus.
+struct PromptFocusScopeKey: EnvironmentKey {
+    static let defaultValue: Namespace.ID? = nil
+}
+
 extension EnvironmentValues {
+    var promptFocusScope: Namespace.ID? {
+        get { self[PromptFocusScopeKey.self] }
+        set { self[PromptFocusScopeKey.self] = newValue }
+    }
     var openWorkspace: ((String) -> Void)? {
         get { self[OpenWorkspaceKey.self] }
         set { self[OpenWorkspaceKey.self] = newValue }

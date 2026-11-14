@@ -549,8 +549,9 @@ struct PermissionRequest: Identifiable, Equatable {
         }
     }
 
-    /// The command, path, address or pattern, cut to `limit` characters. Nil when the input has nothing readable.
-    func detail(limit: Int = 400) -> String? {
+    /// The command, path, address or pattern, cut to `maxLines` lines and `limit` characters. Nil when the input has
+    /// nothing readable. The prompt card asks for all of it (`PermissionRequest.shownDetail`); short forms are for one line.
+    func detail(limit: Int = 400, maxLines: Int = 6) -> String? {
         let text: String?
         switch tool {
         case "Bash", "Monitor", "PowerShell": text = input["command"]
@@ -566,7 +567,7 @@ struct PermissionRequest: Identifiable, Equatable {
         }
         guard var t = text?.trimmingCharacters(in: .whitespacesAndNewlines), !t.isEmpty else { return nil }
         let lines = t.components(separatedBy: "\n")
-        if lines.count > 6 { t = lines.prefix(6).joined(separator: "\n") + "\n…" }
+        if lines.count > maxLines { t = lines.prefix(maxLines).joined(separator: "\n") + "\n…" }
         if t.count > limit { t = String(t.prefix(limit - 1)) + "…" }
         return t
     }

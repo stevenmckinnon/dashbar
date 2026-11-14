@@ -62,6 +62,8 @@ struct WorkspaceRow: View {
             Button(action: toggle) { header }
                 .buttonStyle(PressStyle())
                 .help("\(workspace.name) — \(Fmt.tilde(workspace.root))")
+                .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
+                .accessibilityHint(isExpanded ? "Hides its sessions and actions" : "Shows its sessions and actions")
             if isExpanded {
                 detail.transition(reduceMotion
                     ? .opacity
@@ -107,6 +109,7 @@ struct WorkspaceRow: View {
                 .font(.system(size: UI.Size.micro, weight: .semibold))
                 .foregroundStyle(UI.textSecondary)
                 .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                .accessibilityHidden(true)
         }
         .padding(.horizontal, 4).padding(.vertical, 4)
         .background(RoundedRectangle(cornerRadius: UI.innerRadius, style: .continuous)
@@ -187,6 +190,7 @@ struct SessionLine: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(session.title).font(.system(size: UI.Size.body, weight: .medium)).lineLimit(1)
                         .help("\(session.name)\n\(Fmt.tilde(session.cwd))\n\(OpenSession.hint(session))")
+                        .accessibilityLabel(session.spokenTitle)
                     let host = HostApp.info(for: session)?.name ?? session.surface
                     // Google's agents say which they are; Claude's rows don't spend the room.
                     Text((session.agentNote.map { $0 + " · " } ?? "")
@@ -266,6 +270,14 @@ struct ContextLabel: View {
                 .foregroundStyle(UI.textSecondary)
         }
         .fixedSize()
+    }
+}
+
+extension LiveSession {
+    /// "Claude: Fix flaky invoice export test": which agent a row belongs to, for VoiceOver, unless the row already
+    /// says it (a Google agent's note, or a title that is the agent's name).
+    var spokenTitle: String {
+        agentNote != nil || title == agent.name ? title : "\(agent.name): \(title)"
     }
 }
 

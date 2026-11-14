@@ -333,8 +333,9 @@ struct IslandContent: View {
     // MARK: List
 
     @ViewBuilder private var listBody: some View {
-        let shown = Self.listSessions(store.sessions)
-        let prompts = store.unmatchedPermissionRequests
+        let plan = Self.listPlan(sessions: store.sessions, requests: store.permissionRequests)
+        let shown = plan.sessions
+        let prompts = store.unmatchedPermissionRequests.filter { plan.promptIDs.contains($0.id) }
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 BrandMarkView(size: 16)
@@ -352,8 +353,16 @@ struct IslandContent: View {
             ForEach(shown) { s in
                 VStack(alignment: .leading, spacing: 6) {
                     IslandRow(session: s) { onOpenSession(s) }
-                    if let r = store.permissionRequest(for: s) { PermissionPrompt(request: r) }
+                    if let r = store.permissionRequest(for: s), plan.promptIDs.contains(r.id) { PermissionPrompt(request: r) }
                 }
+            }
+            // What was left out is counted, never dropped silently; the rest are a click away.
+            if let more = plan.moreText {
+                Button(action: onOpenDashbar) {
+                    Text(more).font(.system(size: 11, weight: .medium)).foregroundStyle(.white.opacity(0.6))
+                }
+                .buttonStyle(PressStyle())
+                .help("Open Dashbar to see them all")
             }
             if shown.isEmpty && prompts.isEmpty {
                 Text("No agents working").font(.system(size: 12)).foregroundStyle(.white.opacity(0.55))
@@ -365,6 +374,38 @@ struct IslandContent: View {
     static func listSessions(_ sessions: [LiveSession]) -> [LiveSession] {
         let sorted = sessions.sorted { ($0.urgency, $1.since) < ($1.urgency, $0.since) }
         return Array(sorted.prefix(5))
+    }
+
+    /// What the island's list shows: five sessions at most, and at most two prompts as cards, so a stack of waiting
+    /// prompts can't run off the screen. Sessions whose prompt isn't drawn still say "Needs permission" on their row.
+    struct ListPlan: Equatable {
+        var sessions: [LiveSession]
+        var promptIDs: Set<String>
+        var moreSessions = 0
+        var morePrompts = 0
+
+        /// "+2 more prompts · 7 more sessions"
+        var moreText: String? {
+            var parts: [String] = []
+            if morePrompts > 0 { parts.append("\(morePrompts) more \(morePrompts == 1 ? "prompt" : "prompts")") }
+            if moreSessions > 0 { parts.append("\(moreSessions) more \(moreSessions == 1 ? "session" : "sessions")") }
+            return parts.isEmpty ? nil : "+" + parts.joined(separator: " · ")
+        }
+    }
+
+    static let listMaxSessions = 5
+    static let listMaxPrompts = 2
+
+    static func listPlan(sessions: [LiveSession], requests: [PermissionRequest]) -> ListPlan {
+        let shown = listSessions(sessions)
+        let ids = Set(sessions.map(\.id))
+        // In the order they're drawn: prompts with no session row first, then each listed session's.
+        let unmatched = requests.filter { !ids.contains($0.sessionId) }
+        let underRows = shown.compactMap { s in requests.first { $0.sessionId == s.id } }
+        let candidates = unmatched + underRows
+        let drawn = candidates.prefix(listMaxPrompts)
+        return ListPlan(sessions: shown, promptIDs: Set(drawn.map(\.id)),
+                        moreSessions: max(0, sessions.count - shown.count), morePrompts: candidates.count - drawn.count)
     }
 }
 
@@ -381,6 +422,7 @@ private struct IslandRow: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(verbatim: session.title).font(.system(size: 12, weight: .medium)).foregroundStyle(.white)
                         .lineLimit(1).truncationMode(.tail)
+                        .accessibilityLabel(session.spokenTitle)
                     Text(verbatim: (session.identityParts + [HostApp.info(for: session)?.name, session.account].compactMap { $0 }).joined(separator: " · "))
                         .font(.system(size: 11)).foregroundStyle(.white.opacity(0.55)).lineLimit(1)
                 }
