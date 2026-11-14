@@ -117,6 +117,7 @@ private struct GeneralSettings: View {
     @AppStorage(Notifier.limitsKey) private var notifyLimits = true
     @AppStorage(Notifier.waitingKey) private var notifyWaiting = true
     @AppStorage(GlobalShortcut.enabledKey) private var shortcut = true
+    @AppStorage(CostLine.showKey) private var showCost = true
     @State private var shortcutUnavailable = GlobalShortcut.shared.unavailable
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
@@ -126,6 +127,10 @@ private struct GeneralSettings: View {
                 Toggle("Current workspace", isOn: $settings.showNow)
                 Toggle("Today and this week", isOn: $settings.showWidgets)
                 Toggle("Servers outside projects", isOn: $settings.showServers)
+            }
+            Section("Usage") {
+                Toggle("Estimated cost at API prices", isOn: $showCost)
+                    .help("Works out what your tokens would cost on the pay-as-you-go API at list prices. On a plan you pay the plan's price, not this.")
             }
             Section {
                 AppPicker(title: "Editor", selection: $settings.editorID, candidates: Launcher.editorCandidates)

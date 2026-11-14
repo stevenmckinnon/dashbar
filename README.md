@@ -43,6 +43,7 @@ The project site is a small React app in `site/` (`npm run dev` inside it), depl
 - **Agents**: live Claude Code sessions (`~/.claude/sessions`), working/idle status, and "needs you" when Claude has stopped to ask for permission or an answer (it sorts first, in amber, with a count beside the menu bar icon), plus other agent apps and CLIs it spots running (T3 Code, Codex, Cursor, Gemini, Aider, Ollama…). Click a session to open its folder.
 - **Claude Code usage**: today's tokens (in / out / cache read / cache write), a 14-day chart, and top projects and models, read incrementally from `~/.claude/projects/**/*.jsonl`.
 - **Codex usage**: the same, plus 5h/weekly rate-limit gauges, from `~/.codex/sessions`. Shown once Codex has session logs.
+- **Estimated cost**: what the period's tokens would cost at public API list prices, per model and project, worked out on your Mac from the token counts (a guide for subscribers, not a bill; models without a known price are named, never counted as $0). Settings → General can hide it.
 - **Local servers**: listening TCP ports with their project name, command and uptime. Hover a row to open it in the browser or stop the process.
   Servers up over an hour that use almost no CPU are marked "barely used", and servers started from a Claude Code
   session say so (the session shows what it runs).

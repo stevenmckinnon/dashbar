@@ -1496,6 +1496,7 @@ struct UsageCard: View {
     let loading: Bool
     var limits: [RateLimit] = []
     @State private var period = UsagePeriod.today
+    @AppStorage(CostLine.showKey) private var showCost = true
 
     var body: some View {
         let usage = summary.period(period)
@@ -1519,6 +1520,7 @@ struct UsageCard: View {
                         MiniStat(label: "Cache read", value: usage.totals.cacheRead)
                         MiniStat(label: "Cache write", value: usage.totals.cacheWrite)
                     }
+                    if showCost && usage.totals.total > 0 { CostLine(usage: usage) }
                     HStack {
                         Text(period == .today ? "By hour, last 24 hours" : "By day, last \(period.days) days")
                             .font(.system(size: UI.Size.caption, weight: .medium)).foregroundStyle(UI.textSecondary)
@@ -1530,8 +1532,8 @@ struct UsageCard: View {
                     if period == .today { hourly } else { daily(Array(summary.last14.suffix(period.days))) }
                     if !usage.projects.isEmpty {
                         HStack(alignment: .top, spacing: 14) {
-                            RankList(title: "Projects", items: usage.projects, tint: tint)
-                            RankList(title: "Models", items: usage.models, tint: tint)
+                            RankList(title: "Projects", items: usage.projects, tint: tint, showCost: showCost)
+                            RankList(title: "Models", items: usage.models, tint: tint, showCost: showCost)
                         }
                     }
                     if !limits.isEmpty {
@@ -1596,10 +1598,38 @@ struct MiniStat: View {
     }
 }
 
+/// The period's estimated cost at API list prices. Neutral on purpose: it is an estimate, not a bill or a warning.
+struct CostLine: View {
+    static let showKey = "showCost"
+    let usage: PeriodUsage
+
+    var body: some View {
+        let missing = usage.unpriced
+        let priced = usage.cost > 0 || missing.isEmpty
+        HStack(alignment: .firstTextBaseline, spacing: 5) {
+            if priced {
+                Text("\u{2248} \(Fmt.usd(usage.cost))").font(.system(size: UI.Size.body, weight: .semibold).monospacedDigit())
+                Text("at API prices").font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+            }
+            Spacer(minLength: 4)
+            if !missing.isEmpty {
+                Text("no price for \(missing.joined(separator: ", "))")
+                    .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+                    .lineLimit(1).truncationMode(.tail)
+            }
+        }
+        .help("An estimate of what these tokens would cost on the pay-as-you-go API, at list prices from \(Pricing.asOf). "
+              + "On a Claude or ChatGPT plan you pay the plan's price, not this."
+              + (missing.isEmpty ? "" : " Usage on models without a known price is left out."))
+        .accessibilityElement(children: .combine)
+    }
+}
+
 struct RankList: View {
     let title: String
     let items: [Ranked]
     let tint: Color
+    var showCost = false
     var body: some View {
         let maxV = Double(items.first?.value ?? 1)
         VStack(alignment: .leading, spacing: 4) {
@@ -1609,7 +1639,9 @@ struct RankList: View {
                     HStack {
                         Text(item.name).font(.system(size: UI.Size.caption)).lineLimit(1)
                         Spacer(minLength: 4)
-                        Text(Fmt.tokens(item.value)).font(.system(size: UI.Size.micro).monospacedDigit()).foregroundStyle(UI.textSecondary)
+                        Text(Fmt.tokens(item.value) + (showCost ? item.cost.map { " \u{00B7} " + Fmt.usd($0) } ?? "" : ""))
+                            .font(.system(size: UI.Size.micro).monospacedDigit()).foregroundStyle(UI.textSecondary)
+                            .fixedSize()
                     }
                     GeometryReader { g in
                         Capsule().fill(tint.opacity(0.6))

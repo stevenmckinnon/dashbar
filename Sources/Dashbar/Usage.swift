@@ -33,6 +33,11 @@ struct DayUsage: Codable {
     var totals = TokenTotals()
     var byModel: [String: Int] = [:]
     var byProject: [String: Int] = [:]
+    /// Estimated cost at API list prices (`Pricing`), US dollars.
+    var costByModel: [String: Double] = [:]
+    var costByProject: [String: Double] = [:]
+    /// Tokens from models with no known price, which the cost leaves out.
+    var unpricedByModel: [String: Int] = [:]
 }
 
 struct DayPoint: Identifiable, Equatable {
@@ -54,6 +59,8 @@ struct Ranked: Identifiable, Equatable {
     var id: String { name }
     let name: String
     let value: Int
+    /// Estimated cost at API list prices; nil when none of its tokens has a known price.
+    var cost: Double? = nil
 }
 
 /// The span the usage card shows: one choice drives its totals, chart, projects and models.
@@ -68,6 +75,10 @@ struct PeriodUsage: Equatable {
     var totals = TokenTotals()
     var models: [Ranked] = []
     var projects: [Ranked] = []
+    /// Estimated cost at API list prices of the tokens whose model has a price.
+    var cost: Double = 0
+    /// Models (display names) whose tokens have no price, so `cost` leaves them out.
+    var unpriced: [String] = []
 }
 
 struct UsageSummary: Equatable {
@@ -113,13 +124,21 @@ struct UsageBook: Codable {
         return f
     }()
 
-    mutating func add(_ t: TokenTotals, at date: Date, model: String, project: String, session: String? = nil) {
+    /// `cost` is the estimate for `t` at API list prices; nil means the model has no known price.
+    mutating func add(_ t: TokenTotals, at date: Date, model: String, project: String, session: String? = nil,
+                      cost: Double? = nil) {
         guard t.total > 0 || t.messages > 0 else { return }
         let key = Self.dayKey.string(from: date)
         var d = days[key] ?? DayUsage()
         d.totals.add(t)
         d.byModel[model, default: 0] += t.total
         d.byProject[project, default: 0] += t.total
+        if let cost {
+            d.costByModel[model, default: 0] += cost
+            d.costByProject[project, default: 0] += cost
+        } else if t.total > 0 {
+            d.unpricedByModel[model, default: 0] += t.total
+        }
         days[key] = d
 
         let hour = Calendar.current.dateInterval(of: .hour, for: date)?.start ?? date
@@ -151,22 +170,27 @@ struct UsageBook: Codable {
         }
         let t = days[Self.dayKey.string(from: today)] ?? DayUsage()
         s.today = t.totals
-        s.topModels = t.byModel.sorted { $0.value > $1.value }.prefix(3).map { Ranked(name: $0.key, value: $0.value) }
+        s.topModels = t.byModel.sorted { $0.value > $1.value }.prefix(3).map { Ranked(name: $0.key, value: $0.value, cost: t.costByModel[$0.key]) }
         for p in UsagePeriod.allCases {
             var usage = PeriodUsage()
             var models: [String: Int] = [:], projects: [String: Int] = [:]
+            var modelCost: [String: Double] = [:], projectCost: [String: Double] = [:], unpriced: Set<String> = []
             for offset in 0..<p.days {
                 guard let date = cal.date(byAdding: .day, value: -offset, to: today),
                       let d = days[Self.dayKey.string(from: date)] else { continue }
                 usage.totals.add(d.totals)
                 for (k, v) in d.byModel { models[k, default: 0] += v }
                 for (k, v) in d.byProject { projects[k, default: 0] += v }
+                for (k, v) in d.costByModel { modelCost[k, default: 0] += v; usage.cost += v }
+                for (k, v) in d.costByProject { projectCost[k, default: 0] += v }
+                unpriced.formUnion(d.unpricedByModel.keys)
             }
-            usage.models = models.sorted { ($0.value, $1.key) > ($1.value, $0.key) }.prefix(3).map { Ranked(name: $0.key, value: $0.value) }
-            usage.projects = projects.sorted { ($0.value, $1.key) > ($1.value, $0.key) }.prefix(4).map { Ranked(name: $0.key, value: $0.value) }
+            usage.unpriced = unpriced.sorted()
+            usage.models = models.sorted { ($0.value, $1.key) > ($1.value, $0.key) }.prefix(3).map { Ranked(name: $0.key, value: $0.value, cost: modelCost[$0.key]) }
+            usage.projects = projects.sorted { ($0.value, $1.key) > ($1.value, $0.key) }.prefix(4).map { Ranked(name: $0.key, value: $0.value, cost: projectCost[$0.key]) }
             s.periods.append(usage)
         }
-        s.topProjects = t.byProject.sorted { $0.value > $1.value }.prefix(4).map { Ranked(name: $0.key, value: $0.value) }
+        s.topProjects = t.byProject.sorted { $0.value > $1.value }.prefix(4).map { Ranked(name: $0.key, value: $0.value, cost: t.costByProject[$0.key]) }
 
         let nowHour = cal.dateInterval(of: .hour, for: Date())?.start ?? Date()
         var sessions = Set<String>()
@@ -365,7 +389,13 @@ final class ClaudeUsageScanner {
         seen[file, default: [:]][key] = t.fieldMax(old)
 
         let project = (obj["cwd"] as? String).map(Fmt.project(fromCwd:)) ?? "unknown"
-        book.add(delta, at: date, model: Fmt.model(model), project: project, session: obj["sessionId"] as? String)
+        // Price the new tokens: the 1-hour share of cache writes, the whole prompt for long-context tiers,
+        // fast mode and US-only inference all come from the same usage record.
+        let oneHour = (u["cache_creation"] as? [String: Any])?["ephemeral_1h_input_tokens"] as? Int ?? 0
+        let cost = Pricing.cost(delta, model: model, promptTokens: t.input + t.cacheRead + t.cacheWrite,
+                                oneHourShare: t.cacheWrite > 0 ? Double(oneHour) / Double(t.cacheWrite) : 0,
+                                fast: u["speed"] as? String == "fast", usOnly: u["inference_geo"] as? String == "us")
+        book.add(delta, at: date, model: Fmt.model(model), project: project, session: obj["sessionId"] as? String, cost: cost)
         return .read
     }
 }
@@ -537,7 +567,10 @@ final class CodexUsageScanner {
                 var delta = cum.growth(since: ctx.cumulative)
                 if delta.total > 0 { delta.messages = 1 }
                 ctx.cumulative = cum.fieldMax(ctx.cumulative)
-                book.add(delta, at: date, model: ctx.model, project: ctx.project, session: path)
+                // The latest turn's input (cached included) decides the long-context tier.
+                let lastInput = (info["last_token_usage"] as? [String: Any])?["input_tokens"] as? Int
+                let cost = Pricing.cost(delta, model: ctx.model, promptTokens: lastInput)
+                book.add(delta, at: date, model: ctx.model, project: ctx.project, session: path, cost: cost)
             }
             if let rl = payload["rate_limits"] as? [String: Any], date >= limitsStamp {
                 limitsStamp = date
@@ -562,7 +595,8 @@ final class CodexUsageScanner {
 /// A versioned JSON file in Application Support. A missing, unreadable or older-version
 /// file is ignored, and the scan simply starts from scratch.
 struct ScanCache<State: Codable> {
-    static var version: Int { 1 }
+    /// 2: days carry estimated cost, so older progress is dropped and the last 30 days are read again once.
+    static var version: Int { 2 }
     let url: URL
 
     private struct Envelope: Codable {
