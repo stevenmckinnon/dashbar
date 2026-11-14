@@ -247,6 +247,8 @@ final class Store: ObservableObject {
             }
         }
         notifier.answerPermission = { [weak self] id, answer in self?.answer(id, answer, fromNotification: true) }
+        // VoiceOver hears the moments the island shows (`Announcer.swift`).
+        islandEvents.sink { [weak self] in self?.announce($0) }.store(in: &subscriptions)
         settings.refreshClaudePermissions()
         settings.$claudePermissions.removeDuplicates()
             .sink { [weak self] on in Task { @MainActor in self?.setPermissionsEnabled(on) } }
