@@ -372,10 +372,21 @@ struct MenuBarLabel: View {
             groups.append([.symbol("memorychip"), .text("\(used)%")])
         }
         if settings.menuNetwork { groups.append([.symbol("arrow.down"), .text(Fmt.shortRate(s.netDown))]) }
-        if settings.menuLimit, settings.showsClaudeLimits, store.claudePlan?.problem == nil,
-           let r = ClaudePlanLimits.menuBarReading(store.claudePlan?.limits ?? []) {
-            groups.append([.symbol(r.atRisk ? "exclamationmark.triangle.fill" : "gauge.with.needle"),
-                           .text("\(r.name) \(r.leftPercent)% left")])
+        var sources: [(name: String, limits: [RateLimit])] = []
+        if settings.menuLimit, settings.showsClaudeLimits, store.claudePlan?.problem == nil {
+            sources.append(("Claude", store.claudePlan?.limits ?? []))
+        }
+        if settings.menuCodexLimit, !store.codexLimits.isEmpty { sources.append(("Codex", store.codexLimits)) }
+        if settings.menuAntigravityLimit, let ag = store.antigravityLimits, ag.problem == nil,
+           let group = ag.groups.first(where: { $0.key == "gemini" }) ?? ag.groups.first {
+            sources.append(("Antigravity", group.limits))
+        }
+        let named = sources.count > 1
+        for source in sources {
+            for r in ClaudePlanLimits.menuBarReadings(source.limits, window: settings.menuLimitWindow, prefix: named ? source.name : nil) {
+                groups.append([.symbol(r.atRisk ? "exclamationmark.triangle.fill" : "gauge.with.needle"),
+                               .text("\(r.name) \(r.leftPercent)% left")])
+            }
         }
         return groups
     }

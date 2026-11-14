@@ -893,27 +893,39 @@ struct MenuBarReadingTests {
         RateLimit(label: label, usedPercent: used, resetsAt: now.addingTimeInterval(hoursLeft * 3600), window: window * 3600)
     }
 
-    @Test func showsWhatIsLeftOfTheMostUsedWindow() {
-        let r = ClaudePlanLimits.menuBarReading([
-            limit("5-hour", used: 30, hoursLeft: 2.5, window: 5),
-            limit("Weekly", used: 45, hoursLeft: 84, window: 168),
-        ], now: now)
-        #expect(r == .init(name: "week", leftPercent: 55, atRisk: false))
+    @Test func showsTheChosenWindowEvenWhenTheOtherIsMoreUsed() {
+        let limits = [limit("5-hour", used: 3, hoursLeft: 4.5, window: 5), limit("Weekly", used: 8, hoursLeft: 84, window: 168)]
+        #expect(ClaudePlanLimits.menuBarReadings(limits, now: now) == [.init(name: "5h", leftPercent: 97, atRisk: false)])
+        #expect(ClaudePlanLimits.menuBarReadings(limits, window: .weekly, now: now) == [.init(name: "week", leftPercent: 92, atRisk: false)])
+        #expect(ClaudePlanLimits.menuBarReadings(limits, window: .both, now: now).map(\.name) == ["5h", "week"])
+    }
+
+    @Test func readsAnyToolsWindowsByLengthAndNamesThemWhenAsked() {
+        let codex = [limit("5h window", used: 40, hoursLeft: 3, window: 5), limit("7d window", used: 20, hoursLeft: 100, window: 168)]
+        #expect(ClaudePlanLimits.menuBarReadings(codex, window: .both, prefix: "Codex", now: now)
+                == [.init(name: "Codex 5h", leftPercent: 60, atRisk: false), .init(name: "Codex week", leftPercent: 80, atRisk: false)])
+        let perModel = [limit("Weekly · Opus", used: 70, hoursLeft: 100, window: 168)]
+        #expect(ClaudePlanLimits.menuBarReadings(perModel, window: .weekly, now: now).isEmpty)
+    }
+
+    @Test func theOtherWindowTakesOverWhenOnlyItIsAtRisk() {
+        let limits = [limit("5-hour", used: 10, hoursLeft: 4, window: 5), limit("Weekly", used: 95, hoursLeft: 84, window: 168)]
+        #expect(ClaudePlanLimits.menuBarReadings(limits, window: .fiveHour, now: now) == [.init(name: "week", leftPercent: 5, atRisk: true)])
     }
 
     @Test func warnsWhenOnCourseToRunOut() {
-        let r = ClaudePlanLimits.menuBarReading([limit("5-hour", used: 80, hoursLeft: 2.5, window: 5)], now: now)
+        let r = ClaudePlanLimits.menuBarReadings([limit("5-hour", used: 80, hoursLeft: 2.5, window: 5)], now: now).first
         #expect(r == .init(name: "5h", leftPercent: 20, atRisk: true))
     }
 
     @Test func warnsWhenNearlyUsedUpEvenWithoutPace() {
         let unknown = RateLimit(label: "Weekly", usedPercent: 93, resetsAt: nil)
-        #expect(ClaudePlanLimits.menuBarReading([unknown], now: now)?.atRisk == true)
+        #expect(ClaudePlanLimits.menuBarReadings([unknown], now: now).first?.atRisk == true)
     }
 
     @Test func ignoresOtherWindowsAndEmptyInput() {
-        #expect(ClaudePlanLimits.menuBarReading([], now: now) == nil)
-        #expect(ClaudePlanLimits.menuBarReading([RateLimit(label: "Extra usage", usedPercent: 50, resetsAt: nil)], now: now) == nil)
+        #expect(ClaudePlanLimits.menuBarReadings([], now: now).isEmpty)
+        #expect(ClaudePlanLimits.menuBarReadings([RateLimit(label: "Extra usage", usedPercent: 50, resetsAt: nil)], now: now).isEmpty)
     }
 }
 

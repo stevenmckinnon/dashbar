@@ -380,17 +380,50 @@ enum ClaudePlanLimits {
         let atRisk: Bool
     }
 
-    static func menuBarReading(_ limits: [RateLimit], now: Date = Date()) -> MenuBarReading? {
-        let candidates = limits.filter { $0.label == "5-hour" || $0.label == "Weekly" }
-        guard let top = candidates.max(by: { $0.usedPercent < $1.usedPercent }) else { return nil }
-        let used = min(max(top.usedPercent, 0), 100)
-        let risky: Bool
-        switch top.pace(now: now) {
-        case .runsOut?, .usedUp?: risky = true
-        default: risky = used >= 90
+    /// Which plan window the menu bar shows.
+    enum MenuWindow: String, CaseIterable, Identifiable {
+        case fiveHour, weekly, both
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .fiveHour: return "5-hour"
+            case .weekly: return "Weekly"
+            case .both: return "Both"
+            }
         }
-        return MenuBarReading(name: top.label == "5-hour" ? "5h" : "week",
-                              leftPercent: Int((100 - used).rounded()), atRisk: risky)
+    }
+
+    /// What the menu bar shows of the plan: the chosen window, unless only the other one is at risk of running out,
+    /// which then shows instead (with its warning) so a choice never hides a limit about to stop you.
+    /// Works for any tool's limits: the 5-hour and weekly windows are told apart by their length (`PlanHistory.kind`),
+    /// falling back to Claude's labels, and per-model windows ("Weekly · Opus") are left out.
+    static func menuBarReadings(_ limits: [RateLimit], window: MenuWindow = .fiveHour, prefix: String? = nil,
+                                now: Date = Date()) -> [MenuBarReading] {
+        func kind(_ l: RateLimit) -> PlanHistory.Kind? {
+            if let k = PlanHistory.kind(of: l) { return k }
+            guard l.window == nil else { return nil }
+            return l.label == "5-hour" ? .fiveHour : l.label == "Weekly" ? .weekly : nil
+        }
+        func reading(_ wanted: PlanHistory.Kind) -> MenuBarReading? {
+            guard let l = limits.first(where: { kind($0) == wanted }) else { return nil }
+            let used = min(max(l.usedPercent, 0), 100)
+            let risky: Bool
+            switch l.pace(now: now) {
+            case .runsOut?, .usedUp?: risky = true
+            default: risky = used >= 90
+            }
+            let name = wanted == .fiveHour ? "5h" : "week"
+            return MenuBarReading(name: prefix.map { "\($0) \(name)" } ?? name, leftPercent: Int((100 - used).rounded()), atRisk: risky)
+        }
+        let five = reading(.fiveHour), week = reading(.weekly)
+        switch window {
+        case .both: return [five, week].compactMap { $0 }
+        case .fiveHour, .weekly:
+            let (chosen, other) = window == .fiveHour ? (five, week) : (week, five)
+            guard let chosen else { return other.map { [$0] } ?? [] }
+            if let other, other.atRisk, !chosen.atRisk { return [other] }
+            return [chosen]
+        }
     }
 
     static func label(for key: String) -> String {

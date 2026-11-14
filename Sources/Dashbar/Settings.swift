@@ -20,6 +20,9 @@ final class AppSettings: ObservableObject {
         static let menuMemory = "menuMemory"
         static let menuNetwork = "menuNetwork"
         static let menuLimit = "menuClaudeLimit"
+        static let menuLimitWindow = "menuClaudeLimitWindow"
+        static let menuCodexLimit = "menuCodexLimit"
+        static let menuAntigravityLimit = "menuAntigravityLimit"
         static let menuAnimate = "menuAnimate"
         static let menuDone = "menuDone"
         static let menuText = "menuText"
@@ -46,6 +49,13 @@ final class AppSettings: ObservableObject {
     @Published var menuNetwork: Bool { didSet { defaults.set(menuNetwork, forKey: Key.menuNetwork) } }
     /// What's left of the Claude plan limit, beside the icon. Needs the plan-limits setting in Integrations.
     @Published var menuLimit: Bool { didSet { defaults.set(menuLimit, forKey: Key.menuLimit) } }
+    /// The same for Codex and Antigravity.
+    @Published var menuCodexLimit: Bool { didSet { defaults.set(menuCodexLimit, forKey: Key.menuCodexLimit) } }
+    @Published var menuAntigravityLimit: Bool { didSet { defaults.set(menuAntigravityLimit, forKey: Key.menuAntigravityLimit) } }
+    /// Which plan window they show: 5-hour by default.
+    @Published var menuLimitWindow: ClaudePlanLimits.MenuWindow {
+        didSet { defaults.set(menuLimitWindow.rawValue, forKey: Key.menuLimitWindow) }
+    }
     /// The menu bar mark's bar sweeps while agents work (never with Reduce Motion on).
     @Published var menuAnimate: Bool { didSet { defaults.set(menuAnimate, forKey: Key.menuAnimate) } }
     /// A green "Done · project" beside the icon for a few seconds after an agent finishes.
@@ -224,6 +234,9 @@ final class AppSettings: ObservableObject {
         menuMemory = defaults.bool(forKey: Key.menuMemory)
         menuNetwork = defaults.bool(forKey: Key.menuNetwork)
         menuLimit = defaults.bool(forKey: Key.menuLimit)
+        menuCodexLimit = defaults.bool(forKey: Key.menuCodexLimit)
+        menuAntigravityLimit = defaults.bool(forKey: Key.menuAntigravityLimit)
+        menuLimitWindow = defaults.string(forKey: Key.menuLimitWindow).flatMap(ClaudePlanLimits.MenuWindow.init(rawValue:)) ?? .fiveHour
         menuAnimate = defaults.bool(forKey: Key.menuAnimate)
         menuDone = defaults.bool(forKey: Key.menuDone)
         menuText = defaults.string(forKey: Key.menuText).flatMap(MenuBarStatus.TextMode.init(rawValue:)) ?? .count
@@ -312,10 +325,16 @@ enum SettingsOpener {
         if let tab { UserDefaults.standard.set(tab.rawValue, forKey: SettingsTab.key) }
         NSApp.activate(ignoringOtherApps: true)
         if let open = openSettings ?? action { open() } else { NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) }
-        // SwiftUI creates or reuses the window after this returns.
-        DispatchQueue.main.async { bringForward() }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { bringForward() }
+        // SwiftUI creates or reuses the window after this returns, and closing the panel or its menu hands focus back
+        // to the app that had it a moment later, so try again after that.
+        for delay in [0, 0.15, 0.45] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { bringForward() }
+        }
     }
+
+    /// Whether Settings is on screen (the Dashbar window keeps the Dock icon while it is).
+    static var isVisible: Bool { window?.isVisible == true }
+    private static var closeObserver: NSObjectProtocol?
 
     /// SwiftUI's Settings window, once it exists.
     static var window: NSWindow? {
@@ -339,6 +358,21 @@ enum SettingsOpener {
         }
         // Above the Dashbar window when that one is kept on top.
         window.level = UserDefaults.standard.bool(forKey: AppWindow.floatKey) ? .floating : .normal
+        // A menu-bar-only app can't reliably take focus from the frontmost app; with a Dock icon it can, and the
+        // window then also shows in ⌘-Tab. Back to menu-bar-only when Settings closes (unless the Dashbar window is open).
+        if NSApp.activationPolicy() != .regular {
+            NSApp.setActivationPolicy(.regular)
+            BuildInfo.applyLocalIcon()
+        }
+        if closeObserver == nil {
+            closeObserver = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { _ in
+                MainActor.assumeIsolated {
+                    if let o = closeObserver { NotificationCenter.default.removeObserver(o) }
+                    closeObserver = nil
+                    if !AppWindow.shared.isVisible { NSApp.setActivationPolicy(.accessory) }
+                }
+            }
+        }
         NSApp.activate(ignoringOtherApps: true)   // the plain call is only a request, often refused for an accessory app
         window.makeKeyAndOrderFront(nil)
         window.orderFrontRegardless()
@@ -537,6 +571,9 @@ private struct NotificationSettings: View {
 
 private struct MenuBarSettings: View {
     @ObservedObject private var settings = AppSettings.shared
+    @ObservedObject private var antigravity = AntigravitySettings.shared
+    /// Codex is only offered to someone who uses it.
+    private let usesCodex = FileManager.default.fileExists(atPath: AgentAccounts.defaultPath(.codex))
 
     var body: some View {
         Form {
@@ -558,12 +595,19 @@ private struct MenuBarSettings: View {
                 Toggle("Download speed", isOn: $settings.menuNetwork)
                 Toggle("Claude plan left", isOn: $settings.menuLimit)
                     .disabled(!settings.showsClaudeLimits)
+                if usesCodex { Toggle("Codex plan left", isOn: $settings.menuCodexLimit) }
+                if antigravity.status.isInstalled { Toggle("Antigravity plan left", isOn: $settings.menuAntigravityLimit) }
+                if settings.menuLimit && settings.showsClaudeLimits || settings.menuCodexLimit && usesCodex
+                    || settings.menuAntigravityLimit && antigravity.status.isInstalled {
+                    Picker("Limit", selection: $settings.menuLimitWindow) {
+                        ForEach(ClaudePlanLimits.MenuWindow.allCases) { Text($0.title).tag($0) }
+                    }
+                }
             } header: {
                 Text("Also beside the icon")
             } footer: {
-                Text("These follow the agents' status."
-                     + (settings.showsClaudeLimits ? " Claude plan left shows a warning symbol when you're nearly out or on course to run out."
-                                                   : " Claude plan left needs Claude plan limits, in Integrations."))
+                Text("These follow the agents' status. Plan left shows the limit you pick; if the other one is nearly out or on course to run out, it shows that one instead, with a warning symbol. With more than one tool on, each is named."
+                     + (settings.showsClaudeLimits ? "" : " Claude plan left needs Claude plan limits, in Integrations."))
                     .settingsFooter()
             }
         }

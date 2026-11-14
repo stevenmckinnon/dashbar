@@ -53,6 +53,8 @@ final class AppWindow: NSObject, NSWindowDelegate {
     let model = AppWindowModel()
     private var window: NSWindow?
 
+    var isVisible: Bool { window?.isVisible == true }
+
     func show(store: Store, page: AppPage? = nil) {
         if let page { model.page = page }
         if window == nil { window = makeWindow(store: store) }
@@ -121,7 +123,7 @@ final class AppWindow: NSObject, NSWindowDelegate {
         // Drop the view so the store sees it disappear, then go back to menu-bar-only.
         let closing = window
         window = nil
-        NSApp.setActivationPolicy(.accessory)
+        if !SettingsOpener.isVisible { NSApp.setActivationPolicy(.accessory) }
         DispatchQueue.main.async { closing?.contentViewController = nil }
     }
 }
