@@ -216,6 +216,7 @@ final class GoogleProcesses {
 final class GoogleCollector {
     private let processes = GoogleProcesses()
     private let app = AntigravityApp()
+    private let cliDB: AntigravityApp
     private var busySince: [Int32: Date] = [:]
     /// Gemini CLI project directories by the folder they're for, re-listed at most once a minute.
     private var geminiDirs: [String: URL] = [:]
@@ -223,9 +224,11 @@ final class GoogleCollector {
     let geminiRoot: URL
     let agySessions: URL
 
-    init(geminiRoot: URL = GeminiUsageScanner.defaultRoot, agySessions: URL = AntigravityStatusLine.sessionsDir) {
+    init(geminiRoot: URL = GeminiUsageScanner.defaultRoot, agySessions: URL = AntigravityStatusLine.sessionsDir,
+         agyDatabase: URL = AntigravityApp.cliURL) {
         self.geminiRoot = geminiRoot
         self.agySessions = agySessions
+        cliDB = AntigravityApp(url: agyDatabase)
     }
 
     func read(now: Date = Date()) -> GoogleLive {
@@ -235,9 +238,17 @@ final class GoogleCollector {
             out.sessions += GeminiCLI.live(processes: found.gemini, activity: { [self] root in latestActivity(root, now: now) },
                                            busySince: &busySince, now: now)
         }
+        var bridged: [LiveSession] = []
         if FileManager.default.fileExists(atPath: agySessions.path) {
-            out.sessions += AntigravityStatusLine.live(AntigravityStatusLine.readSessions(dir: agySessions, maxAge: 12 * 3600, now: now),
-                                                       processes: found.agy, now: now)
+            bridged = AntigravityStatusLine.live(AntigravityStatusLine.readSessions(dir: agySessions, maxAge: 12 * 3600, now: now),
+                                                 processes: found.agy, now: now)
+            out.sessions += bridged
+        }
+        if !found.agy.isEmpty {
+            // The CLI's own conversation database: works without the status line bridge (which only starts reporting
+            // once agy is restarted after Add, and never for someone who hasn't added it). The bridge wins per folder.
+            out.sessions += AntigravityCLIDatabase.live(cliDB.read(now: now).sessions, processes: found.agy,
+                                                        covered: Set(bridged.map(\.root)))
         }
         if found.appRunning {
             let reading = app.read(now: now)
@@ -262,5 +273,27 @@ final class GoogleCollector {
         let files = (try? FileManager.default.contentsOfDirectory(at: chats, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
         return files.filter { $0.pathExtension == "jsonl" }
             .compactMap { try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate }.max()
+    }
+}
+
+/// The Antigravity CLI's conversations from its summary database, shown as CLI sessions: filed under each conversation's
+/// folder, tied to the running `agy` process in that folder when there is one (so clicking opens its terminal).
+enum AntigravityCLIDatabase {
+    static func live(_ sessions: [LiveSession], processes: [(pid: Int32, root: String)], covered: Set<String>) -> [LiveSession] {
+        var unmatched = processes.filter { !covered.contains($0.root) }
+        var out: [LiveSession] = []
+        for s in sessions where !covered.contains(s.root) {
+            var pid: Int32 = 0
+            if let i = unmatched.firstIndex(where: { $0.root == s.root }) {
+                pid = unmatched[i].pid
+                unmatched.remove(at: i)
+            }
+            var live = LiveSession(id: "agy-db-" + s.id.replacingOccurrences(of: "antigravity-", with: ""), pid: pid,
+                                   name: s.name, cwd: s.cwd, status: s.status, since: s.since, entrypoint: "cli", root: s.root,
+                                   waitingFor: s.waitingFor == nil ? nil : "permission prompt")
+            live.agent = .antigravityCLI
+            out.append(live)
+        }
+        return out
     }
 }

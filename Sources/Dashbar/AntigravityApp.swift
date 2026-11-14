@@ -10,6 +10,8 @@ import SQLite3
 /// If the table no longer has the columns Dashbar relies on, it says so rather than showing nothing.
 final class AntigravityApp {
     static let defaultURL = homeDir.appendingPathComponent(".gemini/antigravity/conversation_summaries.db")
+    /// The Antigravity CLI (`agy`) keeps the same database, in the same format, in its own folder.
+    static let cliURL = homeDir.appendingPathComponent(".gemini/antigravity-cli/conversation_summaries.db")
     static let formatWarning = "Couldn't read the Antigravity app's conversations. Its format may have changed, so check for a Dashbar update."
 
     struct Row: Equatable {

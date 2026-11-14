@@ -450,3 +450,18 @@ import SQLite3
         #expect(loaded.current(PlanHistory.Series(.antigravity, .fiveHour, account: key), now: now).count == 1)
     }
 }
+
+@Suite struct AntigravityCLIDatabaseTests {
+    @Test func cliConversationsBecomeCLISessionsTiedToTheirProcessUnlessTheBridgeHasTheFolder() {
+        let row = AntigravityApp.Row(id: "abc", status: "CASCADE_RUN_STATUS_RUNNING", modified: Date(),
+                                     workspaces: ["/tmp/dev/app"], notFullyIdle: true)
+        let other = AntigravityApp.Row(id: "def", status: "CASCADE_RUN_STATUS_RUNNING", modified: Date(), workspaces: ["/tmp/dev/site"])
+        let sessions = AntigravityApp.live([row, other], root: { $0 })
+        let out = AntigravityCLIDatabase.live(sessions, processes: [(pid: 42, root: "/tmp/dev/app")], covered: ["/tmp/dev/site"])
+        #expect(out.count == 1)
+        #expect(out.first?.id == "agy-db-abc")
+        #expect(out.first?.pid == 42)
+        #expect(out.first?.agent == .antigravityCLI)
+        #expect(out.first?.isBusy == true)
+    }
+}
