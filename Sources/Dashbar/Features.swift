@@ -344,7 +344,7 @@ extension HostApp {
         let name: String
     }
 
-    /// "/Applications/T3 Code (Beta).app" → "T3 Code (Beta)".
+    /// "/Applications/T3 Code (Beta).app" → "T3 Code".
     static func name(ofBundle bundle: String) -> String {
         let last = URL(fileURLWithPath: bundle).lastPathComponent
         let name = last.hasSuffix(".app") ? String(last.dropLast(4)) : last
