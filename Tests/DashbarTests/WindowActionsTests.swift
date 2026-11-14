@@ -80,8 +80,8 @@ import Testing
 // MARK: - The host app's name
 
 @Suite struct HostAppNameTests {
-    @Test func theBundleNameWithoutItsExtension() {
-        #expect(HostApp.name(ofBundle: "/Applications/T3 Code (Beta).app") == "T3 Code (Beta)")
+    @Test func theBundleNameWithoutItsExtensionOrChannel() {
+        #expect(HostApp.name(ofBundle: "/Applications/T3 Code (Beta).app") == "T3 Code")   // no release channel
         #expect(HostApp.name(ofBundle: "/Applications/Utilities/Terminal.app") == "Terminal")
     }
 

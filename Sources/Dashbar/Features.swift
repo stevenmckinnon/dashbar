@@ -347,7 +347,12 @@ extension HostApp {
     /// "/Applications/T3 Code (Beta).app" → "T3 Code (Beta)".
     static func name(ofBundle bundle: String) -> String {
         let last = URL(fileURLWithPath: bundle).lastPathComponent
-        return last.hasSuffix(".app") ? String(last.dropLast(4)) : last
+        let name = last.hasSuffix(".app") ? String(last.dropLast(4)) : last
+        // "T3 Code (Beta)" → "T3 Code": a release channel is noise in a one-line subtitle.
+        if let open = name.firstIndex(of: "("), name.hasSuffix(")"), open > name.startIndex {
+            return name[..<open].trimmingCharacters(in: .whitespaces)
+        }
+        return name
     }
 
     /// Demo renders never look at real processes (their invented pids could belong to anything): a plausible host

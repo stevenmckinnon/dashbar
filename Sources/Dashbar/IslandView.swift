@@ -272,9 +272,15 @@ struct IslandContent: View {
                         Text(verbatim: session?.title ?? request?.oneLine ?? "Claude Code")
                             .font(.system(size: 12, weight: .medium)).foregroundStyle(.white)
                             .lineLimit(1).truncationMode(.tail)
-                        Text(verbatim: subtitle(banner, session: session, request: request))
-                            .font(.system(size: 11)).foregroundStyle(.white.opacity(0.55))
-                            .lineLimit(1).truncationMode(.middle)
+                        HStack(spacing: 0) {
+                            Text(verbatim: subtitle(session: session, request: request))
+                                .lineLimit(1).truncationMode(.tail)
+                            // The time never truncates: the names give way first.
+                            if let took = took(banner) {
+                                Text(verbatim: " · " + took).lineLimit(1).fixedSize().layoutPriority(1)
+                            }
+                        }
+                        .font(.system(size: 11)).foregroundStyle(.white.opacity(0.55))
                     }
                     Spacer(minLength: 8)
                     if request == nil {
@@ -302,20 +308,26 @@ struct IslandContent: View {
 
     private func heading(_ banner: IslandBanner, session: LiveSession?) -> String {
         switch banner.kind {
-        case .finished: return "Claude finished"
+        case .finished: return "\(session?.agent.name ?? "Claude") finished"
         case .waiting: return session?.waitingSentence ?? "Claude is waiting for you"
         case .permission: return "Claude needs permission"
         }
     }
 
-    /// "docs-site · VS Code · after 12m"
-    private func subtitle(_ banner: IslandBanner, session: LiveSession?, request: PermissionRequest?) -> String {
+    /// "docs-site · VS Code"
+    private func subtitle(session: LiveSession?, request: PermissionRequest?) -> String {
         var parts: [String] = []
         if let p = session?.project ?? request?.project, !p.isEmpty { parts.append(p) }
         if let s = session, let host = HostApp.info(for: s)?.name { parts.append(host) }
         if let a = session?.account { parts.append(a) }
-        if case .finished(let after) = banner.kind, after > 0 { parts.append("after \(Fmt.duration(after))") }
         return parts.joined(separator: " · ")
+    }
+
+    /// "took 42s", "took 12m": how long a finished turn ran.
+    private func took(_ banner: IslandBanner) -> String? {
+        guard case .finished(let after) = banner.kind, after > 0 else { return nil }
+        let s = Int(after.rounded())
+        return "took " + (s < 60 ? "\(s)s" : Fmt.duration(after))
     }
 
     // MARK: List
