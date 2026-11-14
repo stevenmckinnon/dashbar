@@ -52,6 +52,7 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
   pressure), network up/down, GPU utilisation, disk, battery with time remaining, and the busiest apps right
   now with their icons. Recent samples show as small bar charts.
 - **Dashbar window**: the arrow button in the panel header, or ⌃⌥D from anywhere, opens Dashbar as a full window: the panel's pages and every running workspace in a sidebar. A workspace's page shows its uptime, CPU, memory and energy (its servers, agents, what they started and anything else working in its folder), its dev servers and agents, and the processes behind the numbers. There's a pin to keep it on top; ⌃⌥D again closes it.
+- **Island** (Settings → General; on for new installs): a small black pill on the MacBook notch (or just below the middle of the menu bar on other screens) with the most important status: amber "needs you", else green "working", and nothing at all when every agent is idle. It opens for a few seconds when an agent finishes or stops for you, with the session's title and project; with answering permission prompts on, Allow once and Deny work right there. Hover it for your live sessions, click one to go back to it. If another app already draws at the notch, it sits just below that app's (or choose left or right of the notch), and it can stand in for the matching notifications.
 - **First run**: a short welcome window says what Dashbar reads and lets you turn on notifications, open at login and Claude plan limits. macOS asks about notifications only when you turn one on. It's in the gear menu as Welcome… later.
 - **Notifications** (each can be turned off in Settings): when an agent finishes a stretch of work, when it needs you, and when a plan limit runs low: at 80%, when it's on course to run out before it resets, and when it's used up, once per window.
 - **Tabs**: Overview · Agents · Servers · System · Clean-up (⌘1–⌘5). Overview tiles jump to their tab.
@@ -102,7 +103,7 @@ The menu bar shows the number of working Claude sessions beside the icon, and th
 ## Settings
 
 Open from the gear menu or ⌘, : which panel sections show, refresh interval, which editor and
-terminal the quick actions open, notifications, launch at login, and the folders clean-up scans
+terminal the quick actions open, notifications, the island, launch at login, and the folders clean-up scans
 (defaults to whichever of `~/Development`, `~/Developer`, `~/Projects`, `~/Code`, `~/src` exist).
 
 If Claude Code or Codex change their log format, Dashbar shows a warning rather than silently

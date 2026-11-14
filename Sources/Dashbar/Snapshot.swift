@@ -11,6 +11,9 @@ enum Snapshot {
         if let tab = ProcessInfo.processInfo.environment["DASHBAR_TAB"] {
             UserDefaults.standard.set(tab, forKey: "panelTab")
         }
+        let island = CommandLine.arguments.firstIndex(of: "--island").flatMap { CommandLine.arguments.dropFirst($0 + 1).first }
+        if island == "permission" { setenv("DASHBAR_DEMO_PERMISSION", "1", 1) }
+        if island == "needsyou" { setenv("DASHBAR_DEMO_WAITING", "1", 1) }
         let demo = CommandLine.arguments.contains("--demo")
         let store = Store(demo: demo)
         self.store = store
@@ -57,6 +60,10 @@ enum Snapshot {
                     try? png.write(to: URL(fileURLWithPath: path))
                 }
                 exit(0)
+            }
+            if let island {
+                IslandSnapshot.render(island, store: store, dark: dark, to: path)
+                return
             }
             if let flag = CommandLine.arguments.firstIndex(of: "--settings") {
                 // A Settings tab, laid out by AppKit so native controls draw. `--settings labs` picks the tab (general,
@@ -190,6 +197,122 @@ enum Snapshot {
                 try? png.write(to: URL(fileURLWithPath: path))
             }
             exit(0)
+        }
+    }
+}
+
+/// `--island collapsed|needsyou|finished|permission|list`: the island over a made-up top of the screen (menu bar,
+/// notch, wallpaper; `--dark` for a dark one). `DASHBAR_ISLAND_STYLE=floating|left|right` draws it as on a screen
+/// without a notch or beside it. With `--onscreen`, the real panel at the real notch for 8 seconds instead.
+@MainActor
+enum IslandSnapshot {
+    static func mode(_ name: String, store: Store) -> IslandMode {
+        let now = Date()
+        switch name {
+        case "finished":
+            return .banner(IslandBanner(kind: .finished(after: 12 * 60 + 20), sessionID: "s3", shownAt: now))
+        case "permission":
+            let id = store.permissionRequests.first?.id ?? ""
+            return .banner(IslandBanner(kind: .permission(requestID: id), sessionID: "s2", shownAt: now))
+        case "waiting":
+            return .banner(IslandBanner(kind: .waiting, sessionID: "s2", shownAt: now))
+        case "list":
+            return .list
+        default:
+            return .collapsed(IslandStatus.of(sessions: store.sessions, permissionRequests: store.permissionRequests))
+        }
+    }
+
+    static func render(_ name: String, store: Store, dark: Bool, to path: String) {
+        if name == "live" {
+            IslandController.shared.startDemo(store: store)
+            print("window", IslandController.shared.panelWindowNumber)
+            fflush(stdout)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 12) { exit(0) }
+            return
+        }
+        let mode = mode(name, store: store)
+        if CommandLine.arguments.contains("--onscreen") {
+            IslandController.shared.showPinned(store: store, mode: mode)
+            print("window", IslandController.shared.panelWindowNumber)
+            fflush(stdout)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 8) { exit(0) }
+            return
+        }
+        let notch = CGSize(width: 185, height: 32)
+        let style: IslandStyle
+        switch ProcessInfo.processInfo.environment["DASHBAR_ISLAND_STYLE"] {
+        case "floating": style = .floating
+        case "left": style = .beside(leading: true, height: notch.height)
+        case "right": style = .beside(leading: false, height: notch.height)
+        default: style = .notch(width: notch.width, height: notch.height)
+        }
+        let scene = IslandScene(mode: mode, style: style, dark: dark, notch: notch).environmentObject(store)
+        let renderer = ImageRenderer(content: scene)
+        renderer.scale = 2
+        if let img = renderer.nsImage, let tiff = img.tiffRepresentation,
+           let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
+            try? png.write(to: URL(fileURLWithPath: path))
+        }
+        exit(0)
+    }
+}
+
+/// A made-up top of a MacBook screen for island renders: wallpaper, menu bar, the notch, and the island on it.
+private struct IslandScene: View {
+    let mode: IslandMode
+    let style: IslandStyle
+    let dark: Bool
+    let notch: CGSize
+    let size = CGSize(width: 960, height: 320)
+
+    var body: some View {
+        let ink: Color = dark ? .white : .black
+        ZStack(alignment: .top) {
+            (dark ? Color(red: 0.11, green: 0.13, blue: 0.18) : Color(red: 0.80, green: 0.85, blue: 0.91))
+            HStack(spacing: 18) {
+                Image(systemName: "apple.logo").font(.system(size: 14))
+                Text("Finder").fontWeight(.bold)
+                Text("File"); Text("Edit"); Text("View"); Text("Go"); Text("Window")
+                Spacer()
+                Image(systemName: "wifi"); Image(systemName: "battery.75percent")
+                Text("Sat 14 Nov  9:41")
+            }
+            .font(.system(size: 13))
+            .foregroundStyle(ink.opacity(0.85))
+            .padding(.horizontal, 18)
+            .frame(height: notch.height)
+            .background(dark ? Color.black.opacity(0.35) : Color.white.opacity(0.5))
+            if case .floating = style {} else {
+                UnevenRoundedRectangle(bottomLeadingRadius: 9, bottomTrailingRadius: 9, style: .continuous)
+                    .fill(.black).frame(width: notch.width, height: notch.height)
+            }
+            island
+        }
+        .frame(width: size.width, height: size.height)
+        .environment(\.colorScheme, dark ? .dark : .light)
+    }
+
+    @ViewBuilder private var island: some View {
+        let content = IslandContent(mode: mode, style: style)
+        switch style {
+        case .notch:
+            content
+        case .floating:
+            content.padding(.top, notch.height + IslandPlacement.floatingGap)
+        case .beside(let leading, _):
+            HStack(alignment: .top, spacing: 0) {
+                if leading {
+                    Spacer(minLength: 0)
+                    content
+                    Color.clear.frame(width: (size.width + notch.width) / 2, height: 1)
+                } else {
+                    Color.clear.frame(width: (size.width + notch.width) / 2, height: 1)
+                    content
+                    Spacer(minLength: 0)
+                }
+            }
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

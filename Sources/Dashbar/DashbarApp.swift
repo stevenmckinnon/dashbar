@@ -26,6 +26,7 @@ struct DashbarApp: App {
                 .onAppear {
                     if CommandLine.arguments.contains("--window") { AppWindow.shared.show(store: store) }
                     Onboarding.showAtLaunchIfNeeded(store: store)
+                    if !CommandLine.arguments.contains("--snapshot") { IslandController.shared.start(store: store) }
                 }
                 .capturesSettingsOpener()
         }

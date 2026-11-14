@@ -430,7 +430,8 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
 
     /// "Claude needs permission in shop" with what it wants to do, and Allow Once / Deny on the notification itself.
     func permission(_ r: PermissionRequest, session: LiveSession?, account: String? = nil) {
-        guard available, UserDefaults.standard.bool(forKey: Self.waitingKey) else { return }
+        guard available, UserDefaults.standard.bool(forKey: Self.waitingKey),
+              !Self.islandShows(.permission(requestID: r.id)) else { return }
         let content = UNMutableNotificationContent()
         content.title = session?.name ?? (r.project.isEmpty ? "Claude Code" : r.project)
         content.subtitle = "Claude needs permission" + (r.project.isEmpty ? "" : " in \(r.project)") + (account.map { " (\($0))" } ?? "")
@@ -452,7 +453,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     private static func permissionID(_ id: String) -> String { "permission-" + id }
 
     func finished(_ s: LiveSession, after duration: TimeInterval) {
-        guard available, UserDefaults.standard.bool(forKey: Self.defaultsKey) else { return }
+        guard available, UserDefaults.standard.bool(forKey: Self.defaultsKey), !Self.islandShows(.finished(after: duration)) else { return }
         let content = UNMutableNotificationContent()
         content.title = s.name
         content.body = "Claude finished in \(s.project) after \(Fmt.ago(Date().addingTimeInterval(-duration)))"
@@ -463,13 +464,18 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     }
 
     func waiting(_ s: LiveSession) {
-        guard available, UserDefaults.standard.bool(forKey: Self.waitingKey) else { return }
+        guard available, UserDefaults.standard.bool(forKey: Self.waitingKey), !Self.islandShows(.waiting) else { return }
         let content = UNMutableNotificationContent()
         content.title = s.name
         content.body = "\(s.waitingSentence) in \(s.project)." + (s.account.map { " (\($0))" } ?? "")
         content.sound = .default
         content.userInfo = userInfo(for: s)
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: s.id + "-waiting-\(Date().timeIntervalSince1970)", content: content, trigger: nil))
+    }
+
+    /// "Use the island instead of notifications": the island shows this moment, so the banner would only repeat it.
+    private static func islandShows(_ kind: IslandBanner.Kind) -> Bool {
+        IslandSettings.Values.read().suppressesNotification(for: kind)
     }
 
     /// The project, and the app the session runs in, found now while its process is still there.

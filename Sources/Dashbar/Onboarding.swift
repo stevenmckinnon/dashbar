@@ -17,6 +17,7 @@ enum Onboarding {
         AppSettings.Key.scanRoots, AppSettings.Key.editorID, AppSettings.Key.terminalID, AppSettings.Key.refreshSeconds,
         AppSettings.Key.showNow, AppSettings.Key.showWidgets, AppSettings.Key.showServers, AppSettings.Key.menuCPU,
         AppSettings.Key.menuMemory, AppSettings.Key.menuNetwork, AppSettings.Key.menuLimit, AppSettings.Key.claudeLimits,
+        IslandSettings.positionKey,
     ]
 
     /// Show the first run only to someone who has never used Dashbar: it hasn't been shown before, no setting or window
@@ -42,6 +43,9 @@ enum Onboarding {
         let show = shouldShow(seen: seen, storedKeys: keys, hasSavedData: FileManager.default.fileExists(atPath: saved))
         // Existing users are marked too, so a later launch never mistakes them for new.
         if !show && !seen { defaults.set(true, forKey: seenKey) }
+        // The island is on for a new install only. Someone updating gets nothing new drawn over their notch
+        // unasked (it's in Settings → General).
+        if show, defaults.object(forKey: IslandSettings.enabledKey) == nil { defaults.set(true, forKey: IslandSettings.enabledKey) }
         pendingAtLaunch = show
     }
 
