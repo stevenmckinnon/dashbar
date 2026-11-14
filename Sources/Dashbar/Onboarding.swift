@@ -236,7 +236,7 @@ struct OnboardingView: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text("Welcome to Dashbar").font(.system(size: 20, weight: .semibold))
-                Text("Your Claude Code and Codex sessions, token use, dev servers and caches, in the menu bar. Nothing leaves your Mac.")
+                Text("Your Claude Code and Codex sessions, token use, dev servers and caches, in the menu bar. It works from what is already on your Mac and sends none of it anywhere.")
                     .font(.system(size: UI.Size.emphasis))
                     .foregroundStyle(UI.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
