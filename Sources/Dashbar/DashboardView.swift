@@ -1724,7 +1724,7 @@ struct PlanLimitsCard: View {
                     .accessibilityHidden(true)
                 Text(["Claude", store.claudePlan?.plan].compactMap { $0 }.joined(separator: " · "))
                     .font(.system(size: UI.Size.body, weight: .medium))
-                if settings.claudeLimits {
+                if store.claudePlan.map({ $0.source == .endpoint }) ?? (!settings.claudeStatusLine && settings.claudeLimits) {
                     Text("Experimental").font(.system(size: UI.Size.micro, weight: .semibold))
                         .padding(.horizontal, 5).padding(.vertical, 1)
                         .background(Capsule().fill(Color.primary.opacity(0.08)))
@@ -1733,9 +1733,9 @@ struct PlanLimitsCard: View {
                 Spacer()
                 if settings.claudeLimits, store.claudePlanLoading { ProgressView().controlSize(.mini) }
             }
-            if !settings.claudeLimits {
+            if !settings.showsClaudeLimits {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("Claude doesn't save plan limits on your Mac. An experimental setting can read them through Claude Code's sign-in.")
+                    Text("Claude doesn't save plan limits on your Mac. Dashbar can read them from Claude Code's status line.")
                         .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                     SettingsLink { Text("Settings…") }
@@ -1785,7 +1785,21 @@ struct PlanLimitsCard: View {
                     }
                     .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
                     .help(stale.explanation)
+                } else if store.claudePlan?.source == .statusLine, let fetched = store.claudePlan?.fetchedAt {
+                    TimelineView(.periodic(from: .now, by: 30)) { ctx in
+                        if let line = ClaudeStatusLine.ageLine(writtenAt: fetched, now: ctx.date) {
+                            HStack(spacing: 5) {
+                                Image(systemName: "clock").accessibilityHidden(true)
+                                Text(line).fixedSize(horizontal: false, vertical: true)
+                            }
+                            .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+                        }
+                    }
                 }
+            } else if settings.claudeStatusLine && !store.claudePlanLoading {
+                Text("Limits appear after your next Claude Code reply.")
+                    .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             } else {
                 Text("Loading plan limits…").font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
             }

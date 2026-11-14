@@ -43,8 +43,32 @@ final class AppSettings: ObservableObject {
     @Published var menuLimit: Bool { didSet { defaults.set(menuLimit, forKey: Key.menuLimit) } }
     /// Experimental: read Claude Code's sign-in to show plan limits. Off by default.
     @Published var claudeLimits: Bool { didSet { defaults.set(claudeLimits, forKey: Key.claudeLimits) } }
+    /// Dashbar's bridge is in Claude Code's status line. Not a preference: it mirrors Claude Code's settings file,
+    /// re-read at launch, every few minutes and when Settings opens, since the user can change that file any time.
+    @Published private(set) var claudeStatusLine = false
+    @Published private(set) var claudeStatusLineStatus: StatusLineBridge.Status = .notInstalled(current: nil)
 
     var showsMenuBarStats: Bool { menuCPU || menuMemory || menuNetwork }
+    /// Either way of reading Claude plan limits is on.
+    var showsClaudeLimits: Bool { claudeLimits || claudeStatusLine }
+
+    /// Re-reads whether the bridge is in Claude Code's settings, and refreshes its script if it is.
+    func refreshClaudeStatusLine(paths: StatusLineBridge.Paths = .default()) {
+        guard !CommandLine.arguments.contains("--demo") else { return }
+        let status = StatusLineBridge.status(paths)
+        if status.isInstalled { try? StatusLineBridge.writeScript(paths) }
+        if status != claudeStatusLineStatus { claudeStatusLineStatus = status }
+        if status.isInstalled != claudeStatusLine { claudeStatusLine = status.isInstalled }
+    }
+
+    /// Adds or removes Dashbar's bridge in Claude Code's status line. Returns what went wrong, phrased for the user.
+    func setClaudeStatusLine(_ on: Bool, paths: StatusLineBridge.Paths = .default()) -> String? {
+        var problem: String?
+        do { on ? try StatusLineBridge.install(paths) : try StatusLineBridge.uninstall(paths) }
+        catch { problem = error.localizedDescription }
+        refreshClaudeStatusLine(paths: paths)
+        return problem
+    }
 
     private init() {
         defaults.register(defaults: [
@@ -150,13 +174,13 @@ private struct MenuBarSettings: View {
                 Toggle("Memory", isOn: $settings.menuMemory)
                 Toggle("Download speed", isOn: $settings.menuNetwork)
                 Toggle("Claude plan left", isOn: $settings.menuLimit)
-                    .disabled(!settings.claudeLimits)
+                    .disabled(!settings.showsClaudeLimits)
             } header: {
                 Text("Show beside the icon")
             } footer: {
                 Text("The count of working agents always shows."
-                     + (settings.claudeLimits ? " Claude plan left shows a warning symbol when you're nearly out or on course to run out."
-                                              : " Claude plan left needs “Show Claude plan limits” in Labs."))
+                     + (settings.showsClaudeLimits ? " Claude plan left shows a warning symbol when you're nearly out or on course to run out."
+                                                   : " Claude plan left needs Claude plan limits, in Labs."))
                     .foregroundStyle(.secondary)
             }
         }
@@ -167,18 +191,72 @@ private struct MenuBarSettings: View {
 
 private struct LabsSettings: View {
     @ObservedObject private var settings = AppSettings.shared
+    @State private var problem: String?
 
     var body: some View {
         Form {
             Section {
-                Toggle("Show Claude plan limits", isOn: $settings.claudeLimits)
+                statusLineRow
+                if let problem {
+                    Label(problem, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption).foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } header: {
+                Text("Claude plan limits")
             } footer: {
-                Text("Reads Claude Code's sign-in from your Keychain, the same way Claude Code does, to show your 5-hour and weekly limits. Turning this on is the only permission it needs. Uses an undocumented endpoint that may change. Never refreshes or saves the sign-in.")
+                Text(statusLineExplanation).foregroundStyle(.secondary)
+            }
+            Section {
+                Toggle("Also ask Anthropic with Claude Code's sign-in", isOn: $settings.claudeLimits)
+            } footer: {
+                Text("Experimental, and only needed if you'd rather not change Claude Code's status line. Reads Claude Code's sign-in from your Keychain, the same way Claude Code does, and asks an undocumented endpoint that may change. Never refreshes or saves the sign-in. When both are on, Dashbar shows the newer reading.")
                     .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
         .fixedSize(horizontal: false, vertical: true)
+        .onAppear { settings.refreshClaudeStatusLine() }
+    }
+
+    @ViewBuilder private var statusLineRow: some View {
+        switch settings.claudeStatusLineStatus {
+        case .installed(let previous):
+            LabeledContent {
+                Button("Remove") { problem = settings.setClaudeStatusLine(false) }
+            } label: {
+                Text("In Claude Code's status line")
+                Text(previous.map { "Updates after each Claude Code reply. Your status line (\(Self.short($0))) still shows." }
+                     ?? "Updates after each Claude Code reply.")
+            }
+        case .notInstalled(let current):
+            LabeledContent {
+                Button("Add to Status Line") { problem = settings.setClaudeStatusLine(true) }
+            } label: {
+                Text("Read limits from Claude Code's status line")
+                Text(current.map { "Recommended. Your status line (\(Self.short($0))) keeps showing." } ?? "Recommended. Sends nothing.")
+            }
+        case .unreadable(let message):
+            LabeledContent {
+                Button("Check Again") { problem = nil; settings.refreshClaudeStatusLine() }
+            } label: {
+                Text("Read limits from Claude Code's status line")
+                Text(message)
+            }
+        }
+    }
+
+    /// A long inline command, cut to fit a settings row.
+    static func short(_ command: String) -> String {
+        command.count > 48 ? String(command.prefix(47)) + "…" : command
+    }
+
+    private var statusLineExplanation: String {
+        let file = Fmt.tilde(StatusLineBridge.Paths.default().settings.path)
+        return "Claude Code passes your 5-hour and weekly usage to its status line after each reply (Pro, Max and Ultra plans). "
+            + "Adding Dashbar changes one setting, statusLine in \(file), to a small script that saves just those numbers "
+            + "to a file on this Mac, then runs the status line you had, so it looks the same. A backup of the file is kept. "
+            + "No network, no Keychain. Remove puts your previous status line back exactly."
     }
 }
 
