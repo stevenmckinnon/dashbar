@@ -291,8 +291,33 @@ enum DemoData {
         store.cleanupScanned = true
         if ProcessInfo.processInfo.environment["DASHBAR_DEMO_GOOGLE"] != nil { applyGoogle(to: store, now: now) }
         if ProcessInfo.processInfo.environment["DASHBAR_DEMO_WORST"] != nil { applyWorstCase(to: store, now: now, home: home) }
+        if ProcessInfo.processInfo.environment["DASHBAR_DEMO_QUIET"] != nil { applyQuiet(to: store, now: now) }
         applyHistory(to: store, now: now)
         store.lastUpdated = now
+    }
+
+    /// DASHBAR_DEMO_QUIET=1: an ordinary quiet moment. Every agent idle, no dev servers, no subagents or prompts, and
+    /// plan limits at 0% early in their windows (too early for a pace reading), with one small weekly figure.
+    @MainActor static func applyQuiet(to store: Store, now: Date) {
+        store.sessions = store.sessions.map { s in
+            var quiet = LiveSession(id: s.id, pid: s.pid, name: s.name, cwd: s.cwd, status: "idle", since: s.since,
+                                    entrypoint: s.entrypoint, root: s.root)
+            quiet.account = s.account; quiet.configDir = s.configDir; quiet.agent = s.agent
+            return quiet
+        }
+        store.permissionRequests = []
+        store.subagents = [:]
+        store.listeners = []
+        store.spawned = [:]
+        store.claudePlan = ClaudePlanLimits.Result(limits: [
+            RateLimit(label: "5-hour", usedPercent: 0, resetsAt: now.addingTimeInterval(4.9 * 3600), window: 5 * 3600),
+            RateLimit(label: "Weekly", usedPercent: 0, resetsAt: now.addingTimeInterval(6.9 * 86400), window: 7 * 86400),
+            RateLimit(label: "Extra usage", usedPercent: 27, resetsAt: nil, window: nil),
+        ], plan: "Max 5x")
+        store.codexLimits = [
+            RateLimit(label: "5-hour", usedPercent: 0, resetsAt: now.addingTimeInterval(4.95 * 3600), window: 5 * 3600),
+            RateLimit(label: "Weekly", usedPercent: 3, resetsAt: now.addingTimeInterval(5 * 86400), window: 7 * 86400),
+        ]
     }
 
     /// DASHBAR_DEMO_WORST=1: data that strains the layout. Ten sessions (the island lists five), a dev server on twelve

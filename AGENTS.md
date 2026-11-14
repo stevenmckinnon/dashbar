@@ -41,6 +41,7 @@ DASHBAR_TAB=agents Dashbar --snapshot out.png --demo --dark   # render a tab wit
 DASHBAR_DEMO_WAITING=1 Dashbar --snapshot out.png --demo     # the same, with one agent waiting for permission
 DASHBAR_DEMO_PERMISSION=1 Dashbar --snapshot out.png --demo  # the same, with the prompt answerable in Dashbar
 DASHBAR_DEMO_RATE_LIMITED=1 Dashbar --snapshot out.png --demo  # the Claude plan limits rate-limited wait (=stale: kept limits)
+DASHBAR_DEMO_QUIET=1 Dashbar --snapshot out.png --demo     # a quiet moment: all agents idle, no servers, limits at 0%
 Dashbar --snapshot out.png --demo --menubar all     # the menu bar item: idle|working|needsyou|done|time|all, on light (--dark) bars
 Dashbar --snapshot x --demo --menubar working --onscreen   # that state in a real status item for 8s (prints its frame)
 DASHBAR_APP_PAGE=storefront-web Dashbar --snapshot out.png --demo --app  # the Dashbar window (a tab name or a workspace)
