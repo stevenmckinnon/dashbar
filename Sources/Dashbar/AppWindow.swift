@@ -4,17 +4,21 @@ import AppKit
 /// What the Dashbar window shows: one of the panel's pages, or a workspace.
 enum AppPage: Hashable {
     case tab(PanelTab)
+    /// Plan limits and usage over time.
+    case history
     case workspace(String)
 
     /// Saved between launches as "tab:agents" or "workspace:/path/to/project".
     var key: String {
         switch self {
         case .tab(let t): return "tab:" + t.rawValue
+        case .history: return "history"
         case .workspace(let root): return "workspace:" + root
         }
     }
 
     init?(key: String) {
+        if key == "history" { self = .history; return }
         if key.hasPrefix("tab:"), let t = PanelTab(rawValue: String(key.dropFirst(4))) { self = .tab(t); return }
         if key.hasPrefix("workspace:") { self = .workspace(String(key.dropFirst(10))); return }
         return nil

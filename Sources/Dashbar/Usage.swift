@@ -93,6 +93,8 @@ struct UsageSummary: Equatable {
     var last24: [HourPoint] = []
     var tokens24 = 0
     var sessions24 = 0
+    /// The last 30 days, for the History page.
+    var history = UsageHistory()
     /// Set when logs exist but none could be read, which usually means the format changed.
     var warning: String?
 
@@ -201,6 +203,7 @@ struct UsageBook: Codable {
             if let b { sessions.formUnion(b.sessions); s.tokens24 += b.tokens }
         }
         s.sessions24 = sessions.count
+        s.history = history()
         return s
     }
 }
@@ -523,7 +526,8 @@ final class CodexUsageScanner {
 
     private var fileCtx: [String: FileContext] = [:]
     private(set) var limits: [RateLimit] = []
-    private var limitsStamp = Date.distantPast
+    /// When Codex reported `limits` (the log record's time), so history records them as of then.
+    private(set) var limitsStamp = Date.distantPast
 
     func scan() -> UsageSummary {
         guard tail.exists else { return .empty }

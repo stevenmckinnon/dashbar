@@ -42,6 +42,7 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
 - **Claude Code usage**: today's tokens (in / out / cache read / cache write), a 14-day chart, and top projects and models, read incrementally from `~/.claude/projects/**/*.jsonl`.
 - **Codex usage**: the same, plus 5h/weekly rate-limit gauges, from `~/.codex/sessions`. Shown once Codex has session logs.
 - **Estimated cost**: what the period's tokens would cost at public API list prices, per model and project, worked out on your Mac from the token counts (a guide for subscribers, not a bill; models without a known price are named, never counted as $0). Settings → General can hide it.
+- **History**: a page in the Dashbar window (or **History** in a usage card) with each 5-hour and weekly plan window's peak over the last 30 days (how often you hit the limit), the current window against an even pace, and 30 days of tokens and estimated cost per day by agent, project and model. Plan readings are kept for 90 days in `~/Library/Application Support/Dashbar/plan-history.json` (usually tens of KB); usage comes from the scan Dashbar already does.
 - **Local servers**: listening TCP ports with their project name, command and uptime. Hover a row to open it in the browser or stop the process.
   Servers up over an hour that use almost no CPU are marked "barely used", and servers started from a Claude Code
   session say so (the session shows what it runs).

@@ -10,6 +10,10 @@ final class Store: ObservableObject {
     @Published var claude = UsageSummary.empty
     @Published var codex = UsageSummary.empty
     @Published var codexLimits: [RateLimit] = []
+    /// When Codex reported `codexLimits`.
+    var codexLimitsAt = Date.distantPast
+    /// Readings of the plan windows over time, for the History page. Republished only when a reading adds to it.
+    @Published var planHistory = PlanHistory()
     @Published var listeners: [Listener] = []
     /// What each agent session started, keyed by the session's process ID.
     @Published var spawned: [Int32: SpawnedProcesses] = [:]
@@ -87,6 +91,7 @@ final class Store: ObservableObject {
     private var panelVisible: Bool { surfaces.anyVisible }
     /// Demo stores hold invented data and never collect anything.
     private var isDemo = false
+    private let planRecorder = PlanHistoryRecorder()
 
     /// `demo` fills the store with invented data and starts nothing: no scanning, timers, watchers or
     /// Keychain access. Used for README and website screenshots (`Dashbar --snapshot out.png --demo`).
@@ -117,7 +122,10 @@ final class Store: ObservableObject {
             Task { @MainActor in self?.filesChanged() }
         }
         NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.worker.saveNow() }
+            MainActor.assumeIsolated {
+                self?.worker.saveNow()
+                self?.planRecorder.save()
+            }
         }
         settings.$refreshSeconds.dropFirst().removeDuplicates()
             .sink { [weak self] _ in Task { @MainActor in self?.startTimer() } }
@@ -184,6 +192,7 @@ final class Store: ObservableObject {
     /// Notifies when a plan limit is nearly used, on course to run out, or used up (once per window).
     private func checkLimits() {
         guard !isDemo, !paused else { return }
+        recordPlanHistory()
         var alerts = LimitAlerts.check(provider: "Codex", limits: codexLimits, sent: sentLimitAlerts)
         if settings.showsClaudeLimits, let plan = claudePlan, plan.problem == nil {
             alerts += LimitAlerts.check(provider: "Claude", limits: plan.limits, sent: sentLimitAlerts)
@@ -195,6 +204,19 @@ final class Store: ObservableObject {
         }
         sentLimitAlerts = LimitAlerts.prune(sentLimitAlerts)
         UserDefaults.standard.set(Array(sentLimitAlerts), forKey: "limitAlertsSent")
+    }
+
+    /// Adds the latest readings to the plan history, as of when each source took them. Kept limits from an earlier
+    /// reading (stale) are recorded at their own time, so a wait never invents a flat line.
+    private func recordPlanHistory() {
+        var changed = false
+        if !codexLimits.isEmpty, codexLimitsAt > .distantPast {
+            changed = planRecorder.record(codexLimits, provider: .codex, at: codexLimitsAt) || changed
+        }
+        if let plan = claudePlan, plan.problem == nil, !plan.limits.isEmpty {
+            changed = planRecorder.record(plan.limits, provider: .claude, at: plan.fetchedAt) || changed
+        }
+        if changed || planHistory.isEmpty && !planRecorder.history.isEmpty { planHistory = planRecorder.history }
     }
 
     /// Each window reports on its own, so closing one doesn't pause updates for the other.
@@ -324,6 +346,7 @@ final class Store: ObservableObject {
         update(\.usageLoading, false)
         update(\.codex, r.codex)
         update(\.codexLimits, r.codexLimits)
+        codexLimitsAt = r.codexLimitsAt
         checkLimits()
     }
 }
@@ -358,6 +381,7 @@ final class Worker: @unchecked Sendable {
         var claude: UsageSummary
         var codex: UsageSummary
         var codexLimits: [RateLimit]
+        var codexLimitsAt: Date
     }
 
     private let liveQueue = DispatchQueue(label: "dashbar.live", qos: .utility)
@@ -430,7 +454,8 @@ final class Worker: @unchecked Sendable {
 
     private func scanUsage() {
         guard !isStopped else { return }
-        let result = UsageResult(claude: claudeScanner.scan(), codex: codexScanner.scan(), codexLimits: codexScanner.limits)
+        let result = UsageResult(claude: claudeScanner.scan(), codex: codexScanner.scan(), codexLimits: codexScanner.limits,
+                                 codexLimitsAt: codexScanner.limitsStamp)
         if lastSave.map({ Date().timeIntervalSince($0) > 30 }) ?? true { save() }
         let done = onUsage
         DispatchQueue.main.async { done?(result) }
