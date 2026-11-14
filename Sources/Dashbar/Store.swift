@@ -55,6 +55,8 @@ final class Store: ObservableObject {
     @Published var sessionsWarning: String?
     /// Claude Code permission prompts waiting for an answer in Dashbar (only while the permission hook is added).
     @Published var permissionRequests: [PermissionRequest] = []
+    /// Moments the island may open for: an agent finishing, stopping for you, or a new permission prompt.
+    let islandEvents = PassthroughSubject<IslandEvent, Never>()
 
     func permissionRequest(for session: LiveSession) -> PermissionRequest? {
         permissionRequests.first { $0.sessionId == session.id }
@@ -459,10 +461,12 @@ final class Store: ObservableObject {
         for event in transitions.update(new, now: Date()) {
             switch event {
             case .finished(let id, let after):
+                islandEvents.send(IslandEvent(kind: .finished(after: after), sessionID: id))
                 if let s = new.first(where: { $0.id == id }) { notifier.finished(s, after: after) }
             case .waiting(let id):
                 guard let s = new.first(where: { $0.id == id }) else { continue }
                 if permissionRequests.contains(where: { $0.sessionId == id }) { continue }   // its own notification, with answers
+                islandEvents.send(IslandEvent(kind: .waiting, sessionID: id))
                 if heartbeat != nil, s.waitingFor == "permission prompt" {
                     // The hook's request may be a moment behind Claude Code's session file: give it a second to arrive.
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
@@ -524,6 +528,7 @@ final class Store: ObservableObject {
         let marked = PermissionRequest.marking(rawSessions, with: requests)
         for r in requests where notifiedRequests.insert(r.id).inserted {
             let session = marked.first { $0.id == r.sessionId }
+            islandEvents.send(IslandEvent(kind: .permission(requestID: r.id), sessionID: r.sessionId))
             notifier.permission(r, session: session, account: session?.account ?? r.accountLabel(in: claudeAccounts))
         }
         trackTransitions(marked)

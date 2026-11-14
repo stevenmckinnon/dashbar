@@ -326,6 +326,11 @@ private struct GeneralSettings: View {
     @AppStorage(Notifier.waitingKey) private var notifyWaiting = true
     @AppStorage(GlobalShortcut.enabledKey) private var shortcut = true
     @AppStorage(CostLine.showKey) private var showCost = true
+    @AppStorage(IslandSettings.enabledKey) private var island = false
+    @AppStorage(IslandSettings.positionKey) private var islandPosition = IslandPosition.automatic.rawValue
+    @AppStorage(IslandSettings.expandOnFinishKey) private var islandFinish = true
+    @AppStorage(IslandSettings.expandOnNeedsYouKey) private var islandNeedsYou = true
+    @AppStorage(IslandSettings.replacesNotificationsKey) private var islandInstead = false
     @State private var shortcutUnavailable = GlobalShortcut.shared.unavailable
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
@@ -349,6 +354,26 @@ private struct GeneralSettings: View {
                     Text("10 seconds").tag(10.0)
                     Text("30 seconds").tag(30.0)
                 }
+            }
+            Section {
+                Toggle("Show the island at the top of the screen", isOn: $island)
+                    .help("A small black pill on the notch (or below the menu bar) with your agents' status. It opens briefly when something happens, and on hover lists your sessions.")
+                if island {
+                    Picker("Position", selection: $islandPosition) {
+                        Text("Automatic").tag(IslandPosition.automatic.rawValue)
+                        Text("On the notch").tag(IslandPosition.centre.rawValue)
+                        Text("Left of the notch").tag(IslandPosition.left.rawValue)
+                        Text("Right of the notch").tag(IslandPosition.right.rawValue)
+                    }
+                    .help("Automatic sits on the notch, or just below another app's island when one is already there.")
+                    Toggle("Open when an agent finishes", isOn: $islandFinish)
+                    Toggle("Open when an agent needs you", isOn: $islandNeedsYou)
+                        .help("With answering permission prompts on (Labs), you can Allow once or Deny right in the island.")
+                    Toggle("Use the island instead of notifications", isOn: $islandInstead)
+                        .help("Leaves out the notification for anything the island opens for. The others still notify.")
+                }
+            } header: {
+                Text("Island")
             }
             Section {
                 Toggle("Notify when an agent finishes", isOn: $notify)
