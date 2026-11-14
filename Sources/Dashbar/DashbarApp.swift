@@ -65,7 +65,7 @@ struct MenuBarLabel: View {
         if settings.menuNetwork {
             parts.append(Text("\(Image(systemName: "arrow.down")) \(Fmt.shortRate(s.netDown))"))
         }
-        if settings.menuLimit, settings.claudeLimits, store.claudePlan?.problem == nil,
+        if settings.menuLimit, settings.showsClaudeLimits, store.claudePlan?.problem == nil,
            let r = ClaudePlanLimits.menuBarReading(store.claudePlan?.limits ?? []) {
             parts.append(Text("\(Image(systemName: r.atRisk ? "exclamationmark.triangle.fill" : "gauge.with.needle")) \(r.name) \(r.leftPercent)% left"))
         }

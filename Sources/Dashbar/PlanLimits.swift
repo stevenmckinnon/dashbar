@@ -1,7 +1,8 @@
 import Foundation
 import Security
 
-/// Experimental, off by default: Claude plan usage (5-hour and weekly windows).
+/// Experimental, off by default: Claude plan usage (5-hour and weekly windows) from Anthropic's endpoint.
+/// The recommended way is Claude Code's status line (`StatusLineBridge`), which needs neither of these.
 ///
 /// Claude doesn't store these limits on disk. Claude Code's own `/usage` screen fetches them from an
 /// undocumented Anthropic endpoint using its sign-in, which it keeps in the macOS Keychain. With the
@@ -27,6 +28,15 @@ enum ClaudePlanLimits {
         var retryAfter: TimeInterval?
         /// Set on limits kept from an earlier reading: why the latest fetch didn't replace them.
         var stale: Stale?
+        /// Where the reading came from.
+        var source: Source = .endpoint
+    }
+
+    enum Source: Equatable {
+        /// Saved by the status line bridge after a Claude Code reply (no network, no Keychain).
+        case statusLine
+        /// Asked from Anthropic's usage endpoint with Claude Code's sign-in (experimental).
+        case endpoint
     }
 
     enum Stale: Equatable {

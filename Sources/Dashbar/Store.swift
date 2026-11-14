@@ -28,14 +28,13 @@ final class Store: ObservableObject {
     /// What each workspace's processes use, keyed by workspace root. Sampled only while a window is open.
     @Published var workspaceUsage: [String: WorkspaceUsage] = [:]
     @Published var workspaceHistory: [String: WorkspaceHistory] = [:]
+    /// Mirrors of `plan`'s state, so views (and demo data) read them from the store.
     @Published var claudePlan: ClaudePlanLimits.Result?
     @Published var claudePlanLoading = false
-    /// After a temporary failure, no plan request goes out before this, not even from Retry or Refresh:
-    /// asking again while rate limited only keeps the limit tripped.
     @Published var claudePlanRetryAt: Date?
-    private var claudePlanFailures = 0
-    /// Claude Code is running to refresh its own sign-in.
     @Published var claudeSigningIn = false
+    /// Claude plan limits: the status line bridge and the experimental endpoint.
+    let plan = ClaudePlanMonitor()
     /// A failed user action, phrased with what to do next. Shown until dismissed.
     @Published var notice: String?
     /// Set when Claude Code's session files exist but can't be read (see `ClaudeSessions.readChecked`).
@@ -123,12 +122,17 @@ final class Store: ObservableObject {
         settings.$refreshSeconds.dropFirst().removeDuplicates()
             .sink { [weak self] _ in Task { @MainActor in self?.startTimer() } }
             .store(in: &subscriptions)
+        plan.$result.assign(to: &$claudePlan)
+        plan.$loading.assign(to: &$claudePlanLoading)
+        plan.$retryAt.assign(to: &$claudePlanRetryAt)
+        plan.$signingIn.assign(to: &$claudeSigningIn)
+        plan.onUpdate = { [weak self] in self?.checkLimits() }
+        settings.refreshClaudeStatusLine()
         settings.$claudeLimits.removeDuplicates()
-            .sink { [weak self] on in
-                Task { @MainActor in
-                    if on { self?.refreshClaudePlan(force: true) } else { self?.claudePlan = nil }
-                }
-            }
+            .sink { [weak self] on in Task { @MainActor in self?.plan.setEndpointEnabled(on) } }
+            .store(in: &subscriptions)
+        settings.$claudeStatusLine.removeDuplicates()
+            .sink { [weak self] on in Task { @MainActor in self?.plan.setStatusLineEnabled(on) } }
             .store(in: &subscriptions)
         settings.$scanRoots.dropFirst().removeDuplicates()
             .debounce(for: .seconds(0.5), scheduler: RunLoop.main)
@@ -160,7 +164,12 @@ final class Store: ObservableObject {
         } else if minute {
             refresh(usage: true, servers: false, panel: false)
         }
-        if tick % every(300) == 0 { refreshClaudePlan() }   // every 5 minutes
+        if tick % every(300) == 0 {   // every 5 minutes
+            settings.refreshClaudeStatusLine()   // notices the status line being changed outside Dashbar
+            refreshClaudePlan()
+        } else if minute {
+            plan.statusLineChanged()
+        }
         if minute { watcher?.restart() }            // pick up folders created since launch
         if panelVisible, tick % every(Self.cleanupInterval) == 0 { scanCleanup() }   // nothing shows it while closed
     }
@@ -168,13 +177,14 @@ final class Store: ObservableObject {
     private func filesChanged() {
         guard !paused else { return }
         refresh(usage: true, servers: false, panel: panelVisible)
+        plan.statusLineChanged()   // a reply in the logs means the status line has just run
     }
 
     /// Notifies when a plan limit is nearly used, on course to run out, or used up (once per window).
     private func checkLimits() {
         guard !isDemo, !paused else { return }
         var alerts = LimitAlerts.check(provider: "Codex", limits: codexLimits, sent: sentLimitAlerts)
-        if settings.claudeLimits, let plan = claudePlan, plan.problem == nil {
+        if settings.showsClaudeLimits, let plan = claudePlan, plan.problem == nil {
             alerts += LimitAlerts.check(provider: "Claude", limits: plan.limits, sent: sentLimitAlerts)
         }
         guard !alerts.isEmpty else { return }
@@ -203,86 +213,15 @@ final class Store: ObservableObject {
         refreshClaudePlan(force: true)
     }
 
-    /// Experimental Claude plan limits, only while the user has opted in.
-    /// Has Claude Code refresh its sign-in, then loads the plan limits again.
+    /// Has Claude Code refresh its sign-in, then loads the plan limits again (the experimental endpoint only).
     func refreshClaudeSignIn() {
-        guard !isDemo, settings.claudeLimits, !claudeSigningIn else { return }
-        claudeSigningIn = true
-        Task.detached(priority: .utility) {
-            let problem = await ClaudePlanLimits.refreshSignIn()
-            await MainActor.run {
-                self.claudeSigningIn = false
-                if let problem { self.claudePlan = ClaudePlanLimits.Result(plan: self.claudePlan?.plan, problem: problem) }
-                else { self.refreshClaudePlan(force: true) }
-            }
-        }
+        guard !isDemo else { return }
+        plan.refreshSignIn()
     }
 
     func refreshClaudePlan(force: Bool = false) {
         guard !isDemo else { return }
-        guard settings.claudeLimits, !claudePlanLoading else { return }
-        if let retryAt = claudePlanRetryAt, Date() < retryAt { return }
-        if !force, let fetched = claudePlan?.fetchedAt, claudePlan?.stale == nil,
-           Date().timeIntervalSince(fetched) < 60 { return }
-
-        // Another copy of Dashbar (the release beside a local build) may have just asked, or be waiting out a limit.
-        let shared = ClaudePlanLimits.Shared.load()
-        switch shared?.decide(force: force) {
-        case .useShared?:
-            if let shared, (claudePlan?.fetchedAt ?? .distantPast) < (shared.fetchedAt ?? .distantPast) || claudePlan?.stale != nil {
-                claudePlan = shared.result()
-                claudePlanFailures = 0
-                claudePlanRetryAt = nil
-                checkLimits()
-            }
-            return
-        case .wait(let until)?:
-            if let shared, !shared.limits.isEmpty {
-                claudePlan = shared.result(stale: .rateLimited)
-            } else if claudePlan?.limits.isEmpty ?? true {
-                claudePlan = ClaudePlanLimits.Result(plan: claudePlan?.plan, problem: ClaudePlanLimits.rateLimitedMessage, transient: true)
-            }
-            scheduleClaudeRetry(at: until)
-            return
-        default:
-            break
-        }
-
-        claudePlanLoading = true
-        Task.detached(priority: .utility) {
-            let result = await ClaudePlanLimits.fetch()
-            await MainActor.run {
-                self.claudePlanLoading = false
-                guard self.settings.claudeLimits else { return }
-                var record = ClaudePlanLimits.Shared.load() ?? ClaudePlanLimits.Shared()
-                if result.transient {
-                    self.claudePlanFailures += 1
-                    let wait = ClaudePlanLimits.backoff(failures: self.claudePlanFailures, retryAfter: result.retryAfter)
-                    let retryAt = Date().addingTimeInterval(wait)
-                    self.scheduleClaudeRetry(at: retryAt)
-                    record.retryAt = retryAt
-                    record.save()
-                } else {
-                    self.claudePlanFailures = 0
-                    self.claudePlanRetryAt = nil
-                    if result.problem == nil {
-                        record = ClaudePlanLimits.Shared(fetchedAt: result.fetchedAt, plan: result.plan, limits: result.limits)
-                        record.save()
-                    }
-                }
-                self.claudePlan = ClaudePlanLimits.keepingLastGood(self.claudePlan, result)
-                self.checkLimits()
-            }
-        }
-    }
-
-    /// Waits until `retryAt`, then tries again, so the countdown means what it says (the regular check is 5 minutes).
-    private func scheduleClaudeRetry(at retryAt: Date) {
-        claudePlanRetryAt = retryAt
-        DispatchQueue.main.asyncAfter(deadline: .now() + max(0, retryAt.timeIntervalSinceNow) + 1) { [weak self] in
-            guard let self, self.claudePlanRetryAt == retryAt, !self.paused else { return }
-            self.refreshClaudePlan(force: true)
-        }
+        plan.refresh(force: force)
     }
 
     func stop(_ l: Listener) {

@@ -162,6 +162,13 @@ enum DemoData {
             store.claudePlanRetryAt = now.addingTimeInterval(45)
         case nil: break
         }
+        // DASHBAR_DEMO_STATUSLINE=1 shows limits read from Claude Code's status line (no plan name: only the endpoint
+        // knows it); =old makes that reading 25 minutes old, to see the age line.
+        if let mode = ProcessInfo.processInfo.environment["DASHBAR_DEMO_STATUSLINE"] {
+            store.claudePlan = ClaudePlanLimits.Result(limits: store.claudePlan?.limits ?? [],
+                                                       fetchedAt: now.addingTimeInterval(mode == "old" ? -25 * 60 : -40),
+                                                       source: .statusLine)
+        }
 
         // System
         var sys = SystemSnapshot()
