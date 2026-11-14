@@ -13,21 +13,29 @@ struct TileRow: View {
                 // Someone waiting outranks work in progress: amber "needs you" until it's answered.
                 Tile(title: "Agents",
                      badge: store.waitingCount > 0 ? "\(store.waitingCount) \(store.waitingCount == 1 ? "needs" : "need") you"
-                          : store.busyCount > 0 ? "\(store.busyCount) working" : nil,
-                     badgeTint: store.waitingCount > 0 ? UI.textAttention : UI.textSuccess,
-                     value: "\(store.sessions.count)", unit: nil, selected: false) {
-                    HourBars(points: Array(store.claude.last24.suffix(12)), tint: UI.accent, height: 16)
+                          : store.busyCount > 0 ? "\(store.busyCount) working"
+                          : store.sessions.isEmpty ? nil : "All idle",
+                     badgeTint: store.waitingCount > 0 ? UI.textAttention : store.busyCount > 0 ? UI.textSuccess : UI.textSecondary,
+                     value: "\(store.sessions.count)", unit: nil, quiet: store.sessions.isEmpty, selected: false,
+                     accessoryWidth: SessionDots.width) {
+                    // One dot per session, in its state's colour, so the picture is the number beside it.
+                    SessionDots(waiting: store.waitingCount, working: store.busyCount,
+                                idle: store.sessions.count - store.waitingCount - store.busyCount)
                 }
             }
             .buttonStyle(PressStyle())
             .help("Show agents (⌘2)")
             .accessibilityLabel(agentsLabel)
             Button { open(.servers) } label: {
-                Tile(title: "Servers", badge: store.devListeners.isEmpty ? nil : "Live",
-                     value: "\(Set(store.devListeners.map(\.pid)).count)", unit: nil, selected: false) {
-                    Text(store.serverMemory > 0 ? Fmt.bytes(store.serverMemory) : "—")
-                        .font(.system(size: UI.Size.caption, weight: .medium).monospacedDigit()).foregroundStyle(UI.textSecondary)
-                        .lineLimit(1).fixedSize()
+                let count = Set(store.devListeners.map(\.pid)).count
+                // A running server isn't an agent, so "Live" stays neutral; green is for working agents.
+                Tile(title: "Servers", badge: count == 0 ? nil : "Live", badgeTint: UI.textSecondary,
+                     value: "\(count)", unit: nil, quiet: count == 0, selected: false) {
+                    if store.serverMemory > 0 {
+                        Text(Fmt.bytes(store.serverMemory))
+                            .font(.system(size: UI.Size.caption, weight: .medium).monospacedDigit()).foregroundStyle(UI.textSecondary)
+                            .lineLimit(1).fixedSize()
+                    }
                 }
             }
             .buttonStyle(PressStyle())
@@ -35,29 +43,102 @@ struct TileRow: View {
             .accessibilityLabel(serversLabel)
             Button { open(.cleanup) } label: {
                 let (v, u) = store.cleanupScanned ? Fmt.bytesSplit(store.cleanupTotal) : ("…", "")
-                Tile(title: "Clean-up", badge: nil, value: v, unit: u, selected: false) {
-                    CleanupMeter(items: store.cleanup)
+                let biggest = store.cleanupScanned ? Self.biggest(store.cleanup) : nil
+                Tile(title: "Clean-up", badge: nil, value: v, unit: u,
+                     quiet: store.cleanupScanned && store.cleanupTotal == 0, selected: false,
+                     detail: biggest.map { [$0.name + " " + Fmt.diskBytes($0.size), $0.name] }) {
+                    EmptyView()
                 }
             }
             .buttonStyle(PressStyle())
             .help("Show clean-up (⌘5)")
-            .accessibilityLabel(store.cleanupScanned ? "Clean-up, \(Fmt.diskBytes(store.cleanupTotal)) reclaimable" : "Clean-up, measuring")
+            .accessibilityLabel(cleanupLabel)
         }
     }
 
-    /// "Agents, 4 sessions, 1 needs you": the number with what it counts.
+    /// The single largest folder to clean up, named as the Clean-up tab names it: "Xcode" for DerivedData,
+    /// otherwise its project.
+    static func biggest(_ items: [CleanupItem]) -> (name: String, size: UInt64)? {
+        guard let top = items.max(by: { $0.size < $1.size }), top.size > 0 else { return nil }
+        return (top.project, top.size)
+    }
+
+    /// "Agents, 4 sessions: 1 needs you, 1 working, 2 idle": the number with what it counts, as the dots show it.
     private var agentsLabel: String {
-        let n = store.sessions.count
-        var text = "Agents, \(n) \(n == 1 ? "session" : "sessions")"
-        if store.waitingCount > 0 { text += ", \(store.waitingCount) \(store.waitingCount == 1 ? "needs" : "need") you" }
-        else if store.busyCount > 0 { text += ", \(store.busyCount) working" }
-        return text
+        SessionDots.label(waiting: store.waitingCount, working: store.busyCount,
+                          idle: store.sessions.count - store.waitingCount - store.busyCount)
     }
 
     /// "Servers, 4 dev servers using 980 MB"
     private var serversLabel: String {
         let n = Set(store.devListeners.map(\.pid)).count
         return "Servers, \(n) dev \(n == 1 ? "server" : "servers")" + (store.serverMemory > 0 ? " using \(Fmt.bytes(store.serverMemory))" : "")
+    }
+
+    /// "Clean-up, 6.99 GB reclaimable, the largest Xcode at 2.3 GB"
+    private var cleanupLabel: String {
+        guard store.cleanupScanned else { return "Clean-up, measuring" }
+        let base = "Clean-up, \(Fmt.diskBytes(store.cleanupTotal)) reclaimable"
+        guard let top = Self.biggest(store.cleanup) else { return base }
+        return base + ", the largest \(top.name) at \(Fmt.diskBytes(top.size))"
+    }
+}
+
+/// The Agents tile's picture: one dot per session, needs-you first (amber), then working (green), then idle (grey),
+/// with "+N" past what fits. It counts the same thing as the number beside it.
+struct SessionDots: View {
+    let waiting: Int
+    let working: Int
+    let idle: Int
+
+    enum State: Equatable { case waiting, working, idle }
+    static let dot: CGFloat = 6
+    static let spacing: CGFloat = 3
+    /// Room for six dots, or four and a "+N".
+    static let width: CGFloat = 6 * dot + 5 * spacing
+    static let capacity = 6
+
+    /// The dots to draw and how many are left over for "+N". With more than `capacity` sessions, one slot fewer
+    /// for dots and two for the "+N" label, so the picture never grows past its slot.
+    static func layout(waiting: Int, working: Int, idle: Int, capacity: Int = SessionDots.capacity) -> (dots: [State], more: Int) {
+        let all = Array(repeating: State.waiting, count: max(0, waiting)) + Array(repeating: .working, count: max(0, working))
+            + Array(repeating: .idle, count: max(0, idle))
+        guard all.count > capacity else { return (all, 0) }
+        let shown = max(1, capacity - 2)
+        return (Array(all.prefix(shown)), all.count - shown)
+    }
+
+    /// The counts in words, for VoiceOver: "Agents, 4 sessions: 1 needs you, 1 working, 2 idle".
+    static func label(waiting: Int, working: Int, idle: Int) -> String {
+        let n = waiting + working + idle
+        guard n > 0 else { return "Agents, no sessions" }
+        let parts = [waiting > 0 ? "\(waiting) \(waiting == 1 ? "needs" : "need") you" : nil,
+                     working > 0 ? "\(working) working" : nil,
+                     idle > 0 ? "\(idle) idle" : nil].compactMap { $0 }
+        return "Agents, \(n) \(n == 1 ? "session" : "sessions"): " + parts.joined(separator: ", ")
+    }
+
+    var body: some View {
+        let l = Self.layout(waiting: waiting, working: working, idle: idle)
+        HStack(spacing: Self.spacing) {
+            ForEach(Array(l.dots.enumerated()), id: \.offset) { _, state in
+                Circle().fill(Self.color(state)).frame(width: Self.dot, height: Self.dot)
+            }
+            if l.more > 0 {
+                Text("+\(l.more)").font(.system(size: UI.Size.micro, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(UI.textSecondary).fixedSize()
+            }
+        }
+        .frame(height: 13, alignment: .center)
+        .accessibilityHidden(true)   // the tile's label states the counts
+    }
+
+    static func color(_ state: State) -> Color {
+        switch state {
+        case .waiting: return UI.attention
+        case .working: return .green
+        case .idle: return Color.secondary.opacity(0.5)   // as StatusDot draws an idle session
+        }
     }
 }
 
@@ -67,93 +148,44 @@ struct Tile<Accessory: View>: View {
     var badgeTint: Color = UI.textSuccess
     let value: String
     let unit: String?
+    /// Nothing to count: the figure drops to secondary ink, a calm state rather than an alarm.
+    var quiet = false
     let selected: Bool
+    var accessoryWidth: CGFloat = 44
+    /// Quiet text in the badge's place, longest first; the first that fits is shown ("Xcode 2.3 GB", then "Xcode").
+    var detail: [String]? = nil
     @ViewBuilder var accessory: Accessory
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(title).font(.system(size: UI.Size.caption, weight: .medium)).foregroundStyle(selected ? .primary : .secondary)
+                    .fixedSize()
                 Spacer(minLength: 2)
                 if let badge { Text(badge).font(.system(size: UI.Size.caption, weight: .medium)).foregroundStyle(badgeTint).lineLimit(1) }
+                else if let detail, !detail.isEmpty {
+                    ViewThatFits(in: .horizontal) {
+                        ForEach(detail, id: \.self) { Text($0).lineLimit(1).fixedSize() }
+                        Text(detail.last ?? "").lineLimit(1).truncationMode(.tail)
+                    }
+                    .font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
+                }
             }
             HStack(alignment: .lastTextBaseline, spacing: 2) {
                 Text(value)
                     .font(.system(size: UI.Size.numeral, weight: .semibold, design: .rounded).monospacedDigit())
+                    .foregroundStyle(quiet ? AnyShapeStyle(UI.textSecondary) : AnyShapeStyle(.primary))
                     .lineLimit(1).fixedSize()
                 if let unit, !unit.isEmpty {
                     Text(unit).font(.system(size: UI.Size.caption, weight: .semibold)).foregroundStyle(UI.textSecondary).fixedSize()
                 }
                 Spacer(minLength: 6)
-                accessory.frame(maxWidth: 44, maxHeight: 16, alignment: .bottomTrailing)
+                accessory.frame(maxWidth: accessoryWidth, maxHeight: 16, alignment: .bottomTrailing)
             }
         }
         .padding(.horizontal, 11).padding(.vertical, 10)
         .frame(minWidth: UI.column, maxWidth: .infinity, minHeight: 66, maxHeight: 66, alignment: .topLeading)
         .surface(selected: selected)
         .contentShape(Rectangle())
-    }
-}
-
-/// Hourly activity: a 1pt baseline, with bars only where something happened.
-struct HourBars: View {
-    let points: [HourPoint]
-    let tint: Color
-    var height: CGFloat = 16
-    var barWidth: CGFloat = 2.5
-
-    var body: some View {
-        let maxV = Double(points.map(\.messages).max() ?? 0)
-        ZStack(alignment: .bottom) {
-            Capsule().fill(Color.primary.opacity(0.14)).frame(height: 1)
-            HStack(alignment: .bottom, spacing: barWidth * 0.6) {
-                ForEach(points) { p in
-                    let h = maxV > 0 ? height * Double(p.messages) / maxV : 0
-                    RoundedRectangle(cornerRadius: barWidth / 2)
-                        .fill(p.isNow ? tint : Color.secondary.opacity(0.55))
-                        .frame(width: barWidth, height: p.messages == 0 ? 0 : max(3, h))
-                }
-            }
-        }
-        .frame(height: height, alignment: .bottom)
-        .accessibilityElement()
-        .accessibilityLabel("Activity, last \(points.count) hours")
-        .accessibilityValue("\(points.last?.messages ?? 0) messages this hour, \(points.reduce(0) { $0 + $1.messages }) in total")
-    }
-}
-
-/// Reclaimable space by kind. Categories under 8% are dropped rather than drawn as dots.
-struct CleanupMeter: View {
-    let items: [CleanupItem]
-    var body: some View {
-        let total = Double(items.reduce(0) { $0 + $1.size })
-        let groups = Dictionary(grouping: items, by: \.kind)
-            .map { ($0.key, Double($0.value.reduce(0) { $0 + $1.size })) }
-            .filter { total > 0 && $0.1 / total >= 0.08 }
-            .sorted { $0.1 > $1.1 }.prefix(3)
-        let shown = groups.reduce(0) { $0 + $1.1 }
-        let colors: [Color] = [.blue, .purple, .orange]
-        // Shrinks to whatever room the value leaves, so a wide figure never pushes it out of the tile.
-        GeometryReader { geo in
-            HStack(spacing: 2) {
-                ForEach(Array(groups.enumerated()), id: \.offset) { i, g in
-                    Capsule().fill(colors[i].opacity(0.8))
-                        .frame(width: max(2, (geo.size.width - 2 * CGFloat(groups.count - 1)) * g.1 / max(shown, 1)), height: 3)
-                }
-            }
-            .frame(maxHeight: .infinity, alignment: .bottom)
-        }
-        .frame(minWidth: 10, maxWidth: 32)
-        .frame(height: 16, alignment: .bottom)
-        .help(legend(groups.map { ($0.0, $0.1) }, colored: true))
-        .accessibilityElement()
-        .accessibilityLabel(legend(groups.map { ($0.0, $0.1) }, colored: false))
-    }
-
-    private func legend(_ groups: [(String, Double)], colored: Bool) -> String {
-        let names = ["blue", "purple", "orange"]
-        return groups.enumerated().map { i, g in
-            (colored ? names[i] + ": " : "") + g.0 + " " + Fmt.diskBytes(UInt64(g.1))
-        }.joined(separator: "\n")
     }
 }

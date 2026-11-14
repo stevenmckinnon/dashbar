@@ -150,7 +150,7 @@ struct WidgetRow: View {
             Widget(title: "Claude · today") {
                 BigNumber(Fmt.tokens(store.claude.today.total), unit: "tokens")
                 Spacer(minLength: 4)
-                DayBars(points: Array(days.suffix(7)), tint: UI.textInfo)
+                DayBars(points: Array(days.suffix(7)), tint: UI.claudeFill)
                 Spacer(minLength: 4)
                 Footnote(Self.sessionsText(store.claude.sessionsToday))
                     .help(Self.messagesHelp(store.claude.today.messages))
@@ -189,8 +189,8 @@ struct WeekCompare: View {
     var body: some View {
         let maxV = Double(max(this, last, 1))
         VStack(alignment: .leading, spacing: 5) {
-            bar("Last 7", value: this, maxV: maxV, fill: UI.textInfo)
-            bar("Prior 7", value: last, maxV: maxV, fill: Color.secondary.opacity(0.45))
+            bar("Last 7", value: this, maxV: maxV, fill: UI.claudeFill)
+            bar("Prior 7", value: last, maxV: maxV, fill: UI.dataPast)
         }
         .accessibilityElement()
         .accessibilityLabel("Last 7 days \(Fmt.tokens(this)) tokens, the 7 days before \(Fmt.tokens(last))")
@@ -201,7 +201,8 @@ struct WeekCompare: View {
             Text(label).font(.system(size: UI.Size.micro)).foregroundStyle(UI.textSecondary).fixedSize()
                 .frame(minWidth: 34, alignment: .leading)
             GeometryReader { g in
-                Capsule().fill(fill).frame(width: max(3, g.size.width * Double(value) / maxV))
+                // Nothing drawn for nothing used; a tiny week still shows as a sliver.
+                Capsule().fill(fill).frame(width: Meter.width(Double(value) / maxV, in: g.size.width, minimum: 3))
             }
             .frame(height: 5)
             // Sized to its text, so "12.4B" or "1.20T" never truncates; the bar takes what is left.
@@ -226,26 +227,49 @@ struct Widget<Content: View>: View {
             content
         }
         .padding(UI.cardPadding)
-        .frame(maxWidth: .infinity, minHeight: 118, maxHeight: 118, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 130, maxHeight: 130, alignment: .topLeading)
         .surface()
     }
 }
 
+/// Claude's tokens for each of the last seven days, today last and in Claude's colour, each bar over its weekday's
+/// initial in the user's language. Bars keep a bar's width however wide the widget is.
 struct DayBars: View {
     let points: [DayPoint]
     let tint: Color
+    static let height: CGFloat = 20
+
     var body: some View {
         let maxV = Double(points.map(\.tokens).max() ?? 0)
-        HStack(alignment: .bottom, spacing: 3) {
+        HStack(alignment: .bottom, spacing: 4) {
             ForEach(points) { p in
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(p.isToday ? tint : Color.secondary.opacity(0.35))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: maxV > 0 ? max(3, 22 * Double(p.tokens) / maxV) : 3)
+                VStack(spacing: 2) {
+                    ZStack(alignment: .bottom) {
+                        // A hairline baseline, so a day with nothing still has its place.
+                        Capsule().fill(Color.primary.opacity(0.12)).frame(height: 1)
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(p.isToday ? tint : UI.dataPast)
+                            .frame(height: maxV > 0 ? Meter.width(Double(p.tokens) / maxV, in: Self.height, minimum: 2) : 0)
+                    }
+                    .frame(width: 10, height: Self.height, alignment: .bottom)
+                    Text(Self.initial(p.date)).font(.system(size: UI.Size.micro, weight: p.isToday ? .semibold : .regular))
+                        .foregroundStyle(p.isToday ? AnyShapeStyle(.primary) : AnyShapeStyle(UI.textSecondary))
+                        .fixedSize()
+                }
+                .frame(minWidth: 12)
             }
         }
-        .frame(height: 22, alignment: .bottom)
+        .accessibilityElement()
+        .accessibilityLabel("Claude tokens by day, last 7 days")
+        .accessibilityValue(points.map { "\($0.isToday ? "today" : Self.dayName($0.date)) \(Fmt.tokens($0.tokens))" }.joined(separator: ", "))
     }
+
+    /// The weekday's narrow form in the user's language: "M", "T"… in English, "L", "M"… in French.
+    static func initial(_ date: Date, locale: Locale = .current) -> String {
+        date.formatted(Date.FormatStyle(locale: locale).weekday(.narrow))
+    }
+
+    static func dayName(_ date: Date) -> String { date.formatted(.dateTime.weekday(.wide)) }
 }
 
 /// A widget's figure, with its unit small and secondary beside it, as the Clean-up tile sets "GB".
