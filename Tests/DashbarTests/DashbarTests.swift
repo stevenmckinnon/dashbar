@@ -129,7 +129,7 @@ import Testing
         #expect(s.topProjects.first?.name == "api")
         #expect(s.topModels.first?.name == "gpt-5-codex")
         #expect(scanner.limits.first?.usedPercent == 42)
-        #expect(scanner.limits.first?.label == "5h window")
+        #expect(scanner.limits.first?.label == "5-hour")
         #expect(s.warning == nil)
     }
 }

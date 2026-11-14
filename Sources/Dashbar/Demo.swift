@@ -136,6 +136,7 @@ enum DemoData {
         claude.last24 = hours
         claude.tokens24 = hourTokens.reduce(0, +)
         claude.sessions24 = 6
+        claude.sessionsToday = 6
         claude.topProjects = [Ranked(name: "storefront-web", value: 92_000_000), Ranked(name: "billing-api", value: 38_000_000),
                               Ranked(name: "docs-site", value: 12_000_000), Ranked(name: "notes-ios", value: 6_000_000)]
         claude.topModels = [Ranked(name: "Opus 5.5", value: 112_000_000), Ranked(name: "Sonnet 5.5", value: 36_000_000)]
@@ -181,8 +182,8 @@ enum DemoData {
         }
         store.codex = codex
         store.codexLimits = [
-            RateLimit(label: "5h window", usedPercent: 21, resetsAt: now.addingTimeInterval(3.4 * 3600), window: 5 * 3600),
-            RateLimit(label: "7d window", usedPercent: 34, resetsAt: now.addingTimeInterval(4.1 * 86400), window: 7 * 86400),
+            RateLimit(label: "5-hour", usedPercent: 21, resetsAt: now.addingTimeInterval(3.4 * 3600), window: 5 * 3600),
+            RateLimit(label: "Weekly", usedPercent: 34, resetsAt: now.addingTimeInterval(4.1 * 86400), window: 7 * 86400),
         ]
         store.usageLoading = false
 

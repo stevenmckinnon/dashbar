@@ -114,7 +114,7 @@ private struct WindowHistory: View {
     let summary: PlanHistory.Summary
 
     private var tint: Color { series.provider.tint }
-    private var name: String { series.kind == .fiveHour ? "5-hour window" : "Weekly window" }
+    private var name: String { RateLimit.name(window: series.kind.length) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -123,10 +123,10 @@ private struct WindowHistory: View {
                 Spacer()
                 if let limit {
                     let used = min(max(limit.usedPercent, 0), 100)
-                    Text("\(Int(used.rounded()))% used").font(.system(size: UI.Size.caption, weight: .semibold).monospacedDigit())
+                    Text(Fmt.usedPercent(limit.usedPercent)).font(.system(size: UI.Size.caption, weight: .semibold).monospacedDigit())
                         .foregroundStyle(used >= PlanHistory.limitHit ? UI.textDanger : Color.primary)
                     if let r = limit.resetsAt {
-                        Text("· resets \(r.formatted(.relative(presentation: .named)))")
+                        Text("· " + Fmt.resets(r))
                             .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
                     }
                 }

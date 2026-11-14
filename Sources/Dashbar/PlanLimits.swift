@@ -386,8 +386,8 @@ enum ClaudePlanLimits {
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .fiveHour: return "5-hour"
-            case .weekly: return "Weekly"
+            case .fiveHour: return RateLimit.name(window: PlanHistory.Kind.fiveHour.length)
+            case .weekly: return RateLimit.name(window: PlanHistory.Kind.weekly.length)
             case .both: return "Both"
             }
         }
@@ -402,7 +402,8 @@ enum ClaudePlanLimits {
         func kind(_ l: RateLimit) -> PlanHistory.Kind? {
             if let k = PlanHistory.kind(of: l) { return k }
             guard l.window == nil else { return nil }
-            return l.label == "5-hour" ? .fiveHour : l.label == "Weekly" ? .weekly : nil
+            return l.label == RateLimit.name(window: PlanHistory.Kind.fiveHour.length) ? .fiveHour
+                : l.label == RateLimit.name(window: PlanHistory.Kind.weekly.length) ? .weekly : nil
         }
         func reading(_ wanted: PlanHistory.Kind) -> MenuBarReading? {
             guard let l = limits.first(where: { kind($0) == wanted }) else { return nil }
@@ -428,10 +429,9 @@ enum ClaudePlanLimits {
 
     static func label(for key: String) -> String {
         switch key {
-        case "five_hour": return "5-hour"
-        case "seven_day": return "Weekly"
-        case "seven_day_opus": return "Weekly · Opus"
-        case "seven_day_sonnet": return "Weekly · Sonnet"
+        case "five_hour", "seven_day": return RateLimit.name(window: window(for: key)!)
+        case "seven_day_opus": return RateLimit.name(window: 7 * 86400) + " · Opus"
+        case "seven_day_sonnet": return RateLimit.name(window: 7 * 86400) + " · Sonnet"
         default:
             let words = key.replacingOccurrences(of: "_", with: " ")
             return words.prefix(1).uppercased() + words.dropFirst()   // "extra_usage" -> "Extra usage"

@@ -17,9 +17,16 @@ enum Shell {
 }
 
 enum Fmt {
+    /// "999", "1.2K", "25M", "2.34B", "12.4B", "1.20T": at most five characters before the unit, so a figure never
+    /// outgrows the narrow columns it sits in.
     static func tokens(_ n: Int) -> String {
         let d = Double(n)
         switch n {
+        case 100_000_000_000_000...: return String(format: "%.0fT", d / 1e12)
+        case 10_000_000_000_000...: return String(format: "%.1fT", d / 1e12)
+        case 1_000_000_000_000...: return String(format: "%.2fT", d / 1e12)
+        case 100_000_000_000...: return String(format: "%.0fB", d / 1e9)
+        case 10_000_000_000...: return String(format: "%.1fB", d / 1e9)
         case 1_000_000_000...: return String(format: "%.2fB", d / 1e9)
         case 10_000_000...: return String(format: "%.0fM", d / 1e6)
         case 1_000_000...: return String(format: "%.1fM", d / 1e6)
@@ -40,21 +47,47 @@ enum Fmt {
         ByteCountFormatter.string(fromByteCount: Int64(n), countStyle: .file)
     }
 
+    /// A whole drive's space, as Finder counts it but without the hundredths: "421 GB", "995 GB", "1.2 TB".
+    static func driveBytes(_ n: UInt64) -> String {
+        let f = ByteCountFormatter()
+        f.countStyle = .file
+        f.isAdaptive = false
+        return f.string(fromByteCount: Int64(n))
+    }
+
+    /// "15% used". The real figure, above 100 too: a limit some way over is shown as it is, never as a flat 100%.
+    static func usedPercent(_ p: Double) -> String {
+        "\(Int(max(0, p).rounded()))% used"
+    }
+
+    /// When a limit resets: "resets in 2h 10m" within a day, "resets Thu 09:00" within six days, "resets 21 Nov" after
+    /// that. Day and time follow the locale and its 12- or 24-hour clock.
+    static func resets(_ date: Date, now: Date = Date(), locale: Locale = .autoupdatingCurrent,
+                       timeZone: TimeZone = .autoupdatingCurrent) -> String {
+        let left = date.timeIntervalSince(now)
+        if left < 86400 { return "resets in " + duration(left) }
+        let style = Date.FormatStyle(locale: locale, timeZone: timeZone)
+        // Within six days the weekday can't be today's, so it never reads as a time that has already passed.
+        if left < 6 * 86400 { return "resets " + date.formatted(style.weekday(.abbreviated).hour().minute()) }
+        return "resets " + date.formatted(style.day().month(.abbreviated))
+    }
+
+    /// How long since `date`: "45s", "4m", "20h", "2h 5m", "1d 4h". The same shape as `duration`.
     static func ago(_ date: Date, now: Date = Date()) -> String {
-        let s = max(0, Int(now.timeIntervalSince(date)))
-        switch s {
-        case ..<60: return "\(s)s"
-        case ..<3600: return "\(s / 60)m"
-        case ..<86400: return "\(s / 3600)h \(s % 3600 / 60)m"
-        default: return "\(s / 86400)d"
-        }
+        span(Int(now.timeIntervalSince(date)))
     }
 
     /// A span of time ahead, for sentences: "less than a minute", "45m", "2h 5m", "3d 4h".
     static func duration(_ seconds: TimeInterval) -> String {
-        let s = max(0, Int(seconds.rounded()))
+        let s = Int(seconds.rounded())
+        return s < 60 ? "less than a minute" : span(s)
+    }
+
+    /// Every duration the app shows: the two largest parts, leaving out a part that is zero ("20h", not "20h 0m").
+    static func span(_ seconds: Int) -> String {
+        let s = max(0, seconds)
         switch s {
-        case ..<60: return "less than a minute"
+        case ..<60: return "\(s)s"
         case ..<3600: return "\(s / 60)m"
         case ..<86400: return s % 3600 / 60 == 0 ? "\(s / 3600)h" : "\(s / 3600)h \(s % 3600 / 60)m"
         default: return s % 86400 / 3600 == 0 ? "\(s / 86400)d" : "\(s / 86400)d \(s % 86400 / 3600)h"

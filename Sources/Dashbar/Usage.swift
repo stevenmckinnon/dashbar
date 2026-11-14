@@ -72,6 +72,10 @@ enum UsagePeriod: Int, CaseIterable, Identifiable {
     var id: Int { rawValue }
     var short: String { ["Today", "7d", "14d"][rawValue] }
     var days: Int { [1, 7, 14][rawValue] }
+    /// A usage card's headline, with its unit and span: "153M tokens today", "1.14B tokens in 7 days".
+    func tokensLine(_ total: Int) -> String {
+        Fmt.tokens(total) + " tokens " + (self == .today ? "today" : "in \(days) days")
+    }
 }
 
 struct PeriodUsage: Equatable {
@@ -99,6 +103,8 @@ struct UsageSummary: Equatable {
     var last24: [HourPoint] = []
     var tokens24 = 0
     var sessions24 = 0
+    /// Sessions with usage since midnight (the same calendar day as `today`).
+    var sessionsToday = 0
     /// The last 30 days, for the History page.
     var history = UsageHistory()
     /// Set when logs exist but none could be read, which usually means the format changed.
@@ -208,14 +214,18 @@ struct UsageBook: Codable {
         s.topProjects = t.byProject.sorted { $0.value > $1.value }.prefix(4).map { Ranked(name: $0.key, value: $0.value, cost: t.costByProject[$0.key]) }
 
         let nowHour = cal.dateInterval(of: .hour, for: Date())?.start ?? Date()
-        var sessions = Set<String>()
+        var sessions = Set<String>(), sessionsToday = Set<String>()
         for offset in (0..<24).reversed() {
             let h = cal.date(byAdding: .hour, value: -offset, to: nowHour)!
             let b = hours[h]
             s.last24.append(HourPoint(id: h, tokens: b?.tokens ?? 0, messages: b?.messages ?? 0, isNow: offset == 0))
-            if let b { sessions.formUnion(b.sessions); s.tokens24 += b.tokens }
+            if let b {
+                sessions.formUnion(b.sessions); s.tokens24 += b.tokens
+                if h >= today { sessionsToday.formUnion(b.sessions) }
+            }
         }
         s.sessions24 = sessions.count
+        s.sessionsToday = sessionsToday.count
         s.history = history()
         return s
     }
@@ -458,9 +468,37 @@ struct RateLimit: Identifiable, Codable, Equatable {
     let resetsAt: Date?
     /// How long the window lasts, when known, for working out the pace.
     var window: TimeInterval? = nil
+    /// The provider's own name for the limit ("gemini-argon-wtu-weekly"), when `label` was made from it, for the tooltip.
+    var source: String? = nil
 }
 
 extension RateLimit {
+    /// Every tool's limit rows are named by their length, the same way: "5-hour", "Daily", "Weekly", "Monthly", or else
+    /// "8-hour", "3-day". One helper, so Claude, Codex, Antigravity and History never name the same window two ways.
+    static func name(window seconds: TimeInterval) -> String {
+        let hours = seconds / 3600
+        if abs(hours - 5) <= 0.5 { return "5-hour" }
+        if abs(hours - 24) <= 1 { return "Daily" }
+        if abs(hours - 168) <= 6 { return "Weekly" }
+        if hours >= 28 * 24 && hours <= 31 * 24 { return "Monthly" }
+        if hours >= 24, Int(hours.rounded()) % 24 == 0 { return "\(Int(hours.rounded()) / 24)-day" }
+        return "\(max(1, Int(hours.rounded())))-hour"
+    }
+
+    /// Limits worth a row of their own, and the rest folded into "N more at 0%": with two or more at 0% used, those
+    /// are folded away, except the tightest limit (the most used, or the first when all are at 0%), which always shows.
+    static func fold(_ limits: [RateLimit]) -> (shown: [RateLimit], folded: [RateLimit]) {
+        func isZero(_ l: RateLimit) -> Bool { Int(max(0, l.usedPercent).rounded()) == 0 }
+        let zeros = limits.filter(isZero)
+        guard zeros.count >= 2 else { return (limits, []) }
+        let tightest = limits.indices.max { limits[$0].usedPercent < limits[$1].usedPercent || (limits[$0].usedPercent == limits[$1].usedPercent && $0 > $1) }
+        var shown: [RateLimit] = [], folded: [RateLimit] = []
+        for (i, l) in limits.enumerated() {
+            if isZero(l) && i != tightest { folded.append(l) } else { shown.append(l) }
+        }
+        return folded.count >= 2 ? (shown, folded) : (limits, [])
+    }
+
     enum Pace: Equatable {
         /// Using well under the even rate for the time that has passed.
         case under
@@ -534,7 +572,10 @@ final class CodexUsageScanner {
             tail.offsets = saved.offsets
             book = saved.book
             fileCtx = saved.fileCtx
-            limits = saved.limits
+            // Older copies saved "5h window" and "7d window": name them by length now, as fresh readings are.
+            limits = saved.limits.map { l in
+                l.window.map { RateLimit(label: RateLimit.name(window: $0), usedPercent: l.usedPercent, resetsAt: l.resetsAt, window: $0) } ?? l
+            }
             limitsStamp = saved.limitsStamp
         }
     }
@@ -603,13 +644,13 @@ final class CodexUsageScanner {
             }
             if let rl = payload["rate_limits"] as? [String: Any], date >= limitsStamp {
                 limitsStamp = date
-                limits = [("primary", "5h"), ("secondary", "Weekly")].compactMap { key, fallback in
+                limits = [("primary", "5-hour"), ("secondary", "Weekly")].compactMap { key, fallback in
                     guard let w = rl[key] as? [String: Any], let used = w["used_percent"] as? Double else { return nil }
-                    let label = (w["window_minutes"] as? Int).map { $0 >= 1440 ? "\($0 / 1440)d" : "\($0 / 60)h" } ?? fallback
+                    let label = (w["window_minutes"] as? Int).map { RateLimit.name(window: TimeInterval($0 * 60)) } ?? fallback
                     var reset: Date?
                     if let at = w["resets_at"] as? Double { reset = Date(timeIntervalSince1970: at) }
                     else if let s = w["resets_in_seconds"] as? Double { reset = date.addingTimeInterval(s) }
-                    return RateLimit(label: label + " window", usedPercent: used, resetsAt: reset,
+                    return RateLimit(label: label, usedPercent: used, resetsAt: reset,
                                      window: (w["window_minutes"] as? Int).map { TimeInterval($0 * 60) })
                 }
             }

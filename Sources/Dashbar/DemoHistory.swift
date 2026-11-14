@@ -115,8 +115,8 @@ extension DemoData {
             return reset
         }
         func limits(_ used5: Double, _ reset5: Date, _ usedW: Double, _ resetW: Date) -> [RateLimit] {
-            [RateLimit(label: provider == .claude ? "5-hour" : "5h window", usedPercent: used5, resetsAt: reset5, window: fiveHours),
-             RateLimit(label: provider == .claude ? "Weekly" : "7d window", usedPercent: usedW, resetsAt: resetW, window: week)]
+            [RateLimit(label: "5-hour", usedPercent: used5, resetsAt: reset5, window: fiveHours),
+             RateLimit(label: "Weekly", usedPercent: usedW, resetsAt: resetW, window: week)]
         }
 
         // Each week's 5-hour peaks add up to that week's peak; the current week ends at its current reading.

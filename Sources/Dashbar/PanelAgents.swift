@@ -21,7 +21,7 @@ struct UsageCard: View {
 
     var body: some View {
         let usage = summary.period(period)
-        Card(title: title, icon: icon, tint: tint, count: nil, trailing: "\(period.short) \(Fmt.tokens(usage.totals.total))") {
+        Card(title: title, icon: icon, tint: tint, count: nil, trailing: period.tokensLine(usage.totals.total)) {
             if loading {
                 HStack { ProgressView().controlSize(.small); Text("Scanning transcripts…").font(.caption).foregroundStyle(UI.textSecondary) }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -63,7 +63,7 @@ struct UsageCard: View {
                     if period == .today { hourly } else { daily(Array(summary.last14.suffix(period.days))) }
                     if !usage.projects.isEmpty {
                         HStack(alignment: .top, spacing: 14) {
-                            RankList(title: "Projects", items: usage.projects, tint: tint, showCost: showCost)
+                            RankList(title: "Workspaces", items: usage.projects, tint: tint, showCost: showCost)
                             RankList(title: "Models", items: RankList.shortModels(usage.models), tint: tint, showCost: showCost)
                         }
                     }
@@ -71,7 +71,7 @@ struct UsageCard: View {
                         RankList(title: "Accounts", items: Self.byAccount(accounts, period), tint: tint, showCost: showCost)
                     }
                     if !limits.isEmpty {
-                        VStack(spacing: 6) { ForEach(limits) { LimitBar(limit: $0, tint: tint) } }
+                        VStack(spacing: 6) { LimitList(limits: limits, tint: tint) }
                     }
                 }
             }
@@ -252,11 +252,11 @@ struct LimitBar: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(limit.label).font(.system(size: UI.Size.caption, weight: .medium))
                 if let r = limit.resetsAt {
-                    Text("resets \(r.formatted(.relative(presentation: .named)))")
+                    Text(Fmt.resets(r))
                         .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
                 }
                 Spacer()
-                Text("\(Int(used.rounded()))% used")
+                Text(Fmt.usedPercent(limit.usedPercent))
                     .font(.system(size: UI.Size.caption, weight: .semibold).monospacedDigit())
                     .foregroundStyle(used >= 90 ? UI.textDanger : Color.primary)
             }
@@ -280,9 +280,16 @@ struct LimitBar: View {
                     .foregroundStyle(Self.color(pace))
             }
         }
-        .help(expected.map { "The mark shows where an even pace would be by now: \(Int($0.rounded()))% used." } ?? "")
+        .help(([expected.map { "The mark shows where an even pace would be by now: \(Int($0.rounded()))% used." },
+                Self.sourceNote(limit)] as [String?]).compactMap { $0 }.joined(separator: "\n"))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(limit.label) limit, \(Int(used.rounded())) percent used" + (pace.map { ". " + Self.text($0) } ?? ""))
+        .accessibilityLabel("\(limit.label) limit, \(Int(max(0, limit.usedPercent).rounded())) percent used" + (pace.map { ". " + Self.text($0) } ?? ""))
+        .accessibilityHint(Self.sourceNote(limit) ?? "")
+    }
+
+    /// The provider's own name for a limit whose label was made from it: "Reported as gemini-argon-wtu-weekly".
+    static func sourceNote(_ limit: RateLimit) -> String? {
+        limit.source.map { "Reported as \($0)" }
     }
 
     /// A forecast of running out is a heads-up (amber); only a limit that's actually used up is a problem (red).
@@ -296,14 +303,39 @@ struct LimitBar: View {
 
     static func text(_ pace: RateLimit.Pace) -> String {
         switch pace {
-        case .under: return "Well under pace"
-        case .onPace: return "On pace to last until it resets"
+        case .under: return "At this rate, plenty left when it resets"
+        case .onPace: return "At this rate, lasts until it resets"
         case .usedUp: return "Used up until it resets"
         case .runsOut(let date):
             let when = Calendar.current.isDateInToday(date)
                 ? "at " + date.formatted(date: .omitted, time: .shortened)
                 : date.formatted(.dateTime.weekday(.abbreviated).hour().minute())
             return "At this rate, runs out \(when)"
+        }
+    }
+}
+
+/// One tool's limit rows. Two or more at 0% used fold into a quiet "N more at 0%" line that opens to show them, so the
+/// card leads with the limits in use; the tightest limit always keeps its row (`RateLimit.fold`).
+struct LimitList: View {
+    let limits: [RateLimit]
+    let tint: Color
+    @State private var expanded = false
+
+    var body: some View {
+        let fold = RateLimit.fold(limits)
+        ForEach(expanded ? limits : fold.shown) { LimitBar(limit: $0, tint: tint) }
+        if !fold.folded.isEmpty {
+            Button { expanded.toggle() } label: {
+                HStack(spacing: 3) {
+                    Text(expanded ? "Show fewer" : "\(fold.folded.count) more at 0%")
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down").font(.system(size: UI.Size.micro - 1, weight: .semibold))
+                }
+                .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(PressStyle())
+            .help(expanded ? "Hide the limits at 0% used" : fold.folded.map(\.label).joined(separator: ", "))
         }
     }
 }
@@ -402,7 +434,7 @@ struct PlanLimitsCard: View {
                     }
                 }
             } else if let limits = store.claudePlan?.limits, !limits.isEmpty {
-                ForEach(limits) { LimitBar(limit: $0, tint: UI.claude) }
+                LimitList(limits: limits, tint: UI.claude)
                 if let stale = store.claudePlan?.stale, let fetched = store.claudePlan?.fetchedAt {
                     // Worked out live, so "2m ago" keeps counting and the countdown says when it will refresh.
                     TimelineView(.periodic(from: .now, by: 1)) { ctx in
@@ -448,7 +480,7 @@ struct PlanLimitsCard: View {
                 Text("Codex hasn't reported limits yet. They appear after your next Codex session.")
                     .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
             } else {
-                ForEach(limits) { LimitBar(limit: $0, tint: .teal) }
+                LimitList(limits: limits, tint: .teal)
             }
         }
     }
@@ -472,7 +504,7 @@ struct ClaudeAccountLimitsView: View {
                 }
                 .font(.system(size: UI.Size.caption))
             } else if !account.limits.isEmpty {
-                ForEach(account.limits) { LimitBar(limit: $0, tint: UI.claude) }
+                LimitList(limits: account.limits, tint: UI.claude)
                 if let fetched = account.fetchedAt {
                     TimelineView(.periodic(from: .now, by: 30)) { ctx in
                         if let line = ClaudeStatusLine.ageLine(writtenAt: fetched, now: ctx.date) {
