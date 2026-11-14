@@ -164,7 +164,7 @@ struct DashboardView: View {
     private var cards: some View {
         VStack(spacing: UI.gap) {
             if let notice = store.notice { NoticeBanner(text: notice) { store.notice = nil }.transition(.opacity) }
-            if let warning = store.claude.warning ?? store.codex.warning, tab == .overview || tab == .agents {
+            if let warning = store.formatWarning, tab == .overview || tab == .agents {
                 NoticeBanner(text: warning, dismiss: nil)
             }
             switch forcedTab ?? tab {

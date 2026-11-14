@@ -16,7 +16,7 @@ enum Bench {
         let scanner = ClaudeUsageScanner()
         let s = time("Claude scan (first)") { scanner.scan() }
         _ = time("Claude scan (incremental)") { scanner.scan() }
-        print("  today \(Fmt.tokens(s.today.total)) tokens, \(s.today.messages) msgs")
+        print("  today \(Fmt.tokens(s.today.total)) tokens, \(s.today.messages) msgs, format \(s.warning == nil ? "reads" : "WARNING")")
         let cacheURL = FileManager.default.temporaryDirectory.appendingPathComponent("dashbar-bench-\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: cacheURL) }
         let warm = ClaudeUsageScanner(cache: cacheURL)

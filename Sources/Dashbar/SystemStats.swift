@@ -18,7 +18,7 @@ enum MemoryPressure: Int {
     }
 }
 
-struct SystemSnapshot {
+struct SystemSnapshot: Equatable {
     var cpu: Double = 0              // 0...1 of all cores
     var cpuUser: Double = 0
     var cpuSystem: Double = 0
@@ -306,7 +306,7 @@ extension Fmt {
 }
 
 /// Recent samples for the bar charts (newest last).
-struct SystemHistory {
+struct SystemHistory: Equatable {
     static let length = 40
     var cpu: [Double] = []
     var memory: [Double] = []

@@ -41,7 +41,7 @@ struct Workspace: Identifiable {
 
 // MARK: - Context window fill per live session
 
-struct ContextInfo {
+struct ContextInfo: Equatable {
     let used: Int
     let window: Int
     var fraction: Double { min(1, Double(used) / Double(max(window, 1))) }
@@ -72,13 +72,20 @@ final class ContextReader {
     /// Last result per transcript, reused while the file's size and mtime are unchanged.
     private var cached: [String: (size: UInt64, mtime: Date, info: ContextInfo?)] = [:]
 
-    init(projects: URL = ClaudeUsageScanner.defaultRoot) { self.projects = projects }
+    /// When a session's transcript wasn't found, so the projects folder isn't listed again on every refresh.
+    private var misses: [String: Date] = [:]
+    private let missRetry: TimeInterval
+
+    init(projects: URL = ClaudeUsageScanner.defaultRoot, missRetry: TimeInterval = 15) {
+        self.projects = projects
+        self.missRetry = missRetry
+    }
     private let needle = Data("\"usage\"".utf8)
 
-    func read(_ sessions: [LiveSession]) -> [String: ContextInfo] {
+    func read(_ sessions: [LiveSession], now: Date = Date()) -> [String: ContextInfo] {
         var out: [String: ContextInfo] = [:]
         for s in sessions {
-            guard let url = path(for: s.id) else { continue }
+            guard let url = path(for: s.id, now: now) else { continue }
             let rv = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
             let size = UInt64(rv?.fileSize ?? 0), mtime = rv?.contentModificationDate ?? .distantPast
             if let hit = cached[s.id], hit.size == size, hit.mtime == mtime {
@@ -91,16 +98,19 @@ final class ContextReader {
         }
         let live = Set(sessions.map(\.id))
         cached = cached.filter { live.contains($0.key) }
+        misses = misses.filter { live.contains($0.key) }
         return out
     }
 
-    private func path(for id: String) -> URL? {
+    private func path(for id: String, now: Date) -> URL? {
         if let u = paths[id] { return u }
+        if let missed = misses[id], now.timeIntervalSince(missed) < missRetry { return nil }
         let dirs = (try? FileManager.default.contentsOfDirectory(at: projects, includingPropertiesForKeys: nil)) ?? []
         for dir in dirs {
             let f = dir.appendingPathComponent("\(id).jsonl")
-            if FileManager.default.fileExists(atPath: f.path) { paths[id] = f; return f }
+            if FileManager.default.fileExists(atPath: f.path) { paths[id] = f; misses[id] = nil; return f }
         }
+        misses[id] = now
         return nil
     }
 

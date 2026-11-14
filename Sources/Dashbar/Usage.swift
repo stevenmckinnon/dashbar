@@ -35,14 +35,14 @@ struct DayUsage: Codable {
     var byProject: [String: Int] = [:]
 }
 
-struct DayPoint: Identifiable {
+struct DayPoint: Identifiable, Equatable {
     let id: String
     let date: Date
     let tokens: Int
     let isToday: Bool
 }
 
-struct HourPoint: Identifiable {
+struct HourPoint: Identifiable, Equatable {
     let id: Date
     let tokens: Int
     let messages: Int
@@ -50,7 +50,7 @@ struct HourPoint: Identifiable {
     var date: Date { id }
 }
 
-struct Ranked: Identifiable {
+struct Ranked: Identifiable, Equatable {
     var id: String { name }
     let name: String
     let value: Int
@@ -64,13 +64,13 @@ enum UsagePeriod: Int, CaseIterable, Identifiable {
     var days: Int { [1, 7, 14][rawValue] }
 }
 
-struct PeriodUsage {
+struct PeriodUsage: Equatable {
     var totals = TokenTotals()
     var models: [Ranked] = []
     var projects: [Ranked] = []
 }
 
-struct UsageSummary {
+struct UsageSummary: Equatable {
     var found = false
     /// Indexed by `UsagePeriod.rawValue`. Empty means only the single-day fields below are known.
     var periods: [PeriodUsage] = []
@@ -183,27 +183,40 @@ struct UsageBook: Codable {
 
 /// Reads JSONL files under a root incrementally: each pass only parses bytes appended since the last pass.
 struct JSONLTail {
+    /// One complete new line that contains a needle. `json` is nil when the line isn't a JSON object, which the
+    /// scanners count against the log format rather than skipping silently.
+    struct Line {
+        let path: String
+        let json: [String: Any]?
+        /// The file was modified within `recentDays`: only these lines judge whether the format still reads,
+        /// since old files keep whatever format they were written in.
+        let recent: Bool
+    }
+
     let root: URL
-    let needle: Data
+    let needles: [Data]
     var windowDays = 30
+    var recentDays = 2.0
     /// Bytes consumed per file. Saved between launches so a restart only reads new lines.
     var offsets: [String: UInt64] = [:]
     /// Files that had new lines in the most recent scan.
     private(set) var changed: Set<String> = []
 
-    init(root: URL, needle: String) {
+    init(root: URL, needles: [String]) {
         self.root = root
-        self.needle = Data(needle.utf8)
+        self.needles = needles.map { Data($0.utf8) }
     }
 
     var exists: Bool { FileManager.default.fileExists(atPath: root.path) }
 
-    /// Calls `handle(path, json)` for each new complete line containing the needle.
-    mutating func scan(_ handle: (String, [String: Any]) -> Void) {
+    /// Calls `handle` for each new complete line containing any needle. A partial last line waits for its newline.
+    mutating func scan(_ handle: (Line) -> Void) {
         let keys: [URLResourceKey] = [.contentModificationDateKey, .fileSizeKey]
         guard let en = FileManager.default.enumerator(at: root, includingPropertiesForKeys: keys,
                                                       options: [.skipsHiddenFiles]) else { return }
-        let cutoff = Date().addingTimeInterval(-Double(windowDays) * 86_400)
+        let now = Date()
+        let cutoff = now.addingTimeInterval(-Double(windowDays) * 86_400)
+        let recentCutoff = now.addingTimeInterval(-recentDays * 86_400)
         var live: [String: UInt64] = [:]
         changed = []
         for case let url as URL in en where url.pathExtension == "jsonl" {
@@ -211,9 +224,10 @@ struct JSONLTail {
                   let mtime = rv.contentModificationDate, mtime >= cutoff,
                   let size = rv.fileSize.map(UInt64.init) else { continue }
             var offset = offsets[url.path] ?? 0
-            if size < offset { offset = 0 } // file was rewritten
+            if size < offset { offset = 0 } // file was rewritten shorter
             if size > offset {
-                offset = read(url, from: offset) { handle(url.path, $0) }
+                let path = url.path, recent = mtime >= recentCutoff
+                offset = read(url, from: offset) { handle(Line(path: path, json: $0, recent: recent)) }
                 changed.insert(url.path)
             }
             live[url.path] = offset
@@ -221,10 +235,21 @@ struct JSONLTail {
         offsets = live // forget deleted files and ones that aged out of the window
     }
 
-    private func read(_ url: URL, from offset: UInt64, _ handle: ([String: Any]) -> Void) -> UInt64 {
-        guard let h = try? FileHandle(forReadingFrom: url) else { return offset }
+    private func matches(_ line: Data) -> Bool {
+        needles.contains { line.range(of: $0) != nil }
+    }
+
+    private func read(_ url: URL, from start: UInt64, _ handle: ([String: Any]?) -> Void) -> UInt64 {
+        guard let h = try? FileHandle(forReadingFrom: url) else { return start }
         defer { try? h.close() }
-        guard (try? h.seek(toOffset: offset)) != nil else { return offset }
+        var offset = start
+        // Every saved offset sits just after a newline. If that byte isn't one any more, the file was rewritten
+        // (possibly longer than before), so read it again from the top rather than from the middle of a line.
+        if offset > 0 {
+            guard (try? h.seek(toOffset: offset - 1)) != nil else { return start }
+            if (try? h.read(upToCount: 1)) != Data([0x0A]) { offset = 0 }
+        }
+        guard (try? h.seek(toOffset: offset)) != nil else { return start }
         var consumed = offset
         var carry = Data()
         while true {
@@ -236,9 +261,8 @@ struct JSONLTail {
                 while start <= lastNL {
                     let end = carry[start...lastNL].firstIndex(of: 0x0A)!
                     let line = carry[start..<end]
-                    if line.range(of: needle) != nil,
-                       let obj = try? JSONSerialization.jsonObject(with: line) as? [String: Any] {
-                        handle(obj)
+                    if !line.isEmpty, matches(line) {
+                        handle(try? JSONSerialization.jsonObject(with: line) as? [String: Any])
                     }
                     start = end + 1
                 }
@@ -277,7 +301,8 @@ final class ClaudeUsageScanner {
     }
 
     init(root: URL = ClaudeUsageScanner.defaultRoot, cache: URL? = nil) {
-        tail = JSONLTail(root: root, needle: "\"output_tokens\"")
+        // "assistant" too, so a record whose usage fields were renamed is still looked at (and counted as unreadable).
+        tail = JSONLTail(root: root, needles: ["\"output_tokens\"", "\"assistant\""])
         self.cache = cache.map { ScanCache(url: $0) }
         if let saved = self.cache?.load(), saved.root == root.path {
             tail.offsets = saved.offsets
@@ -289,11 +314,13 @@ final class ClaudeUsageScanner {
 
     func scan() -> UsageSummary {
         guard tail.exists else { return .empty }
-        var currentFile = ""
-        tail.scan { path, obj in
-            currentFile = path
-            health.candidates += 1
-            if ingest(obj, file: currentFile) { health.parsed += 1 }
+        tail.scan { line in
+            guard let obj = line.json else { health.record(false, recent: line.recent); return }
+            switch ingest(obj, file: line.path) {
+            case .read: health.record(true, recent: line.recent)
+            case .unreadable: health.record(false, recent: line.recent)
+            case .notUsage: break
+            }
         }
         let now = Date()
         for path in tail.changed { lastActivity[path] = now; dirty = true }
@@ -313,14 +340,19 @@ final class ClaudeUsageScanner {
         dirty = false
     }
 
-    /// Returns whether the line had the shape we expect (even if it's deliberately skipped).
+    enum Ingest { case read, unreadable, notUsage }
+
+    /// `.read` when the line had the shape we expect (even if it's deliberately skipped), `.unreadable` for an
+    /// assistant record without readable usage, `.notUsage` for anything else that merely mentioned "assistant".
     @discardableResult
-    private func ingest(_ obj: [String: Any], file: String) -> Bool {
-        guard let msg = obj["message"] as? [String: Any], let u = msg["usage"] as? [String: Any] else { return false }
+    private func ingest(_ obj: [String: Any], file: String) -> Ingest {
+        guard let msg = obj["message"] as? [String: Any], let u = msg["usage"] as? [String: Any] else {
+            return obj["type"] as? String == "assistant" ? .unreadable : .notUsage
+        }
         guard obj["type"] as? String == "assistant",
-              let ts = obj["timestamp"] as? String, let date = Date.fromISO(ts) else { return true }
+              let ts = obj["timestamp"] as? String, let date = Date.fromISO(ts) else { return .read }
         let model = msg["model"] as? String ?? "unknown"
-        if model == "<synthetic>" { return true }
+        if model == "<synthetic>" { return .read }
 
         let t = TokenTotals(input: u["input_tokens"] as? Int ?? 0,
                             output: u["output_tokens"] as? Int ?? 0,
@@ -334,19 +366,30 @@ final class ClaudeUsageScanner {
 
         let project = (obj["cwd"] as? String).map(Fmt.project(fromCwd:)) ?? "unknown"
         book.add(delta, at: date, model: Fmt.model(model), project: project, session: obj["sessionId"] as? String)
-        return true
+        return .read
     }
 }
 
-/// Counts lines that look like usage records against lines we could actually read.
-/// Many candidates and zero successes means the tool changed its log format.
+/// Judges whether a tool's log format still reads, from the latest usage records in recently modified files.
+/// A run of unreadable records with none readable in between means the format changed. It is judged on what was
+/// written lately, not on everything since launch, so a change while Dashbar has been running for days still shows,
+/// and the warning clears once records read again.
 struct FormatHealth {
     let source: String
-    var candidates = 0
-    var parsed = 0
+    /// How many unreadable records in a row it takes.
+    static let threshold = 20
+    private(set) var unreadableRun = 0
+
+    init(source: String) { self.source = source }
+
+    /// Records one line that looked like a usage record. Lines from files untouched for days don't count.
+    mutating func record(_ readable: Bool, recent: Bool = true) {
+        guard recent else { return }
+        unreadableRun = readable ? 0 : unreadableRun + 1
+    }
 
     var warning: String? {
-        candidates >= 20 && parsed == 0
+        unreadableRun >= Self.threshold
             ? "Couldn't read \(source) usage. Its log format may have changed, so check for a Dashbar update."
             : nil
     }
@@ -354,7 +397,7 @@ struct FormatHealth {
 
 // MARK: - Codex
 
-struct RateLimit: Identifiable, Codable {
+struct RateLimit: Identifiable, Codable, Equatable {
     var id: String { label }
     let label: String
     let usedPercent: Double
@@ -430,7 +473,8 @@ final class CodexUsageScanner {
     }
 
     init(root: URL = CodexUsageScanner.defaultRoot, cache: URL? = nil) {
-        tail = JSONLTail(root: root, needle: "\"type\":\"")
+        // Codex writes compact JSON today; the spaced form is accepted too so a formatting change isn't mistaken for no usage.
+        tail = JSONLTail(root: root, needles: ["\"type\":\"", "\"type\": \""])
         self.cache = cache.map { ScanCache(url: $0) }
         if let saved = self.cache?.load(), saved.root == root.path {
             tail.offsets = saved.offsets
@@ -453,7 +497,10 @@ final class CodexUsageScanner {
 
     func scan() -> UsageSummary {
         guard tail.exists else { return .empty }
-        tail.scan { path, obj in ingest(path, obj) }
+        tail.scan { line in
+            guard let obj = line.json else { health.record(false, recent: line.recent); return }
+            ingest(line.path, obj, recent: line.recent)
+        }
         if !tail.changed.isEmpty { dirty = true }
         // Keep per-file context only for files still in the scan window.
         fileCtx = fileCtx.filter { tail.offsets[$0.key] != nil }
@@ -463,7 +510,7 @@ final class CodexUsageScanner {
         return s
     }
 
-    private func ingest(_ path: String, _ obj: [String: Any]) {
+    private func ingest(_ path: String, _ obj: [String: Any], recent: Bool) {
         guard let payload = obj["payload"] as? [String: Any] else { return }
         var ctx = fileCtx[path] ?? FileContext()
         defer { fileCtx[path] = ctx }
@@ -476,12 +523,13 @@ final class CodexUsageScanner {
             if let cwd = payload["cwd"] as? String { ctx.project = Fmt.project(fromCwd: cwd) }
         case "event_msg" where payload["type"] as? String == "token_count":
             let date = (obj["timestamp"] as? String).flatMap(Date.fromISO) ?? Date()
-            health.candidates += 1
             // `info` is null on the first event of a session; only a present-but-unreadable shape counts against us.
-            if payload["info"] is NSNull || payload["info"] == nil { health.parsed += 1 }
-            if let info = payload["info"] as? [String: Any],
+            let info = payload["info"]
+            if !(info == nil || info is NSNull) {
+                health.record((info as? [String: Any])?["total_token_usage"] is [String: Any], recent: recent)
+            }
+            if let info = info as? [String: Any],
                let total = info["total_token_usage"] as? [String: Any] {
-                health.parsed += 1
                 let input = total["input_tokens"] as? Int ?? 0
                 let cached = total["cached_input_tokens"] as? Int ?? 0
                 let output = (total["output_tokens"] as? Int ?? 0)

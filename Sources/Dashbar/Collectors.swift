@@ -3,7 +3,7 @@ import Darwin
 
 // MARK: - Live Claude Code sessions (~/.claude/sessions/<pid>.json)
 
-struct LiveSession: Identifiable {
+struct LiveSession: Identifiable, Equatable {
     let id: String
     let pid: Int32
     let name: String
@@ -51,12 +51,31 @@ struct LiveSession: Identifiable {
 enum ClaudeSessions {
     static let defaultDir = homeDir.appendingPathComponent(".claude/sessions")
 
-    static func read(dir: URL = ClaudeSessions.defaultDir) -> [LiveSession] {
-        guard let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else { return [] }
+    /// Live sessions, plus a warning when session files exist but none can be read.
+    struct Reading: Equatable {
+        var sessions: [LiveSession] = []
+        var warning: String?
+    }
+
+    static let formatWarning = "Couldn't read Claude Code's live sessions. Its session file format may have changed, so check for a Dashbar update."
+
+    static func read(dir: URL = ClaudeSessions.defaultDir) -> [LiveSession] { readChecked(dir: dir).sessions }
+
+    /// Every session file that parses is checked for the keys Dashbar relies on, live process or not. If some parse
+    /// but none has them (or no live one says what it's doing), Claude Code changed the format: say so rather than
+    /// showing "no agents".
+    static func readChecked(dir: URL = ClaudeSessions.defaultDir) -> Reading {
+        guard let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else { return Reading() }
+        var parsed = 0, recognised = 0, withStatus = 0
         let sessions: [LiveSession] = files.filter { $0.pathExtension == "json" }.compactMap { url in
+            // A file being written right now may not parse yet; it isn't evidence either way.
             guard let data = try? Data(contentsOf: url),
-                  let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let pid = (o["pid"] as? Int).map(Int32.init), isAlive(pid) else { return nil }
+                  let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+            parsed += 1
+            guard let pid = (o["pid"] as? Int).map(Int32.init) else { return nil }
+            recognised += 1
+            guard isAlive(pid) else { return nil }
+            if o["status"] is String { withStatus += 1 }
             let cwd = o["cwd"] as? String ?? ""
             let ms = (o["statusUpdatedAt"] as? Double) ?? (o["updatedAt"] as? Double) ?? (o["startedAt"] as? Double) ?? 0
             return LiveSession(
@@ -70,7 +89,9 @@ enum ClaudeSessions {
                 root: cwd.isEmpty ? homeDir.path : Fmt.root(fromCwd: cwd),
                 waitingFor: o["waitingFor"] as? String)
         }
-        return sessions.sorted { ($0.urgency, $1.since) < ($1.urgency, $0.since) }
+        let unreadable = parsed > 0 && recognised == 0 || !sessions.isEmpty && withStatus == 0
+        return Reading(sessions: sessions.sorted { ($0.urgency, $1.since) < ($1.urgency, $0.since) },
+                       warning: unreadable ? formatWarning : nil)
     }
 
     static func isAlive(_ pid: Int32) -> Bool {
@@ -80,7 +101,7 @@ enum ClaudeSessions {
 
 // MARK: - Other agent processes
 
-struct AgentProcess: Identifiable {
+struct AgentProcess: Identifiable, Equatable {
     var id: String { name }
     let name: String
     let count: Int
@@ -117,7 +138,7 @@ enum AgentProcesses {
 
 // MARK: - Listening TCP ports
 
-struct Listener: Identifiable {
+struct Listener: Identifiable, Equatable {
     var id: String { "\(pid):\(port)" }
     let pid: Int32
     let port: Int
@@ -161,6 +182,24 @@ enum Listeners {
         "com.docker.backend", "vfkit", "esbuild", "turbo", "pnpm", "npm", "yarn", "flask", "django-admin",
     ]
 
+    /// Whether a listening process is a dev server, from its process name, command line and working folder alone.
+    static func isDevServer(command: String, cmdline: String, cwd: String) -> Bool {
+        let probe = Listener(pid: 0, port: 0, command: command, address: "", cmdline: cmdline)
+        if probe.isDocker { return true }
+        let exe = URL(fileURLWithPath: cmdline.split(separator: " ").first.map(String.init) ?? command).lastPathComponent.lowercased()
+        // Helpers bundled inside Mac apps (Raycast's node, sync clients…) aren't dev servers.
+        // Developer toolchains also live inside bundles (Xcode's Python, Python.org's framework build).
+        let toolchain = cmdline.contains("/Contents/Developer/") || cmdline.contains("Python.framework/")
+            || cmdline.contains("Python3.framework/")
+        let insideApp = !toolchain && cmdline.contains(".app/Contents/")
+            || cmdline.contains("/Library/Application Support/")
+            || cwd.contains("/Library/Application Support/")
+        guard !insideApp else { return false }
+        return devExecutables.contains(exe) || exe.hasPrefix("python")
+            // The process name says "node" but the process renamed itself (e.g. "Raycast Backend"): an app helper.
+            || devExecutables.contains(command) && cmdline.contains(command)
+    }
+
     static func read() -> [Listener] {
         var result: [String: Listener] = [:]
         var cwds: [Int32: String] = [:]
@@ -195,18 +234,7 @@ enum Listeners {
             if !cwd.isEmpty, cwd != "/", cwd != homeDir.path, !cwd.contains("/Library/") {
                 listeners[i].root = Fmt.root(fromCwd: cwd)
             }
-            let exe = URL(fileURLWithPath: listeners[i].cmdline.split(separator: " ").first.map(String.init) ?? l.command).lastPathComponent.lowercased()
-            // Helpers bundled inside Mac apps (Raycast's node, sync clients…) aren't dev servers.
-            // Developer toolchains also live inside bundles (Xcode's Python, Python.org's framework build).
-            let toolchain = listeners[i].cmdline.contains("/Contents/Developer/") || listeners[i].cmdline.contains("Python.framework/")
-                || listeners[i].cmdline.contains("Python3.framework/")
-            let insideApp = !toolchain && listeners[i].cmdline.contains(".app/Contents/")
-                || listeners[i].cmdline.contains("/Library/Application Support/")
-                || cwd.contains("/Library/Application Support/")
-            listeners[i].isDev = listeners[i].isDocker || !insideApp && (
-                devExecutables.contains(exe) || exe.hasPrefix("python")
-                    // lsof says "node" but the process renamed itself (e.g. "Raycast Backend"): an app helper.
-                    || devExecutables.contains(l.command) && listeners[i].cmdline.contains(l.command))
+            listeners[i].isDev = isDevServer(command: l.command, cmdline: listeners[i].cmdline, cwd: cwd)
         }
         return listeners.sorted { ($0.isDev ? 0 : 1, $0.port) < ($1.isDev ? 0 : 1, $1.port) }
     }

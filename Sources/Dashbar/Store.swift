@@ -18,7 +18,9 @@ final class Store: ObservableObject {
     @Published var cpuHistory: [Double] = []
     @Published var cleanup: [CleanupItem] = []
     @Published var cleanupScanned = false
-    @Published var lastUpdated = Date()
+    /// When live data last arrived. Deliberately not published: setting it on every refresh would redraw every view
+    /// that observes the store.
+    var lastUpdated = Date()
     @Published var usageLoading = true
     @Published var paused = false
     @Published var topApps: [AppUsage] = []
@@ -36,6 +38,11 @@ final class Store: ObservableObject {
     @Published var claudeSigningIn = false
     /// A failed user action, phrased with what to do next. Shown until dismissed.
     @Published var notice: String?
+    /// Set when Claude Code's session files exist but can't be read (see `ClaudeSessions.readChecked`).
+    @Published var sessionsWarning: String?
+
+    /// A log or session format Dashbar can no longer read. Shown instead of quietly reporting nothing.
+    var formatWarning: String? { claude.warning ?? codex.warning ?? sessionsWarning }
 
     var busyCount: Int { sessions.filter(\.isBusy).count }
     var waitingCount: Int { sessions.filter(\.isWaiting).count }
@@ -69,6 +76,9 @@ final class Store: ObservableObject {
     private var transitions = SessionTransitions()
     private var tick = 0
     private var timer: Timer?
+    /// When the last clean-up scan started. It runs again only while a window is open, or on opening once stale.
+    private var lastCleanupScan: Date?
+    private static let cleanupInterval: TimeInterval = 600
     private var subscriptions = Set<AnyCancellable>()
     private var watcher: FileWatcher?
     /// Which windows (the menu bar panel, the popout) are on screen, as reported by their views. Closed until one opens.
@@ -97,6 +107,7 @@ final class Store: ObservableObject {
             guard let self else { return }
             AppWindow.shared.show(store: self, page: .tab(.agents))   // the plan limits live there
         }
+        worker.start(live: { [weak self] in self?.apply($0) }, usage: { [weak self] in self?.apply($0) })
         refresh(usage: true, servers: true, panel: true)
         scanCleanup()
         startTimer()
@@ -151,7 +162,7 @@ final class Store: ObservableObject {
         }
         if tick % every(300) == 0 { refreshClaudePlan() }   // every 5 minutes
         if minute { watcher?.restart() }            // pick up folders created since launch
-        if tick % every(600) == 0 { scanCleanup() }
+        if panelVisible, tick % every(Self.cleanupInterval) == 0 { scanCleanup() }   // nothing shows it while closed
     }
 
     private func filesChanged() {
@@ -181,6 +192,7 @@ final class Store: ObservableObject {
         guard surfaces.set(visible, surface: surface) else { return }
         if visible && !paused {
             refresh(usage: false, servers: true, panel: true)   // fresh on open
+            if let last = lastCleanupScan, Date().timeIntervalSince(last) > Self.cleanupInterval { scanCleanup() }
             if let fetched = claudePlan?.fetchedAt, Date().timeIntervalSince(fetched) > 120 { refreshClaudePlan() }
         }
     }
@@ -288,6 +300,7 @@ final class Store: ObservableObject {
     func scanCleanup() {
         guard !isDemo else { return }
         let roots = settings.scanRoots.map { URL(fileURLWithPath: $0) }
+        lastCleanupScan = Date()
         worker.scanCleanup(roots: roots) { [weak self] items in
             self?.cleanup = items
             self?.cleanupScanned = true
@@ -317,39 +330,67 @@ final class Store: ObservableObject {
 
     /// `panel` adds what only the open panel shows (other agent processes, busiest apps) and implies `system`.
     /// `system` samples CPU, memory, network, GPU and battery, which the menu bar stats also need.
+    /// Live data and the usage scan run separately, so a long scan never holds up sessions and servers.
     private func refresh(usage: Bool, servers: Bool, panel: Bool, system: Bool = false) {
         guard !isDemo else { return }
-        worker.collect(usage: usage, servers: servers, panel: panel, system: system || panel) { [weak self] r in
-            guard let self else { return }
-            self.trackTransitions(r.sessions)
-            self.sessions = r.sessions
-            self.contexts = r.contexts
-            if let a = r.agents { self.otherAgents = a }
-            if let sys = r.system {
-                self.system = sys
-                self.cpuHistory = Array((self.cpuHistory + [sys.cpu]).suffix(40))
-                self.history.append(sys)
-            }
-            if let apps = r.topApps { self.topApps = apps }
-            if let usage = r.workspaceUsage {
-                self.workspaceUsage = usage
-                var history = self.workspaceHistory.filter { usage[$0.key] != nil }
-                for (root, u) in usage { history[root, default: WorkspaceHistory()].append(u) }
-                self.workspaceHistory = history
-            }
-            if let l = r.listeners { self.listeners = l }
-            if let s = r.spawned { self.spawned = s }
-            if let c = r.claude { self.claude = c; self.usageLoading = false }
-            if let c = r.codex { self.codex = c; self.codexLimits = r.codexLimits; self.checkLimits() }
-            self.lastUpdated = Date()
+        worker.requestLive(.init(servers: servers, panel: panel, system: system || panel))
+        if usage { worker.requestUsage() }
+    }
+
+    /// Assigns only what changed, so views that observe the store redraw when there is something new to show.
+    private func update<T: Equatable>(_ keyPath: ReferenceWritableKeyPath<Store, T>, _ value: T) {
+        if self[keyPath: keyPath] != value { self[keyPath: keyPath] = value }
+    }
+
+    private func apply(_ r: Worker.LiveResult) {
+        trackTransitions(r.sessions)
+        update(\.sessions, r.sessions)
+        update(\.sessionsWarning, r.sessionsWarning)
+        update(\.contexts, r.contexts)
+        if let a = r.agents { update(\.otherAgents, a) }
+        if let sys = r.system {
+            update(\.system, sys)
+            cpuHistory = Array((cpuHistory + [sys.cpu]).suffix(40))
+            history.append(sys)
         }
+        if let apps = r.topApps { update(\.topApps, apps) }
+        if let usage = r.workspaceUsage {
+            update(\.workspaceUsage, usage)
+            var history = workspaceHistory.filter { usage[$0.key] != nil }
+            for (root, u) in usage { history[root, default: WorkspaceHistory()].append(u) }
+            update(\.workspaceHistory, history)
+        }
+        if let l = r.listeners { update(\.listeners, l) }
+        if let s = r.spawned { update(\.spawned, s) }
+        lastUpdated = Date()
+    }
+
+    private func apply(_ r: Worker.UsageResult) {
+        update(\.claude, r.claude)
+        update(\.usageLoading, false)
+        update(\.codex, r.codex)
+        update(\.codexLimits, r.codexLimits)
+        checkLimits()
     }
 }
 
-/// Owns all collectors and runs them on background queues.
+/// Owns all collectors and runs them on background queues: live data (sessions, servers, system) on one,
+/// the usage scan on another, so the first scan of a large log folder never holds up the rest.
 final class Worker: @unchecked Sendable {
-    struct Result {
+    /// What a live refresh should read beyond the sessions, which it always reads.
+    struct LiveRequest: Equatable {
+        var servers = false
+        var panel = false
+        var system = false
+
+        func merged(with other: LiveRequest) -> LiveRequest {
+            LiveRequest(servers: servers || other.servers, panel: panel || other.panel, system: system || other.system)
+        }
+    }
+
+    struct LiveResult {
         var sessions: [LiveSession] = []
+        var sessionsWarning: String?
         var contexts: [String: ContextInfo] = [:]
         var agents: [AgentProcess]?
         var system: SystemSnapshot?
@@ -357,62 +398,102 @@ final class Worker: @unchecked Sendable {
         var listeners: [Listener]?
         var spawned: [Int32: SpawnedProcesses]?
         var workspaceUsage: [String: WorkspaceUsage]?
-        var claude: UsageSummary?
-        var codex: UsageSummary?
-        var codexLimits: [RateLimit] = []
     }
 
-    private let queue = DispatchQueue(label: "dashbar.worker", qos: .utility)
+    struct UsageResult {
+        var claude: UsageSummary
+        var codex: UsageSummary
+        var codexLimits: [RateLimit]
+    }
+
+    private let liveQueue = DispatchQueue(label: "dashbar.live", qos: .utility)
+    private let usageQueue = DispatchQueue(label: "dashbar.usage", qos: .utility)
     private let cleanupQueue = DispatchQueue(label: "dashbar.cleanup", qos: .background)
-    // Created on the worker queue at first use, so loading saved progress never blocks the main thread.
+    private lazy var live = Coalescer<LiveRequest>(queue: liveQueue, merge: { $0.merged(with: $1) }) { [unowned self] in
+        self.collectLive($0)
+    }
+    private lazy var usage = Coalescer<Void>(queue: usageQueue, merge: { _, _ in () }) { [unowned self] in
+        self.scanUsage()
+    }
+    // Created on the usage queue at first use, so loading saved progress never blocks the main thread.
     private lazy var claudeScanner = ClaudeUsageScanner(cache: ScanCache<ClaudeUsageScanner.State>.defaultURL("claude-usage.json"))
     private lazy var codexScanner = CodexUsageScanner(cache: ScanCache<CodexUsageScanner.State>.defaultURL("codex-usage.json"))
     private let contextReader = ContextReader()
     private let sampler = SystemSampler()
     private let serverActivity = ServerActivity()
     private let workspaceSampler = WorkspaceSampler()
-    /// Servers are read every few ticks; workspace sampling uses the latest reading in between.
+    /// Servers are read every few ticks; workspace sampling uses the latest reading in between. Live queue only.
     private var lastListeners: [Listener] = []
-    private var lastSave = Date()
+    /// Usage queue only. Nil until the first scan, which is saved straight away: it is the expensive one.
+    private var lastSave: Date?
+    private let stopLock = NSLock()
+    private var stopped = false
+    private var onLive: (@MainActor (LiveResult) -> Void)?
+    private var onUsage: (@MainActor (UsageResult) -> Void)?
 
-    func collect(usage: Bool, servers: Bool, panel: Bool, system: Bool, done: @escaping @MainActor (Result) -> Void) {
-        queue.async { [self] in
-            var r = Result()
-            r.sessions = ClaudeSessions.read()
-            r.contexts = contextReader.read(r.sessions)
-            if system { r.system = sampler.sample() }
-            if servers {
-                var listeners = Listeners.read()
-                serverActivity.annotate(&listeners)
-                r.spawned = ProcessTree.spawned(sessions: r.sessions, listeners: &listeners)
-                r.listeners = listeners
-                lastListeners = listeners
-            }
-            if panel {
-                r.agents = AgentProcesses.read()
-                r.topApps = sampler.topApps()
-                let workspaces = Workspace.build(sessions: r.sessions,
-                                                 servers: lastListeners.filter { $0.isDev && $0.root != nil && !$0.isDocker })
-                var anchors: [pid_t: String] = [:]
-                for w in workspaces {
-                    for s in w.sessions { anchors[s.pid] = w.root }
-                    for l in w.servers { anchors[l.pid] = w.root }
-                }
-                r.workspaceUsage = workspaceSampler.sample(roots: workspaces.map(\.root), anchors: anchors)
-            }
-            if usage {
-                r.claude = claudeScanner.scan()
-                r.codex = codexScanner.scan()
-                r.codexLimits = codexScanner.limits
-                if Date().timeIntervalSince(lastSave) > 30 { save() }
-            }
-            let result = r
-            DispatchQueue.main.async { done(result) }
-        }
+    /// Sets where results go. Call once, on the main thread, before the first request.
+    func start(live: @escaping @MainActor (LiveResult) -> Void, usage: @escaping @MainActor (UsageResult) -> Void) {
+        onLive = live
+        onUsage = usage
     }
 
-    /// Saves scan progress immediately; called as the app quits.
-    func saveNow() { queue.sync { save() } }
+    /// Requests that arrive while one is already waiting merge into it, so ticks and file events never pile up.
+    func requestLive(_ request: LiveRequest) { live.submit(request) }
+    func requestUsage() { usage.submit(()) }
+
+    private var isStopped: Bool { stopLock.withLock { stopped } }
+
+    private func collectLive(_ req: LiveRequest) {
+        guard !isStopped else { return }
+        var r = LiveResult()
+        let reading = ClaudeSessions.readChecked()
+        r.sessions = reading.sessions
+        r.sessionsWarning = reading.warning
+        r.contexts = contextReader.read(r.sessions)
+        if req.system { r.system = sampler.sample() }
+        if req.servers {
+            var listeners = Listeners.read()
+            serverActivity.annotate(&listeners)
+            r.spawned = ProcessTree.spawned(sessions: r.sessions, listeners: &listeners)
+            r.listeners = listeners
+            lastListeners = listeners
+        }
+        if req.panel {
+            r.agents = AgentProcesses.read()
+            r.topApps = sampler.topApps()
+            let workspaces = Workspace.build(sessions: r.sessions,
+                                             servers: lastListeners.filter { $0.isDev && $0.root != nil && !$0.isDocker })
+            var anchors: [pid_t: String] = [:]
+            for w in workspaces {
+                for s in w.sessions { anchors[s.pid] = w.root }
+                for l in w.servers { anchors[l.pid] = w.root }
+            }
+            r.workspaceUsage = workspaceSampler.sample(roots: workspaces.map(\.root), anchors: anchors)
+        }
+        let result = r, done = onLive
+        DispatchQueue.main.async { done?(result) }
+    }
+
+    private func scanUsage() {
+        guard !isStopped else { return }
+        let result = UsageResult(claude: claudeScanner.scan(), codex: codexScanner.scan(), codexLimits: codexScanner.limits)
+        if lastSave.map({ Date().timeIntervalSince($0) > 30 }) ?? true { save() }
+        let done = onUsage
+        DispatchQueue.main.async { done?(result) }
+    }
+
+    /// Saves scan progress as the app quits. Waits at most `timeout` for a scan in progress, so quitting never hangs:
+    /// if the scan runs longer, the last save (made after the first scan, then every 30 s) stays, and the next launch
+    /// reads on from there. Saves are written atomically, so an interrupted one never leaves a broken file.
+    func saveNow(timeout: TimeInterval = 2) {
+        stopLock.withLock { stopped = true }   // queued refreshes are skipped from here on
+        let saved = DispatchSemaphore(value: 0)
+        usageQueue.async { [self] in
+            save()
+            saved.signal()
+        }
+        _ = saved.wait(timeout: .now() + timeout)
+    }
 
     private func save() {
         claudeScanner.save()
@@ -424,6 +505,41 @@ final class Worker: @unchecked Sendable {
         cleanupQueue.async {
             let items = Cleanup.scan(roots: roots)
             DispatchQueue.main.async { done(items) }
+        }
+    }
+}
+
+/// Runs jobs on a serial queue with at most one waiting. A request that arrives while one is waiting merges into it,
+/// so a burst of timer ticks and file events becomes a single job, and one more after the job that is running.
+final class Coalescer<Request>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var pending: Request?
+    private let queue: DispatchQueue
+    private let merge: (Request, Request) -> Request
+    private let run: (Request) -> Void
+
+    init(queue: DispatchQueue, merge: @escaping (Request, Request) -> Request, run: @escaping (Request) -> Void) {
+        self.queue = queue
+        self.merge = merge
+        self.run = run
+    }
+
+    func submit(_ request: Request) {
+        let schedule: Bool = lock.withLock {
+            if let waiting = pending {
+                pending = merge(waiting, request)
+                return false
+            }
+            pending = request
+            return true
+        }
+        guard schedule else { return }
+        queue.async { [self] in
+            let next: Request? = lock.withLock {
+                defer { pending = nil }
+                return pending
+            }
+            if let next { run(next) }
         }
     }
 }
