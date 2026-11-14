@@ -186,7 +186,7 @@ enum DemoData {
         ]
         store.usageLoading = false
 
-        // Claude plan limits (only shown with the Labs setting, which --demo switches on in memory)
+        // Claude plan limits (only shown with the plan limits setting, which --demo switches on in memory)
         store.claudePlan = ClaudePlanLimits.Result(limits: [
             RateLimit(label: "5-hour", usedPercent: 55, resetsAt: now.addingTimeInterval(2.2 * 3600), window: 5 * 3600),
             RateLimit(label: "Weekly", usedPercent: 38, resetsAt: now.addingTimeInterval(3.5 * 86400), window: 7 * 86400),

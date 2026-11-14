@@ -271,14 +271,14 @@ struct OnboardingView: View {
         OnboardingRow(symbol: "gauge.with.dots.needle.33percent", title: "Claude plan limits",
                       detail: "Your 5-hour and weekly limits. Off until you choose to turn them on.") {
             if settings.showsClaudeLimits && !snapshot { Done(text: "On") }
-            else { Button("Set Up…") { SettingsOpener.open(.labs) } }
+            else { Button("Set Up…") { SettingsOpener.open(.claudeLimits) } }
         }
     }
 
     private var cleanup: some View {
         OnboardingRow(symbol: "folder", title: "Clean-up",
                       detail: "Looks for rebuildable caches, like node_modules, in \(folders). Nothing goes to the Trash until you confirm.") {
-            Button("Change…") { SettingsOpener.open(.folders) }
+            Button("Change…") { SettingsOpener.open(.cleanupFolders) }
         }
     }
 

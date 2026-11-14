@@ -53,8 +53,8 @@ DASHBAR_ISLAND_STYLE=floating Dashbar --snapshot out.png --demo --island collaps
 Dashbar --snapshot x --demo --island permission --onscreen    # the real panel at the real notch for 8s (screencapture -R)
 Dashbar --snapshot x --demo --island live --onscreen          # the real controller: an agent finishes at 1s, folds away at 6s
 Dashbar --snapshot out.png --demo --onboarding [--dark]       # the first-run window, with invented folders
-Dashbar --snapshot out.png --demo --settings labs [--dark]    # one Settings tab: general, menuBar, folders, accounts, labs, about
-DASHBAR_DEMO_ACCOUNTS=2 DASHBAR_DEMO_PERMISSION=1 Dashbar --snapshot out.png --demo --settings labs  # two accounts, the hook in one
+Dashbar --snapshot out.png --demo --settings integrations [--dark]  # one Settings tab: general, notifications, menuBar, folders, accounts, integrations, about (DASHBAR_SETTINGS_HEIGHT=1200 to see a whole long tab)
+DASHBAR_DEMO_ACCOUNTS=2 DASHBAR_DEMO_PERMISSION=1 Dashbar --snapshot out.png --demo --settings integrations  # two accounts, the hook in one
 Dashbar --bench                                               # collector timings
 ```
 

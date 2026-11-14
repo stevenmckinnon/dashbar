@@ -19,7 +19,7 @@ struct HistoryPage: View {
                     .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
-                SettingsButton(tab: .labs) { Text("Settings…") }
+                SettingsButton(tab: .claudeLimits) { Text("Settings…") }
                     .buttonStyle(.link).font(.system(size: UI.Size.caption, weight: .medium))
             }
             .padding(UI.cardPadding).surface()

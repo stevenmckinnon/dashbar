@@ -366,8 +366,8 @@ struct PlanLimitsCard: View {
                     Text("Claude doesn't save plan limits on your Mac. Dashbar can read them from Claude Code's status line.")
                         .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    SettingsButton(tab: .labs) { Text("Settings…") }
-                        .help("Opens Settings at Labs, where “Show Claude plan limits” is")
+                    SettingsButton(tab: .claudeLimits) { Text("Settings…") }
+                        .help("Opens Settings at Integrations, where Claude plan limits are set up")
                         .buttonStyle(.link).font(.system(size: UI.Size.caption, weight: .medium))
                 }
             } else if let problem = store.claudePlan?.problem {
@@ -493,7 +493,7 @@ struct ClaudeAccountLimitsView: View {
                     Text("Add Dashbar to this account's status line to see its limits.")
                         .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    SettingsButton(tab: .accounts) { Text("Settings…") }
+                    SettingsButton(tab: .otherAccounts) { Text("Settings…") }
                         .buttonStyle(.link).font(.system(size: UI.Size.caption, weight: .medium))
                 }
             }

@@ -47,7 +47,7 @@ enum PermissionBridge {
     # there and waits a short while for you to click Allow or Deny, then hands Claude Code that answer. If you don't
     # answer in Dashbar, if Dashbar isn't running, or if anything goes wrong, it prints nothing and Claude Code asks you
     # in the terminal as usual. It never answers by itself and sends nothing anywhere.
-    # Remove it in Dashbar's Settings, under Labs.
+    # Remove it in Dashbar's Settings, under Integrations.
     dir="${DASHBAR_PERMISSION_DIR:-$HOME/Library/Application Support/Dashbar/Permissions}"
     umask 077
     id=

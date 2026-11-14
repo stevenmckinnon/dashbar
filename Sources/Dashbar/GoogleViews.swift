@@ -101,7 +101,7 @@ final class AntigravitySettings: ObservableObject {
     }
 }
 
-/// Labs → Antigravity: add or remove the status line bridge. Shown only when the Antigravity CLI is installed (its
+/// Integrations → Antigravity: add or remove the status line bridge. Shown only when the Antigravity CLI is installed (its
 /// settings folder exists) or the bridge is in.
 struct AntigravityLabsSection: View {
     @ObservedObject private var settings = AntigravitySettings.shared
