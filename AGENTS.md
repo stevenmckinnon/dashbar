@@ -48,6 +48,8 @@ DASHBAR_DEMO_STATUSLINE=1 Dashbar --snapshot out.png --demo # Claude plan limits
 Dashbar --snapshot x --demo --app --onscreen   # the window on screen for 8s (prints its number) for `screencapture -o -l`, which draws Liquid Glass
 Dashbar --snapshot out.png --demo --hosted                    # real scrolling panel, so native controls draw
 Dashbar --snapshot out.png --demo --onboarding [--dark]       # the first-run window, with invented folders
+Dashbar --snapshot out.png --demo --settings labs [--dark]    # one Settings tab: general, menuBar, folders, accounts, labs, about
+DASHBAR_DEMO_ACCOUNTS=2 DASHBAR_DEMO_PERMISSION=1 Dashbar --snapshot out.png --demo --settings labs  # two accounts, the hook in one
 Dashbar --bench                                               # collector timings
 ```
 
@@ -95,6 +97,9 @@ images stay clean.
   only, never `updatedPermissions` or `updatedInput`; leave `AskUserQuestion` and `ExitPlanMode` to Claude Code;
   keep the queue folder 0700, files 0600, ids 128 random bits; never copy file contents or edits into a request.
   Test the script only in temp folders with sample stdin; never wire it into the real Claude Code while developing.
+  (A live check, when asked for, goes in a throwaway project's `.claude/settings.local.json` with `DASHBAR_PERMISSION_DIR`
+  pointing at a temp queue, run as `claude --setting-sources project,local`. Claude Code shows its own prompt at once
+  beside the hook, and an answer there does not stop the hook.)
 - Never read, print, log or store Claude Code's token. Dashbar only reads its Keychain entry, with
   `/usr/bin/security` as Claude Code does (the entry trusts that tool, so macOS doesn't ask; reading it directly
   asked again after every renewal, since Claude Code rewrites the entry), keeps it in memory, makes one read-only request, and never refreshes or saves the sign-in. The reading it shares between

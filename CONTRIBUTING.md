@@ -25,7 +25,7 @@ For the site: `cd site && npm install && npm run build` must pass before you com
 ./build.sh --run        # build build/"Dashbar Local.app" and launch it
 ./build.sh --install    # copy to /Applications as "Dashbar Local" (needed for "Launch at login"), beside any installed release
 .build/release/Dashbar --snapshot out.png --dark   # render the panel to a PNG
-.build/release/Dashbar --snapshot settings.png --settings   # render the Settings window
+.build/release/Dashbar --snapshot settings.png --settings labs   # render one Settings tab (general, menuBar, folders, accounts, labs, about)
 ```
 
 `build.sh` makes a local build unless `DASHBAR_HARDENED=1`, which only `scripts/release.sh` sets. A local build is a

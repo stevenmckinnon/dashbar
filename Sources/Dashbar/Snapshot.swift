@@ -58,10 +58,13 @@ enum Snapshot {
                 }
                 exit(0)
             }
-            if CommandLine.arguments.contains("--settings") {
-                // The Settings window's General tab, laid out by AppKit so native controls draw.
-                let host = NSHostingView(rootView: SettingsView().environment(\.colorScheme, dark ? .dark : .light))
-                // Offline renders show the first tab; the others are checked by building SettingsView's tabs directly.
+            if let flag = CommandLine.arguments.firstIndex(of: "--settings") {
+                // A Settings tab, laid out by AppKit so native controls draw. `--settings labs` picks the tab (general,
+                // menuBar, folders, accounts, labs, about); without one it is the whole window, which offline shows General.
+                let next = CommandLine.arguments.dropFirst(flag + 1).first
+                let root: AnyView = next.flatMap(SettingsTab.init(rawValue:)).map { AnyView(SettingsView.page($0)) } ?? AnyView(SettingsView())
+                let host = NSHostingView(rootView: root.environment(\.colorScheme, dark ? .dark : .light)
+                    .background(Color(nsColor: .windowBackgroundColor)))
                 let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 480, height: 600), styleMask: [.titled], backing: .buffered, defer: false)
                 window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
                 window.contentView = host

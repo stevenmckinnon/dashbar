@@ -216,7 +216,19 @@ final class AppSettings: ObservableObject {
         menuLimit = defaults.bool(forKey: Key.menuLimit)
         // Demo renders show the plan limits without reading the Keychain; assigning here skips `didSet`, so nothing is saved.
         claudeLimits = defaults.bool(forKey: Key.claudeLimits) || CommandLine.arguments.contains("--demo")
-        if CommandLine.arguments.contains("--demo") { menuLimit = true }
+        if CommandLine.arguments.contains("--demo") {
+            menuLimit = true
+            // For `--settings` renders, in memory only: two Claude accounts, and the permission hook in the first.
+            let env = ProcessInfo.processInfo.environment
+            if env["DASHBAR_DEMO_ACCOUNTS"].flatMap(Int.init).map({ $0 >= 2 }) == true {
+                accounts = [AgentAccount(kind: .claude, path: AgentAccounts.defaultPath(.claude), label: "Personal"),
+                            AgentAccount(kind: .claude, path: homeDir.appendingPathComponent(".claude-work").path, label: "Work")]
+            }
+            if env["DASHBAR_DEMO_PERMISSION"] != nil {
+                claudePermissions = true
+                claudePermissionsStatus = .installed
+            }
+        }
     }
 }
 
@@ -245,6 +257,12 @@ enum SettingsOpener {
 extension View {
     /// Hands this scene's `openSettings` to `SettingsOpener`.
     func capturesSettingsOpener() -> some View { modifier(CaptureSettingsOpener()) }
+
+    /// A section footer: secondary, and ragged right from the leading edge (grouped forms otherwise set long footers
+    /// flush right, which reads as broken).
+    func settingsFooter() -> some View {
+        foregroundStyle(.secondary).multilineTextAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading)
+    }
 }
 
 private struct CaptureSettingsOpener: ViewModifier {
@@ -282,6 +300,22 @@ struct SettingsView: View {
             // An accessory app's windows open behind the frontmost app unless we activate.
             NSApp.activate(ignoringOtherApps: true)
         }
+    }
+
+    /// One tab's page on its own, at the window's width, for `--snapshot … --settings <tab>` (offline renders of the
+    /// TabView only ever draw its first tab).
+    @ViewBuilder static func page(_ tab: SettingsTab) -> some View {
+        Group {
+            switch tab {
+            case .general: GeneralSettings()
+            case .menuBar: MenuBarSettings()
+            case .folders: FolderSettings()
+            case .accounts: AccountSettings()
+            case .labs: LabsSettings()
+            case .about: AboutSettings()
+            }
+        }
+        .frame(width: 440)
     }
 }
 
@@ -365,7 +399,7 @@ private struct MenuBarSettings: View {
                 Text("The count of working agents always shows."
                      + (settings.showsClaudeLimits ? " Claude plan left shows a warning symbol when you're nearly out or on course to run out."
                                                    : " Claude plan left needs Claude plan limits, in Labs."))
-                    .foregroundStyle(.secondary)
+                    .settingsFooter()
             }
         }
         .formStyle(.grouped)
@@ -390,13 +424,13 @@ private struct LabsSettings: View {
             } header: {
                 Text("Claude plan limits")
             } footer: {
-                Text(statusLineExplanation).foregroundStyle(.secondary)
+                Text(statusLineExplanation).settingsFooter()
             }
             Section {
                 Toggle("Also ask Anthropic with Claude Code's sign-in", isOn: $settings.claudeLimits)
             } footer: {
                 Text("Experimental, and only needed if you'd rather not change Claude Code's status line. Reads Claude Code's sign-in from your Keychain, the same way Claude Code does, and asks an undocumented endpoint that may change. Never refreshes or saves the sign-in. When both are on, Dashbar shows the newer reading.")
-                    .foregroundStyle(.secondary)
+                    .settingsFooter()
             }
             Section {
                 if settings.claudeAccounts.count > 1 {
@@ -419,7 +453,7 @@ private struct LabsSettings: View {
             } header: {
                 Text("Claude Code permission prompts")
             } footer: {
-                Text(permissionsExplanation).foregroundStyle(.secondary)
+                Text(permissionsExplanation).settingsFooter()
             }
         }
         .formStyle(.grouped)
@@ -482,12 +516,10 @@ private struct LabsSettings: View {
     private var permissionsExplanation: String {
         let file = settings.claudeAccounts.count > 1 ? "that account's settings.json"
             : Fmt.tilde(PermissionBridge.Paths.default().settings.path)
-        return "Adding this puts one hook, PermissionRequest, in \(file), pointing at a small script. When Claude Code is about "
-            + "to ask you to allow a tool, Dashbar shows what it wants to do, with Allow once and Deny. Dashbar can only answer "
-            + "prompts Claude Code already shows you, never changes your permission rules and never answers by itself. The "
-            + "terminal keeps its own prompt the whole time, so you can answer in either place; after the wait, or if Dashbar "
-            + "isn't running, the terminal is the only place. Requests stay in a folder only you can "
-            + "read, and nothing is sent anywhere. A backup of the file is kept, and Remove takes out only Dashbar's hook."
+        return "Adds one PermissionRequest hook to \(file), pointing at a small script. When Claude Code asks to use a tool, "
+            + "Dashbar shows the request with Allow once and Deny. The terminal asks at the same time, so you can answer in "
+            + "either place. Dashbar never answers by itself or changes your permission rules. Requests stay in a folder only "
+            + "you can read, and nothing is sent anywhere. A backup of the file is kept; Remove takes out only Dashbar's hook."
     }
 
     @ViewBuilder private var statusLineRow: some View {
@@ -528,6 +560,8 @@ private struct LabsSettings: View {
             + "Adding Dashbar changes one setting, statusLine in \(file), to a small script that saves just those numbers "
             + "to a file on this Mac, then runs the status line you had, so it looks the same. A backup of the file is kept. "
             + "No network, no Keychain. Remove puts your previous status line back exactly."
+            + (settings.claudeAccounts.count > 1
+                ? " This is \(settings.claudeAccounts[0].label)'s; add other accounts' in Accounts." : "")
     }
 }
 
@@ -578,7 +612,7 @@ private struct FolderSettings: View {
                 Text("Clean-up scans these folders")
             } footer: {
                 Text("Dashbar looks for node_modules, .next, .turbo, .build and similar caches. Xcode's DerivedData is always included.")
-                    .foregroundStyle(.secondary)
+                    .settingsFooter()
             }
         }
         .formStyle(.grouped)
@@ -645,7 +679,7 @@ private struct AccountSettings: View {
             Text(kind == .claude
                  ? "Each account is a folder you run Claude Code with, set by CLAUDE_CONFIG_DIR (for example ~/.claude-work). Dashbar reads its sessions and usage, and names them by account once there's more than one. Plan limits come from each account's own status line."
                  : "Each account is a folder you run Codex with, set by CODEX_HOME. Dashbar reads its sessions for usage and limits.")
-                .foregroundStyle(.secondary)
+                .settingsFooter()
         }
     }
 
