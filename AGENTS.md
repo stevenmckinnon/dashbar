@@ -47,6 +47,8 @@ DASHBAR_APP_PAGE=storefront-web Dashbar --snapshot out.png --demo --app  # the D
 DASHBAR_APP_PAGE=history DASHBAR_APP_HEIGHT=1400 Dashbar --snapshot out.png --demo --app  # the History page, in a taller window
 DASHBAR_DEMO_ACCOUNTS=2 Dashbar --snapshot out.png --demo   # two Claude Code accounts, labelled
 DASHBAR_DEMO_STATUSLINE=1 Dashbar --snapshot out.png --demo # Claude plan limits read from the status line
+DASHBAR_DEMO_WORST=1 DASHBAR_DEMO_PERMISSION=1 Dashbar --snapshot out.png --demo --hosted  # worst case: 10 sessions, a server on 12 ports, a long command, 4 prompts
+DASHBAR_ISLAND_HEIGHT=1000 DASHBAR_DEMO_WORST=1 DASHBAR_DEMO_PERMISSION=1 Dashbar --snapshot out.png --demo --island list  # a tall island, uncropped
 Dashbar --snapshot x --demo --app --onscreen   # the window on screen for 8s (prints its number) for `screencapture -o -l`, which draws Liquid Glass
 Dashbar --snapshot out.png --demo --hosted                    # real scrolling panel, so native controls draw
 Dashbar --snapshot out.png --demo --island finished --dark    # the island over a made-up menu bar and notch: collapsed,

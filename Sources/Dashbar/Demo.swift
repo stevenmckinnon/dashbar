@@ -289,7 +289,49 @@ enum DemoData {
         ]
         store.cleanupScanned = true
         if ProcessInfo.processInfo.environment["DASHBAR_DEMO_GOOGLE"] != nil { applyGoogle(to: store, now: now) }
+        if ProcessInfo.processInfo.environment["DASHBAR_DEMO_WORST"] != nil { applyWorstCase(to: store, now: now, home: home) }
         applyHistory(to: store, now: now)
         store.lastUpdated = now
+    }
+
+    /// DASHBAR_DEMO_WORST=1: data that strains the layout. Ten sessions (the island lists five), a dev server on twelve
+    /// ports and, with DASHBAR_DEMO_PERMISSION=1, a long command and three more prompts (one with no session row).
+    @MainActor static func applyWorstCase(to store: Store, now: Date, home: String) {
+        func minutes(_ m: Double) -> Date { now.addingTimeInterval(-m * 60) }
+        let names = ["Tidy up the release script", "Port the importer to async", "Bump the design tokens",
+                     "Add retries to the sync job", "Write the onboarding copy", "Profile the search index"]
+        let extra = names.enumerated().map { i, name in
+            LiveSession(id: "w\(i)", pid: Int32(9200 + i), name: name, cwd: "\(home)/project-\(i + 1)",
+                        status: i < 2 && !store.permissionRequests.isEmpty ? "waiting" : i % 2 == 0 ? "busy" : "idle",
+                        since: minutes(Double(5 + i * 7)), entrypoint: "cli", root: "\(home)/project-\(i + 1)",
+                        waitingFor: i < 2 && !store.permissionRequests.isEmpty ? "permission prompt" : nil)
+        }
+        store.sessions += extra
+        // One process on twelve ports, outside any project (so the Servers card lists it on Overview too).
+        store.listeners += (8080...8091).map { port in
+            var l = Listener(pid: 9300, port: port, command: "node", address: "127.0.0.1")
+            l.cmdline = "node services/gateway.js"
+            l.isDev = true
+            l.memory = 96 * 1_048_576
+            l.started = minutes(300)
+            return l
+        }
+        guard var first = store.permissionRequests.first else { return }
+        let lines = ["set -euo pipefail", "npm ci", "npm run build", "npm test -- --runInBand",
+                     "rm -rf dist/tmp", "tar -czf release.tgz dist", "scp release.tgz deploy@staging.example:/srv/app/",
+                     "ssh deploy@staging.example 'cd /srv/app && tar -xzf release.tgz && ./restart.sh'",
+                     "curl -fsS https://staging.example/health", "echo done"]
+        first = PermissionRequest(id: first.id, sessionId: first.sessionId, cwd: first.cwd, tool: first.tool,
+                                  input: ["command": lines.joined(separator: " && \\\n  "), "description": "Build, test and deploy to staging"],
+                                  agentType: nil, created: first.created, expires: first.expires, pid: first.pid)
+        func request(_ n: Int, session: String, cwd: String, command: String) -> PermissionRequest {
+            PermissionRequest(id: String(repeating: "\(n)", count: 32), sessionId: session, cwd: cwd, tool: "Bash",
+                              input: ["command": command], agentType: nil, created: minutes(0.2), expires: minutes(0.2).addingTimeInterval(60),
+                              pid: Int32(9200 + n))
+        }
+        store.permissionRequests = [first,
+                                    request(1, session: "w0", cwd: "\(home)/project-1", command: "./scripts/release.sh --dry-run"),
+                                    request(2, session: "w1", cwd: "\(home)/project-2", command: "swift test"),
+                                    request(3, session: "gone", cwd: "\(home)/project-9", command: "make lint")]
     }
 }
