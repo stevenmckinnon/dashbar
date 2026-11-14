@@ -9,7 +9,7 @@ GitHub Pages. Read `README.md` for what the app does; this file is how to work o
 
 | Path | What it is |
 |---|---|
-| `Sources/Dashbar/` | The app. `DashboardView.swift` is the whole panel UI, `Store.swift` the state, `Collectors.swift`, `Usage.swift`, `PlanLimits.swift`, `SystemStats.swift` and `Proc.swift` read data, `Demo.swift` invents data for screenshots, `Snapshot.swift` renders PNGs, `Updater.swift` wraps Sparkle. `AppView.swift` and `AppWindow.swift` are the Dashbar window (sidebar and pages), `WorkspaceUsage.swift` what each workspace's processes use |
+| `Sources/Dashbar/` | The app. `DashboardView.swift` is the whole panel UI, `Store.swift` the state, `Collectors.swift`, `Usage.swift`, `PlanLimits.swift`, `SystemStats.swift` and `Proc.swift` read data, `Demo.swift` invents data for screenshots, `Snapshot.swift` renders PNGs, `Updater.swift` wraps Sparkle. `AppView.swift` and `AppWindow.swift` are the Dashbar window (sidebar and pages), `WorkspaceUsage.swift` what each workspace's processes use. `Accounts.swift` the extra Claude Code and Codex accounts, `StatusLineBridge.swift` and `PermissionBridge.swift` the opt-in Claude Code settings edits, `History.swift` and `HistoryView.swift` the History page, `Onboarding.swift` the first run, `Pricing.swift` the cost estimate |
 | `Tests/DashbarTests/` | Swift Testing suites that run against throwaway log folders (`Fixtures.swift`) |
 | `build.sh` | Builds the app into `build/`, signs it, embeds Sparkle. A local build is `Dashbar Local.app`; `scripts/release.sh` (via `DASHBAR_HARDENED=1`) makes the real `Dashbar.app`. Flags: `--run`, `--install` |
 | `scripts/release.sh` | Signed, notarised, stapled DMG plus the Sparkle `appcast.xml` entry |
@@ -42,6 +42,9 @@ DASHBAR_DEMO_WAITING=1 Dashbar --snapshot out.png --demo     # the same, with on
 DASHBAR_DEMO_PERMISSION=1 Dashbar --snapshot out.png --demo  # the same, with the prompt answerable in Dashbar
 DASHBAR_DEMO_RATE_LIMITED=1 Dashbar --snapshot out.png --demo  # the Claude plan limits rate-limited wait (=stale: kept limits)
 DASHBAR_APP_PAGE=storefront-web Dashbar --snapshot out.png --demo --app  # the Dashbar window (a tab name or a workspace)
+DASHBAR_APP_PAGE=history DASHBAR_APP_HEIGHT=1400 Dashbar --snapshot out.png --demo --app  # the History page, in a taller window
+DASHBAR_DEMO_ACCOUNTS=2 Dashbar --snapshot out.png --demo   # two Claude Code accounts, labelled
+DASHBAR_DEMO_STATUSLINE=1 Dashbar --snapshot out.png --demo # Claude plan limits read from the status line
 Dashbar --snapshot x --demo --app --onscreen   # the window on screen for 8s (prints its number) for `screencapture -o -l`, which draws Liquid Glass
 Dashbar --snapshot out.png --demo --hosted                    # real scrolling panel, so native controls draw
 Dashbar --snapshot out.png --demo --onboarding [--dark]       # the first-run window, with invented folders
