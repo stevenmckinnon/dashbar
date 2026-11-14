@@ -81,6 +81,11 @@ struct ServerRow: View {
         return line
     }
 
+    /// The port chips a row shows: the first two, and how many more there are.
+    static func portChips(_ ports: [Int], max: Int = 2) -> (shown: [Int], more: Int) {
+        ports.count <= max ? (ports, 0) : (Array(ports.prefix(max)), ports.count - max)
+    }
+
     /// Actions show on hover, and also whenever one of them holds keyboard focus. The window always shows them.
     private var revealed: Bool { inWindow || hover || confirmStop || focusedAction != nil }
 
@@ -91,15 +96,22 @@ struct ServerRow: View {
 
     var body: some View {
         HStack(spacing: 9) {
+            // The first two ports and "+N", as workspace rows do, so a server on many ports never pushes its name out.
+            let ports = [listener.port] + extraPorts
+            let chips = Self.portChips(ports)
             HStack(spacing: 4) {
-                ForEach([listener.port] + extraPorts, id: \.self) { port in
-                    Text(verbatim: ":" + String(port))
+                ForEach(chips.shown.map { ":" + String($0) } + (chips.more > 0 ? ["+\(chips.more)"] : []), id: \.self) { label in
+                    Text(verbatim: label)
                         .font(.system(size: UI.Size.caption, weight: .semibold, design: .rounded).monospacedDigit())
                         .padding(.horizontal, 6).padding(.vertical, 2)
                         .background(Capsule().fill((compact ? Color.secondary : UI.textInfo).opacity(compact ? 0.14 : 0.12)))
                         .foregroundStyle(compact ? UI.textSecondary : UI.textInfo)
                 }
             }
+            .fixedSize()
+            .help(chips.more > 0 ? "Ports " + ports.map { ":" + String($0) }.joined(separator: ", ") : "")
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel((ports.count == 1 ? "Port " : "Ports ") + ports.map(String.init).joined(separator: ", "))
             VStack(alignment: .leading, spacing: 1) {
                 Text(inWorkspace ? listener.hint : listener.title)
                     .font(.system(size: UI.Size.body, weight: .medium, design: inWorkspace ? .monospaced : .default))
