@@ -17,6 +17,18 @@ enum Bench {
         let s = time("Claude scan (first)") { scanner.scan() }
         _ = time("Claude scan (incremental)") { scanner.scan() }
         print("  today \(Fmt.tokens(s.today.total)) tokens, \(s.today.messages) msgs, format \(s.warning == nil ? "reads" : "WARNING")")
+        print("  of which subagents: today \(Fmt.tokens(s.period(.today).subagentTokens)), 7d \(Fmt.tokens(s.period(.week).subagentTokens))")
+        // Counts only: never descriptions or anything else from the transcripts.
+        let live = ClaudeSessions.read()
+        let locator = ContextReader()
+        let subagents = SubagentReader()
+        let closed = time("Subagents (panel closed)") { subagents.read(live, transcript: { locator.transcript(for: $0) }, detail: false) }
+        let open = time("Subagents (first open)") { subagents.read(live, transcript: { locator.transcript(for: $0) }, detail: true) }
+        _ = time("Subagents (open, again)", runs: 5) { subagents.read(live, transcript: { locator.transcript(for: $0) }, detail: true) }
+        let all = open.bySession.values.flatMap { $0 }
+        print("  live sessions: \(live.count), with subagents: \(open.bySession.count), subagents running: \(open.runningCount) "
+              + "(\(all.running.filter(\.background).count) background), just finished: \(all.count - all.running.count), "
+              + "closed count matches: \(closed.runningCount == open.runningCount), format \(open.warning == nil ? "reads" : "WARNING")")
         let cacheURL = FileManager.default.temporaryDirectory.appendingPathComponent("dashbar-bench-\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: cacheURL) }
         let warm = ClaudeUsageScanner(cache: cacheURL)

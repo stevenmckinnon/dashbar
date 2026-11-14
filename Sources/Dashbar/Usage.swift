@@ -38,6 +38,9 @@ struct DayUsage: Codable {
     var costByProject: [String: Double] = [:]
     /// Tokens from models with no known price, which the cost leaves out.
     var unpricedByModel: [String: Int] = [:]
+    /// The share of `totals` (and of the cost) that subagents used. Already counted above, never added again.
+    var subagentTokens = 0
+    var subagentCost: Double = 0
 }
 
 struct DayPoint: Identifiable, Equatable {
@@ -79,6 +82,9 @@ struct PeriodUsage: Equatable {
     var cost: Double = 0
     /// Models (display names) whose tokens have no price, so `cost` leaves them out.
     var unpriced: [String] = []
+    /// Of `totals` and `cost`, what subagents (Agent and Task tool runs) used.
+    var subagentTokens = 0
+    var subagentCost: Double = 0
 }
 
 struct UsageSummary: Equatable {
@@ -129,7 +135,7 @@ struct UsageBook: Codable {
 
     /// `cost` is the estimate for `t` at API list prices; nil means the model has no known price.
     mutating func add(_ t: TokenTotals, at date: Date, model: String, project: String, session: String? = nil,
-                      cost: Double? = nil) {
+                      cost: Double? = nil, subagent: Bool = false) {
         guard t.total > 0 || t.messages > 0 else { return }
         let key = Self.dayKey.string(from: date)
         var d = days[key] ?? DayUsage()
@@ -141,6 +147,10 @@ struct UsageBook: Codable {
             d.costByProject[project, default: 0] += cost
         } else if t.total > 0 {
             d.unpricedByModel[model, default: 0] += t.total
+        }
+        if subagent {
+            d.subagentTokens += t.total
+            d.subagentCost += cost ?? 0
         }
         days[key] = d
 
@@ -182,6 +192,8 @@ struct UsageBook: Codable {
                 guard let date = cal.date(byAdding: .day, value: -offset, to: today),
                       let d = days[Self.dayKey.string(from: date)] else { continue }
                 usage.totals.add(d.totals)
+                usage.subagentTokens += d.subagentTokens
+                usage.subagentCost += d.subagentCost
                 for (k, v) in d.byModel { models[k, default: 0] += v }
                 for (k, v) in d.byProject { projects[k, default: 0] += v }
                 for (k, v) in d.costByModel { modelCost[k, default: 0] += v; usage.cost += v }
@@ -403,7 +415,11 @@ final class ClaudeUsageScanner {
         let cost = Pricing.cost(delta, model: model, promptTokens: t.input + t.cacheRead + t.cacheWrite,
                                 oneHourShare: t.cacheWrite > 0 ? Double(oneHour) / Double(t.cacheWrite) : 0,
                                 fast: u["speed"] as? String == "fast", usOnly: u["inference_geo"] as? String == "us")
-        book.add(delta, at: date, model: Fmt.model(model), project: project, session: obj["sessionId"] as? String, cost: cost)
+        // A subagent's records sit in `<sessionId>/subagents/agent-<id>.jsonl`, apart from the main transcript, so each
+        // reply is counted once: in the project its own working folder belongs to.
+        let subagent = obj["isSidechain"] as? Bool == true || file.contains("/subagents/")
+        book.add(delta, at: date, model: Fmt.model(model), project: project, session: obj["sessionId"] as? String, cost: cost,
+                 subagent: subagent)
         return .read
     }
 }
@@ -609,7 +625,8 @@ final class CodexUsageScanner {
 /// file is ignored, and the scan simply starts from scratch.
 struct ScanCache<State: Codable> {
     /// 2: days carry estimated cost, so older progress is dropped and the last 30 days are read again once.
-    static var version: Int { 2 }
+    /// 3: days carry the subagents' share.
+    static var version: Int { 3 }
     let url: URL
 
     private struct Envelope: Codable {

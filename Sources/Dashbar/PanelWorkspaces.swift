@@ -138,15 +138,20 @@ struct WorkspaceRow: View {
 }
 
 struct WorkspaceStatus: View {
+    @EnvironmentObject var store: Store
     let workspace: Workspace
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
             Text(text(now: ctx.date))
                 .font(.system(size: UI.Size.caption).monospacedDigit())
                 .foregroundStyle(workspace.isWaiting ? AnyShapeStyle(UI.textAttention)
-                                 : workspace.isBusy ? AnyShapeStyle(UI.textSuccess) : AnyShapeStyle(UI.textSecondary))
+                                 : workspace.isBusy || subagentsRunning ? AnyShapeStyle(UI.textSuccess) : AnyShapeStyle(UI.textSecondary))
                 .lineLimit(1)
         }
+    }
+
+    private var subagentsRunning: Bool {
+        workspace.sessions.contains { !store.subagents(for: $0).running.isEmpty }
     }
 
     private func text(now: Date) -> String {
@@ -155,8 +160,13 @@ struct WorkspaceStatus: View {
         if let waiting = s.first(where: \.isWaiting) {
             return "\(waiting.waitingSentence) · \(Fmt.ago(waiting.since, now: now))" + more
         }
+        let subagents = s.reduce(0) { $0 + store.subagents(for: $1).running.count }
+        let helpers = subagents == 0 ? "" : subagents == 1 ? " · 1 subagent" : " · \(subagents) subagents"
         if let busy = s.first(where: \.isBusy) {
-            return "Claude is working · \(Fmt.ago(busy.since, now: now))" + more
+            return "Claude is working · \(Fmt.ago(busy.since, now: now))" + helpers + more
+        }
+        if subagents > 0 {   // the session waits while its background subagents work
+            return (subagents == 1 ? "1 subagent working" : "\(subagents) subagents working") + more
         }
         if let idle = s.first {
             return "Claude idle for \(Fmt.ago(idle.since, now: now))" + more

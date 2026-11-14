@@ -181,5 +181,7 @@ extension DayUsage {
         for (k, v) in o.costByModel { costByModel[k, default: 0] += v }
         for (k, v) in o.costByProject { costByProject[k, default: 0] += v }
         for (k, v) in o.unpricedByModel { unpricedByModel[k, default: 0] += v }
+        subagentTokens += o.subagentTokens
+        subagentCost += o.subagentCost
     }
 }
