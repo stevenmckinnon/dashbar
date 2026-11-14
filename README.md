@@ -71,6 +71,18 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
   copies of Dashbar on the same Mac share their last reading (`~/Library/Caches/Dashbar/claude-plan.json`,
   percentages and reset times only) so only one of them asks. With both on, Dashbar shows the newer reading
   and doesn't ask while the status line's is current.
+- **Answer permission prompts** (off by default, in Labs): when Claude Code is about to ask you to allow a tool,
+  Dashbar shows what it wants to do (the command, file or address) under that session, in the window and on the
+  "needs permission" notification, with Allow once and Deny. Open session hands the prompt back to the terminal
+  and takes you there. Choosing Add to Claude Code puts one
+  [`PermissionRequest` hook](https://code.claude.com/docs/en/hooks#permissionrequest) in `~/.claude/settings.json`
+  (after a backup, keeping any hooks you have) pointing at
+  `~/Library/Application Support/Dashbar/claude-permission-bridge.sh`. The script leaves the request in
+  `~/Library/Application Support/Dashbar/Permissions` (readable only by you, file contents and edits left out)
+  and waits up to a minute (adjustable) for your answer. It never answers by itself: if you don't answer, Dashbar
+  isn't running, or anything goes wrong, it prints nothing and Claude Code asks in the terminal as usual. Allow
+  once adds nothing to your permission rules, and Deny tells Claude you said no. Dashbar can only answer prompts
+  Claude Code would show you anyway. Remove takes out only Dashbar's hook.
 
 The menu bar shows the number of working Claude sessions beside the icon, and the icon's bar fills while any are working.
 
@@ -107,6 +119,11 @@ folders. Claude plan limits come from Claude Code's status line: with your conse
 setting so a local script saves your usage percentages to a file, and it sends nothing. The only network
 requests are update checks and the optional experimental plan-limits setting, which sends Claude Code's own
 sign-in to Anthropic's usage endpoint, the same call Claude Code makes.
+
+Answering permission prompts is the one feature that acts on an agent, and only when you click Allow or Deny.
+Requests and answers pass through files only your user can read, named with 128 random bits. Another program
+running as you could write an answer file, but such a program could equally type into your terminal or edit
+Claude Code's settings, so this opens nothing new to it. Nothing about the request leaves your Mac.
 
 ## Licence
 

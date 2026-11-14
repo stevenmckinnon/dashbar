@@ -39,6 +39,7 @@ binary cannot find `Sparkle.framework`):
 ```bash
 DASHBAR_TAB=agents Dashbar --snapshot out.png --demo --dark   # render a tab with invented data
 DASHBAR_DEMO_WAITING=1 Dashbar --snapshot out.png --demo     # the same, with one agent waiting for permission
+DASHBAR_DEMO_PERMISSION=1 Dashbar --snapshot out.png --demo  # the same, with the prompt answerable in Dashbar
 DASHBAR_DEMO_RATE_LIMITED=1 Dashbar --snapshot out.png --demo  # the Claude plan limits rate-limited wait (=stale: kept limits)
 DASHBAR_APP_PAGE=storefront-web Dashbar --snapshot out.png --demo --app  # the Dashbar window (a tab name or a workspace)
 Dashbar --snapshot x --demo --app --onscreen   # the window on screen for 8s (prints its number) for `screencapture -o -l`, which draws Liquid Glass
@@ -83,6 +84,14 @@ images stay clean.
   and a timestamp (never prompts, paths, session ids or tokens), must always run the user's previous status line
   unchanged, and sends nothing. Never touch the real `~/.claude` in tests or while developing: the installer
   takes the settings path as a parameter, so use temp folders.
+- Answering permission prompts (`PermissionBridge.swift`, `PermissionPrompt.swift`) is the first feature that acts
+  on agents. Its rules: strictly opt-in (the hook is added only when the user presses Add to Claude Code, with the
+  same settings-editing care as the status line, and Remove takes out only Dashbar's handler); never auto-approve
+  (the script prints a decision only for an answer file Dashbar writes when the user clicks); fail to the terminal
+  prompt (timeout, Dashbar not running, a missing folder or any error print nothing and exit 0); Allow is once
+  only, never `updatedPermissions` or `updatedInput`; leave `AskUserQuestion` and `ExitPlanMode` to Claude Code;
+  keep the queue folder 0700, files 0600, ids 128 random bits; never copy file contents or edits into a request.
+  Test the script only in temp folders with sample stdin; never wire it into the real Claude Code while developing.
 - Never read, print, log or store Claude Code's token. Dashbar only reads its Keychain entry, with
   `/usr/bin/security` as Claude Code does (the entry trusts that tool, so macOS doesn't ask; reading it directly
   asked again after every renewal, since Claude Code rewrites the entry), keeps it in memory, makes one read-only request, and never refreshes or saves the sign-in. The reading it shares between
