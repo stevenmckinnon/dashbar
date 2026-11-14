@@ -350,7 +350,7 @@ struct LimitBar: View {
     }
 }
 
-/// One tool's limit rows. Two or more at 0% used fold into a quiet "N more at 0%" line that opens to show them, so the
+/// One tool's limit rows. In a list of more than three, two or more at 0% used fold into a quiet "N more at 0%" line that opens to show them, so the
 /// card leads with the limits in use; the tightest limit always keeps its row (`RateLimit.fold`).
 struct LimitList: View {
     let limits: [RateLimit]

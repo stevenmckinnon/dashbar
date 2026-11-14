@@ -485,9 +485,14 @@ extension RateLimit {
         return "\(max(1, Int(hours.rounded())))-hour"
     }
 
-    /// Limits worth a row of their own, and the rest folded into "N more at 0%": with two or more at 0% used, those
-    /// are folded away, except the tightest limit (the most used, or the first when all are at 0%), which always shows.
+    /// Limits worth a row of their own, and the rest folded into "N more at 0%". Only a long list folds (more than
+    /// `foldAbove` rows, like Antigravity's five): three or fewer always all show, since those are the main limits
+    /// people look for (Claude's 5-hour, Weekly and Extra usage). In a long list, two or more at 0% used are folded
+    /// away, except the tightest limit (the most used, or the first when all are at 0%), which always shows.
+    static let foldAbove = 3
+
     static func fold(_ limits: [RateLimit]) -> (shown: [RateLimit], folded: [RateLimit]) {
+        guard limits.count > foldAbove else { return (limits, []) }
         func isZero(_ l: RateLimit) -> Bool { Int(max(0, l.usedPercent).rounded()) == 0 }
         let zeros = limits.filter(isZero)
         guard zeros.count >= 2 else { return (limits, []) }

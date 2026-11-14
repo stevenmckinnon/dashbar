@@ -86,17 +86,28 @@ import Testing
 
     @Test func zeroRowsFoldButTheTightestLimitStays() {
         func l(_ name: String, _ used: Double) -> RateLimit { RateLimit(label: name, usedPercent: used, resetsAt: nil) }
-        // One row at 0% is not worth folding.
-        #expect(RateLimit.fold([l("a", 7), l("b", 0), l("c", 27)]).folded.isEmpty)
+        // Only one row at 0% in a long list is not worth folding.
+        #expect(RateLimit.fold([l("a", 7), l("b", 0), l("c", 27), l("d", 4)]).folded.isEmpty)
         let some = RateLimit.fold([l("a", 0), l("b", 3), l("c", 0), l("d", 0.2)])
         #expect(some.shown.map(\.label) == ["b"])
         #expect(some.folded.map(\.label) == ["a", "c", "d"])
-        // All at 0%: the first stays, the rest fold.
-        let none = RateLimit.fold([l("a", 0), l("b", 0), l("c", 0)])
+        // All at 0% in a long list: the first stays, the rest fold.
+        let none = RateLimit.fold([l("a", 0), l("b", 0), l("c", 0), l("d", 0)])
         #expect(none.shown.map(\.label) == ["a"])
-        #expect(none.folded.map(\.label) == ["b", "c"])
-        // Two zeros, one of them the tightest: only one would fold, so nothing does.
+        #expect(none.folded.map(\.label) == ["b", "c", "d"])
+        // Under half a percent reads as 0%, so it folds too.
+        #expect(RateLimit.fold([l("a", 0), l("b", 0.4), l("c", 5), l("d", 9)]).folded.map(\.label) == ["a", "b"])
+    }
+
+    @Test func threeOrFewerLimitRowsNeverFold() {
+        func l(_ name: String, _ used: Double) -> RateLimit { RateLimit(label: name, usedPercent: used, resetsAt: nil) }
+        // Claude early in its windows: the 5-hour and Weekly limits are the ones people look for, so all three show.
+        let claude = RateLimit.fold([l("5-hour", 0), l("Weekly", 0), l("Extra usage", 27)])
+        #expect(claude.shown.map(\.label) == ["5-hour", "Weekly", "Extra usage"])
+        #expect(claude.folded.isEmpty)
+        #expect(RateLimit.fold([l("a", 0), l("b", 0), l("c", 0)]).folded.isEmpty)
         #expect(RateLimit.fold([l("a", 0), l("b", 0)]).folded.isEmpty)
+        #expect(RateLimit.fold([l("a", 0)]).shown.count == 1)
     }
 
     @Test func paceCaptionsAllSayWhatIsLeftAtThisRate() {
