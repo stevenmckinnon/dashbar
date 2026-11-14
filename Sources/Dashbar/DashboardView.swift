@@ -358,7 +358,7 @@ struct BottomBar: View {
             .modifier(SearchFieldSurface())
 
             Menu {
-                SettingsLink { Text("Settings…") }
+                SettingsButton { Text("Settings…") }
                     .keyboardShortcut(",")
                 Divider()
                 Toggle("Notify when an agent finishes", isOn: $notify)

@@ -307,8 +307,9 @@ enum SettingsTab: String, CaseIterable {
 enum SettingsOpener {
     static var action: OpenSettingsAction?
 
-    static func open(_ tab: SettingsTab, using openSettings: OpenSettingsAction? = nil) {
-        UserDefaults.standard.set(tab.rawValue, forKey: SettingsTab.key)
+    /// - Parameter tab: the tab to show; nil keeps the one Settings was left on.
+    static func open(_ tab: SettingsTab?, using openSettings: OpenSettingsAction? = nil) {
+        if let tab { UserDefaults.standard.set(tab.rawValue, forKey: SettingsTab.key) }
         NSApp.activate(ignoringOtherApps: true)
         if let open = openSettings ?? action { open() } else { NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) }
         // SwiftUI creates or reuses the window after this returns.
@@ -338,7 +339,7 @@ enum SettingsOpener {
         }
         // Above the Dashbar window when that one is kept on top.
         window.level = UserDefaults.standard.bool(forKey: AppWindow.floatKey) ? .floating : .normal
-        NSApp.activate()
+        NSApp.activate(ignoringOtherApps: true)   // the plain call is only a request, often refused for an accessory app
         window.makeKeyAndOrderFront(nil)
         window.orderFrontRegardless()
     }
@@ -362,9 +363,10 @@ private struct CaptureSettingsOpener: ViewModifier {
     }
 }
 
-/// "Settings…" that opens on the tab where the setting lives, rather than wherever Settings was left.
+/// "Settings…" that opens on the tab where the setting lives (or, with no tab, wherever Settings was left), and brings
+/// an already open Settings window to the front, which SwiftUI's `SettingsLink` doesn't.
 struct SettingsButton<Label: View>: View {
-    let tab: SettingsTab
+    var tab: SettingsTab? = nil
     @ViewBuilder var label: Label
     @Environment(\.openSettings) private var openSettings
 

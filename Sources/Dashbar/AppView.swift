@@ -168,7 +168,7 @@ private struct SidebarFooter: View {
             }
             Spacer()
             Menu {
-                SettingsLink { Text("Settings…") }
+                SettingsButton { Text("Settings…") }
                 if updater.isAvailable {
                     Button("Check for Updates…") { updater.checkForUpdates() }.disabled(!updater.canCheck)
                 }
