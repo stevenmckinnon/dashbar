@@ -269,6 +269,7 @@ enum DemoData {
             CleanupItem(path: "~/Library/Developer/Xcode/DerivedData", kind: "DerivedData", project: "Xcode", size: 2_300_000_000),
         ]
         store.cleanupScanned = true
+        if ProcessInfo.processInfo.environment["DASHBAR_DEMO_GOOGLE"] != nil { applyGoogle(to: store, now: now) }
         applyHistory(to: store, now: now)
         store.lastUpdated = now
     }

@@ -18,6 +18,8 @@ struct LiveSession: Identifiable, Equatable {
     var account: String? = nil
     /// The account's configuration folder, where its transcripts are. Nil means the default.
     var configDir: String? = nil
+    /// Claude Code, or one of Google's agents (`Google.swift`).
+    var agent: SessionAgent = .claude
 
     var project: String { URL(fileURLWithPath: root).lastPathComponent }
     var isBusy: Bool { status == "busy" }
@@ -34,9 +36,9 @@ struct LiveSession: Identifiable, Equatable {
     /// Sentence form for rows and notifications: "Claude needs permission".
     var waitingSentence: String {
         switch waitingFor {
-        case "permission prompt": return "Claude needs permission"
-        case "input needed": return "Claude needs input"
-        default: return "Claude is waiting for you"
+        case "permission prompt": return "\(agent.name) needs permission"
+        case "input needed": return "\(agent.name) needs input"
+        default: return "\(agent.name) is waiting for you"
         }
     }
     /// Waiting first (someone has to act), then working, then idle.
@@ -134,7 +136,7 @@ enum AgentProcesses {
     static let known: [String: String] = [
         "codex": "Codex", "Codex": "Codex app",
         "cursor-agent": "Cursor Agent", "Cursor": "Cursor",
-        "gemini": "Gemini CLI", "aider": "Aider", "opencode": "opencode",
+        "aider": "Aider", "opencode": "opencode",
         "amp": "Amp", "goose": "Goose", "copilot": "Copilot CLI",
         "ollama": "Ollama", "LM Studio": "LM Studio",
         "T3 Code": "T3 Code", "T3 Code (Beta)": "T3 Code", "T3 Code (Alpha)": "T3 Code",

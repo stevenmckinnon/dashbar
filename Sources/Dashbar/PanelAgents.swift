@@ -14,6 +14,8 @@ struct UsageCard: View {
     var limits: [RateLimit] = []
     /// Each account's share, shown only with more than one account.
     var accounts: [AccountUsage] = []
+    /// Added to the cost's explanation (Antigravity's own estimates).
+    var costNote: String? = nil
     @State private var period = UsagePeriod.today
     @AppStorage(CostLine.showKey) private var showCost = true
 
@@ -39,7 +41,7 @@ struct UsageCard: View {
                         MiniStat(label: "Cache read", value: usage.totals.cacheRead)
                         MiniStat(label: "Cache write", value: usage.totals.cacheWrite)
                     }
-                    if showCost && usage.totals.total > 0 { CostLine(usage: usage) }
+                    if showCost && usage.totals.total > 0 { CostLine(usage: usage, note: costNote) }
                     HStack {
                         Text(period == .today ? "By hour, last 24 hours" : "By day, last \(period.days) days")
                             .font(.system(size: UI.Size.caption, weight: .medium)).foregroundStyle(UI.textSecondary)
@@ -142,6 +144,7 @@ struct MiniStat: View {
 struct CostLine: View {
     static let showKey = "showCost"
     let usage: PeriodUsage
+    var note: String? = nil
 
     var body: some View {
         let missing = usage.unpriced
@@ -159,8 +162,9 @@ struct CostLine: View {
             }
         }
         .help("An estimate of what these tokens would cost on the pay-as-you-go API, at list prices from \(Pricing.asOf). "
-              + "On a Claude or ChatGPT plan you pay the plan's price, not this."
-              + (missing.isEmpty ? "" : " Usage on models without a known price is left out."))
+              + "On a Claude, ChatGPT or Google AI plan you pay the plan's price, not this."
+              + (missing.isEmpty ? "" : " Usage on models without a known price is left out.")
+              + (note.map { " " + $0 } ?? ""))
         .accessibilityElement(children: .combine)
     }
 }
@@ -267,6 +271,7 @@ struct LimitBar: View {
 struct PlanLimitsCard: View {
     @EnvironmentObject var store: Store
     @ObservedObject private var settings = AppSettings.shared
+    @ObservedObject private var antigravity = AntigravitySettings.shared
 
     var body: some View {
         Card(title: "Plan limits", icon: "gauge.with.needle", tint: .green, count: nil) {
@@ -277,6 +282,10 @@ struct PlanLimitsCard: View {
                     ForEach(store.codexAccountLimits) { a in codexBlock(label: a.label, limits: a.limits) }
                 } else if store.codex.found {
                     codex
+                }
+                // Only for someone with the Antigravity CLI's bridge added, or a reading it left.
+                if store.antigravityLimits != nil || antigravity.status.isInstalled {
+                    AntigravityLimitsBlock(limits: store.antigravityLimits, connected: antigravity.status.isInstalled)
                 }
             }
         }

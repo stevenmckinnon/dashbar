@@ -10,6 +10,14 @@ final class Store: ObservableObject {
     @Published var claude = UsageSummary.empty
     @Published var codex = UsageSummary.empty
     @Published var codexLimits: [RateLimit] = []
+    /// Gemini CLI's and the Antigravity CLI's usage together (`Google.swift`). Not found for someone using neither.
+    @Published var google = UsageSummary.empty
+    /// Which of Google's tools that usage came from, for the card's title.
+    @Published var googleSources: [SessionAgent] = []
+    /// Antigravity's plan limits from its CLI's status line. Nil until the bridge has saved a reading.
+    @Published var antigravityLimits: AntigravityLimits?
+    /// A Google format Dashbar no longer reads (the Antigravity app's conversations).
+    @Published var googleWarning: String?
     /// Each account's usage, only while more than one Claude Code (or Codex) account is read; empty otherwise, so a
     /// single account looks exactly as before.
     @Published var claudeAccountUsage: [AccountUsage] = []
@@ -81,6 +89,15 @@ final class Store: ObservableObject {
                 guard let key = codexAccounts.first(where: { $0.path == a.path })?.key else { return nil }   // nil: the default
                 return HistoryAccount(label: a.label, key: key, limits: a.limits)
             }
+        case .antigravity:
+            // One card per model group, each its own series. A group with history but missing from today's reading
+            // keeps its card until its history ages out.
+            let current = antigravityLimits?.groups ?? []
+            var out = current.map { HistoryAccount(label: $0.name, key: AntigravityLimits.historyKey($0.key), limits: $0.limits) }
+            for key in planHistory.accounts(.antigravity).compactMap({ $0 }).sorted() where !out.contains(where: { $0.key == key }) {
+                out.append(HistoryAccount(label: "Earlier model group", key: key, limits: []))
+            }
+            return out
         }
     }
 
@@ -89,6 +106,7 @@ final class Store: ObservableObject {
         switch provider {
         case .claude: return claudeDefaultLabel
         case .codex: return codexAccounts.count > 1 ? codexAccounts.first?.label : nil
+        case .antigravity: return nil
         }
     }
 
@@ -114,7 +132,7 @@ final class Store: ObservableObject {
     }
 
     /// A log or session format Dashbar can no longer read. Shown instead of quietly reporting nothing.
-    var formatWarning: String? { claude.warning ?? codex.warning ?? sessionsWarning }
+    var formatWarning: String? { claude.warning ?? codex.warning ?? sessionsWarning ?? google.warning ?? googleWarning }
 
     var busyCount: Int { sessions.filter(\.isBusy).count }
     var waitingCount: Int { sessions.filter(\.isWaiting).count }
@@ -236,6 +254,7 @@ final class Store: ObservableObject {
         plan.$signingIn.removeDuplicates().assign(to: &$claudeSigningIn)
         plan.onUpdate = { [weak self] in self?.checkLimits() }
         settings.refreshClaudeStatusLine()
+        AntigravitySettings.shared.refresh()
         settings.$claudeLimits.removeDuplicates()
             .sink { [weak self] on in Task { @MainActor in self?.plan.setEndpointEnabled(on) } }
             .store(in: &subscriptions)
@@ -258,6 +277,7 @@ final class Store: ObservableObject {
         update(\.claudeDefaultLabel, claude.count > 1 ? claude.first?.label : nil)
         // Agent logs and session files change as agents work: react to that instead of polling.
         let paths = claude.flatMap { [$0.projectsDir.path, $0.sessionsDir.path] } + codex.map(\.sessionsDir.path)
+            + [GeminiUsageScanner.defaultRoot.path, AntigravityStatusLine.sessionsDir.path]   // skipped while missing
         if paths != watchedPaths {   // renaming an account changes nothing on disk
             watchedPaths = paths
             watcher = FileWatcher(paths: paths, latency: 1.5, queue: .main) { [weak self] in
@@ -319,6 +339,7 @@ final class Store: ObservableObject {
         if tick % every(300) == 0 {   // every 5 minutes
             settings.refreshClaudeStatusLine()   // notices the status line being changed outside Dashbar
             settings.refreshClaudePermissions()  // …and the permission hook
+            AntigravitySettings.shared.refresh() // …and the Antigravity CLI's status line
             refreshClaudePlan()
         } else if minute {
             plan.statusLineChanged()
@@ -349,6 +370,9 @@ final class Store: ObservableObject {
         for other in claudeAccountLimits where other.problem == nil {
             alerts += LimitAlerts.check(provider: "Claude (\(other.label))", limits: other.limits, sent: sentLimitAlerts)
         }
+        if let ag = antigravityLimits, ag.problem == nil {
+            alerts += LimitAlerts.check(provider: "Antigravity", limits: ag.flattened, sent: sentLimitAlerts)
+        }
         guard !alerts.isEmpty else { return }
         for alert in alerts {
             notifier.limit(alert)
@@ -377,6 +401,13 @@ final class Store: ObservableObject {
             // The default account's limits are `codexLimits`, recorded above.
             guard let at = other.fetchedAt, let key = codexAccounts.first(where: { $0.path == other.path })?.key else { continue }
             changed = planRecorder.record(other.limits, provider: .codex, account: key, at: at) || changed
+        }
+        // Antigravity: each model group as its own series, never in the default file (see `AntigravityLimits.historyKey`).
+        if let ag = antigravityLimits, ag.problem == nil, let at = ag.fetchedAt {
+            for group in ag.groups where !group.limits.isEmpty {
+                changed = planRecorder.record(group.limits, provider: .antigravity, account: AntigravityLimits.historyKey(group.key),
+                                              at: at) || changed
+            }
         }
         if changed || planHistory.isEmpty && !planRecorder.history.isEmpty { planHistory = planRecorder.history }
     }
@@ -578,6 +609,7 @@ final class Store: ObservableObject {
             applyPermissions(permissionRequests)   // marks their sessions, and drops prompts answered in the terminal
         }
         update(\.sessionsWarning, r.sessionsWarning)
+        update(\.googleWarning, r.googleWarning)
         update(\.contexts, r.contexts)
         if let a = r.agents { update(\.otherAgents, a) }
         if let sys = r.system {
@@ -605,6 +637,9 @@ final class Store: ObservableObject {
         update(\.claudeAccountUsage, r.claudeAccounts)
         update(\.codexAccountUsage, r.codexAccounts)
         update(\.codexAccountLimits, r.codexAccountLimits)
+        update(\.google, r.google)
+        update(\.googleSources, r.googleSources)
+        update(\.antigravityLimits, r.antigravityLimits)
         codexLimitsAt = r.codexLimitsAt
         checkLimits()
     }
@@ -627,6 +662,7 @@ final class Worker: @unchecked Sendable {
     struct LiveResult {
         var sessions: [LiveSession] = []
         var sessionsWarning: String?
+        var googleWarning: String?
         var contexts: [String: ContextInfo] = [:]
         var agents: [AgentProcess]?
         var system: SystemSnapshot?
@@ -646,6 +682,9 @@ final class Worker: @unchecked Sendable {
         var codexAccountLimits: [AccountLimits] = []
         /// When Codex reported `codexLimits` (the default account's).
         var codexLimitsAt = Date.distantPast
+        var google = UsageSummary.empty
+        var googleSources: [SessionAgent] = []
+        var antigravityLimits: AntigravityLimits?
     }
 
     private let liveQueue = DispatchQueue(label: "dashbar.live", qos: .utility)
@@ -666,6 +705,10 @@ final class Worker: @unchecked Sendable {
     private var claudeScanners: [String: ClaudeUsageScanner] = [:]
     private var codexScanners: [String: CodexUsageScanner] = [:]
     private let contextReader = ContextReader()
+    /// Google's agents' live sessions (live queue only), and their usage (usage queue only, created at first use).
+    private let googleCollector = GoogleCollector()
+    private var geminiScanner: GeminiUsageScanner?
+    private var antigravityUsage: AntigravityUsageTracker?
     private let sampler = SystemSampler()
     private let serverActivity = ServerActivity()
     private let workspaceSampler = WorkspaceSampler()
@@ -705,14 +748,17 @@ final class Worker: @unchecked Sendable {
         guard !isStopped else { return }
         var r = LiveResult()
         let reading = ClaudeSessions.readChecked(accounts: accounts.claude)
-        r.sessions = reading.sessions
         r.sessionsWarning = reading.warning
-        r.contexts = contextReader.read(r.sessions)
+        r.contexts = contextReader.read(reading.sessions)
+        let google = googleCollector.read()
+        r.sessions = google.sessions.isEmpty ? reading.sessions
+            : (reading.sessions + google.sessions).sorted { ($0.urgency, $1.since) < ($1.urgency, $0.since) }
+        r.googleWarning = google.warning
         if req.system { r.system = sampler.sample() }
         if req.servers {
             var listeners = Listeners.read()
             serverActivity.annotate(&listeners)
-            r.spawned = ProcessTree.spawned(sessions: r.sessions, listeners: &listeners)
+            r.spawned = ProcessTree.spawned(sessions: r.sessions.filter { $0.pid > 0 }, listeners: &listeners)
             r.listeners = listeners
             lastListeners = listeners
         }
@@ -723,7 +769,7 @@ final class Worker: @unchecked Sendable {
                                              servers: lastListeners.filter { $0.isDev && $0.root != nil && !$0.isDocker })
             var anchors: [pid_t: String] = [:]
             for w in workspaces {
-                for s in w.sessions { anchors[s.pid] = w.root }
+                for s in w.sessions where s.pid > 0 { anchors[s.pid] = w.root }   // the Antigravity app's have none
                 for l in w.servers { anchors[l.pid] = w.root }
             }
             r.workspaceUsage = workspaceSampler.sample(roots: workspaces.map(\.root), anchors: anchors)
@@ -766,6 +812,8 @@ final class Worker: @unchecked Sendable {
                               fetchedAt: $0.scanner.limitsStamp > .distantPast ? $0.scanner.limitsStamp : nil)
             }
         }
+        (result.google, result.googleSources) = scanGoogle()
+        result.antigravityLimits = AntigravityStatusLine.readLimits()
         if lastSave.map({ Date().timeIntervalSince($0) > 30 }) ?? true { save() }
         let done = onUsage
         DispatchQueue.main.async { done?(result) }
@@ -784,9 +832,29 @@ final class Worker: @unchecked Sendable {
         _ = saved.wait(timeout: .now() + timeout)
     }
 
+    /// Gemini CLI's logs and the Antigravity CLI's session totals, as one summary. Empty for someone using neither.
+    private func scanGoogle() -> (UsageSummary, [SessionAgent]) {
+        let gemini = geminiScanner ?? GeminiUsageScanner(cache: ScanCache<GeminiUsageScanner.State>.defaultURL("gemini-usage"))
+        geminiScanner = gemini
+        let geminiSummary = gemini.scan()
+        let agy = antigravityUsage
+            ?? AntigravityUsageTracker(cache: ScanCache<AntigravityUsageTracker.State>.defaultURL("antigravity-usage"))
+        antigravityUsage = agy
+        agy.scan()
+        var books: [UsageBook] = [], sources: [SessionAgent] = []
+        if geminiSummary.found { books.append(gemini.currentBook); sources.append(.geminiCLI) }
+        if agy.found { books.append(agy.book); sources.append(.antigravityCLI) }
+        guard !books.isEmpty else { return (.empty, []) }
+        var summary = (books.count == 1 ? books[0] : UsageBook.merged(books)).summary(found: true)
+        summary.warning = geminiSummary.warning
+        return (summary, sources)
+    }
+
     private func save() {
         for scanner in claudeScanners.values { scanner.save() }
         for scanner in codexScanners.values { scanner.save() }
+        geminiScanner?.save()
+        antigravityUsage?.save()
         lastSave = Date()
     }
 

@@ -156,10 +156,10 @@ struct WorkspaceStatus: View {
             return "\(waiting.waitingSentence) · \(Fmt.ago(waiting.since, now: now))" + more
         }
         if let busy = s.first(where: \.isBusy) {
-            return "Claude is working · \(Fmt.ago(busy.since, now: now))" + more
+            return "\(busy.agent.name) is working · \(Fmt.ago(busy.since, now: now))" + more
         }
         if let idle = s.first {
-            return "Claude idle for \(Fmt.ago(idle.since, now: now))" + more
+            return "\(idle.agent.name) idle for \(Fmt.ago(idle.since, now: now))" + more
         }
         return workspace.servers.map(\.hint).uniqued().prefix(2).joined(separator: " · ")
     }
@@ -177,7 +177,11 @@ struct SessionLine: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(session.name).font(.system(size: UI.Size.body, weight: .medium)).lineLimit(1)
                         .help("\(session.name)\n\(Fmt.tilde(session.cwd))\n\(OpenSession.hint(session))")
-                    Text("\(session.isWaiting ? session.waitingLabel : session.isBusy ? "Working" : session.status.capitalized) \(Fmt.ago(session.since, now: ctx.date)) · \(HostApp.info(for: session)?.name ?? session.surface)"
+                    let host = HostApp.info(for: session)?.name ?? session.surface
+                    // Google's agents say which they are; Claude's rows don't spend the room.
+                    Text((session.agent.isGoogle ? session.agent.name + " · " : "")
+                         + "\(session.isWaiting ? session.waitingLabel : session.isBusy ? "Working" : session.status.capitalized) \(Fmt.ago(session.since, now: ctx.date))"
+                         + (host == session.agent.name ? "" : " · " + host)
                          + (session.account.map { " · " + $0 } ?? "")
                          + (store.spawned[session.pid]?.portsText.map { " · " + $0 } ?? ""))
                         .font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary).lineLimit(1)

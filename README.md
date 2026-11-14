@@ -38,9 +38,19 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
 
 ## Features
 
-- **Agents**: live Claude Code sessions (`~/.claude/sessions`), working/idle status, and "needs you" when Claude has stopped to ask for permission or an answer (it sorts first, in amber, with a count beside the menu bar icon), plus other agent apps and CLIs it spots running (T3 Code, Codex, Cursor, Gemini, Aider, Ollama…). Click a session to go back to the app it runs in (its terminal, VS Code, T3 Code or the Desktop app); right-click it to open its folder in your editor or Finder.
+- **Agents**: live Claude Code sessions (`~/.claude/sessions`), working/idle status, and "needs you" when Claude has stopped to ask for permission or an answer (it sorts first, in amber, with a count beside the menu bar icon), plus other agent apps and CLIs it spots running (T3 Code, Codex, Cursor, Aider, Ollama…). Click a session to go back to the app it runs in (its terminal, VS Code, T3 Code or the Desktop app); right-click it to open its folder in your editor or Finder.
 - **Claude Code usage**: today's tokens (in / out / cache read / cache write), a 14-day chart, and top projects and models, read incrementally from `~/.claude/projects/**/*.jsonl`.
 - **Codex usage**: the same, plus 5h/weekly rate-limit gauges, from `~/.codex/sessions`. Shown once Codex has session logs.
+- **Gemini CLI and Antigravity** (shown only if you use them): Gemini CLI sessions as agents in their workspaces (a running
+  `gemini` process, working while its session log is being written) and their tokens and estimated cost per model, read
+  incrementally from `~/.gemini/tmp/*/chats/*.jsonl`. The Antigravity app's conversations (working, idle or waiting for you)
+  from the status columns of its `~/.gemini/antigravity/conversation_summaries.db`, opened read-only; never titles, previews
+  or transcripts. For the Antigravity CLI (`agy`), Settings → Labs → Antigravity CLI → Add to Status Line points its
+  [status line](https://antigravity.google/docs/cli/statusline/) at a small script that saves only the plan quota and tier
+  and each session's folder, model, token totals, estimated cost and state to `~/Library/Caches/Dashbar/antigravity-*`,
+  then runs your own status line as before. Dashbar then shows Antigravity's 5-hour and weekly limits per model group with
+  their pace (and in History), its usage with the CLI's own cost estimate, and its sessions, "needs you" when it asks to
+  confirm a tool. Never your email or conversations. Remove puts your previous status line back exactly.
 - **More than one account**: if you run Claude Code with [`CLAUDE_CONFIG_DIR`](https://code.claude.com/docs/en/authentication#log-in-with-multiple-accounts) (say `~/.claude-work` beside `~/.claude`) or Codex with `CODEX_HOME`, add each folder in Settings → Accounts (Dashbar suggests `~/.claude-*` and `~/.codex-*` folders with logs, looking only at the top of your home folder). It reads every account's sessions and usage, names them by account (only once there's more than one), and shows each Claude account's plan limits from its own status line, saved to `~/Library/Caches/Dashbar/claude-statusline-<id>.json`.
 - **Estimated cost**: what the period's tokens would cost at public API list prices, per model and project, worked out on your Mac from the token counts (a guide for subscribers, not a bill; models without a known price are named, never counted as $0). Settings → General can hide it.
 - **History**: a page in the Dashbar window (or **History** in a usage card) with each 5-hour and weekly plan window's peak over the last 30 days (how often you hit the limit; with more than one account, one card per account), the current window against an even pace, and 30 days of tokens and estimated cost per day by agent, project and model. Plan readings are kept for 90 days in `~/Library/Application Support/Dashbar/plan-history.json` (usually tens of KB; each extra account beside it as `plan-history-<id>.json`); usage comes from the scan Dashbar already does.
@@ -93,9 +103,9 @@ The menu bar shows the number of working Claude sessions beside the icon, and th
 
 ## How it differs
 
-- **Local only.** It reads the session logs Claude Code and Codex already write on your Mac (`~/.claude`, `~/.codex` and any account folders you add), lists listening ports with libproc and measures folders. No browser cookies, no Full Disk Access, no account, no analytics.
+- **Local only.** It reads the session logs Claude Code, Codex and Gemini CLI already write on your Mac (`~/.claude`, `~/.codex`, `~/.gemini` and any account folders you add), lists listening ports with libproc and measures folders. No browser cookies, no Full Disk Access, no account, no analytics.
 - **Nothing is sent**, except Sparkle's update checks to GitHub and, if you turn it on, the experimental Claude plan-limits request to `api.anthropic.com` (the same read-only call Claude Code's `/usage` makes). The recommended way to see Claude plan limits sends nothing: only when you press Add does Dashbar change the `statusLine` setting in Claude Code's `settings.json` (after a backup), so a local script saves your usage percentages to a file on your Mac.
-- **Reads, and acts only when you click.** Dashbar changes Claude Code's `settings.json` only when you press Add (the status line, or the permission hook), after a backup, and Remove puts it back. If you turn on answering permission prompts, it answers one only when you click Allow once or Deny, never by itself and never by changing your permission rules; anything else falls back to Claude Code's own prompt.
+- **Reads, and acts only when you click.** Dashbar changes Claude Code's `settings.json` (or the Antigravity CLI's) only when you press Add (the status line, or the permission hook), after a backup, and Remove puts it back. If you turn on answering permission prompts, it answers one only when you click Allow once or Deny, never by itself and never by changing your permission rules; anything else falls back to Claude Code's own prompt.
 - **One app for the whole picture.** Agents (working, idle, waiting for you), plan limits with a pace mark and a projected run-out time, dev servers grouped by project, what each workspace's processes use, system stats and a clean-up of rebuildable caches, in the panel or in a window.
 
 ## Settings
@@ -122,7 +132,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for local builds, releasing and the rules
 
 Everything stays on your Mac. Dashbar reads local agent logs, lists listening ports and measures cache
 folders. Claude plan limits come from Claude Code's status line: with your consent Dashbar changes that one
-setting so a local script saves your usage percentages to a file, and it sends nothing. The only network
+setting so a local script saves your usage percentages to a file, and it sends nothing. The Antigravity CLI's
+bridge works the same way and picks its fields one by one, so your email, conversation titles and transcript
+paths in that status line's input are never saved. The Antigravity app's database is only ever opened read-only. The only network
 requests are update checks and the optional experimental plan-limits setting, which sends Claude Code's own
 sign-in to Anthropic's usage endpoint, the same call Claude Code makes.
 
@@ -133,4 +145,4 @@ Claude Code's settings, so this opens nothing new to it. Nothing about the reque
 
 ## Licence
 
-MIT. See `LICENSE`. Not affiliated with Anthropic or OpenAI.
+MIT. See `LICENSE`. Not affiliated with Anthropic, OpenAI or Google.

@@ -356,11 +356,15 @@ extension HostApp {
     }
 
     @MainActor private static var cache: [String: Info?] = [:]
+    @MainActor private static let antigravityApp: Info? = NSWorkspace.shared
+        .urlForApplication(withBundleIdentifier: "com.google.antigravity").map { Info(bundle: $0.path, name: "Antigravity") }
     private static let isDemo = CommandLine.arguments.contains("--demo")
 
     /// The host app for a live session, looked up once per session and process (rows redraw every second).
     @MainActor static func info(for session: LiveSession) -> Info? {
         if isDemo { return demoInfo(entrypoint: session.entrypoint) }
+        // The Antigravity app's conversations have no process of their own: they open in the app.
+        if session.agent == .antigravity { return antigravityApp }
         let key = session.id + ":" + String(session.pid)
         if let hit = cache[key] { return hit }
         let info = find(for: session.pid).map { Info(bundle: $0, name: name(ofBundle: $0)) }
@@ -449,7 +453,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         guard available, UserDefaults.standard.bool(forKey: Self.defaultsKey) else { return }
         let content = UNMutableNotificationContent()
         content.title = s.name
-        content.body = "Claude finished in \(s.project) after \(Fmt.ago(Date().addingTimeInterval(-duration)))"
+        content.body = "\(s.agent.name) finished in \(s.project) after \(Fmt.ago(Date().addingTimeInterval(-duration)))"
             + (s.account.map { " · \($0)" } ?? "")
         content.sound = .default
         content.userInfo = userInfo(for: s)
