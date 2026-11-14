@@ -81,8 +81,10 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
   (after a backup, keeping any hooks you have) pointing at
   `~/Library/Application Support/Dashbar/claude-permission-bridge.sh`. The script leaves the request in
   `~/Library/Application Support/Dashbar/Permissions` (readable only by you, file contents and edits left out)
-  and waits up to a minute (adjustable) for your answer. It never answers by itself: if you don't answer, Dashbar
-  isn't running, or anything goes wrong, it prints nothing and Claude Code asks in the terminal as usual. Allow
+  and waits up to 5 minutes (adjustable) for your answer. Claude Code keeps its own prompt up in the terminal the
+  whole time, so you can answer in either place, and a prompt answered in the terminal leaves Dashbar. It never
+  answers by itself: if you don't answer, Dashbar isn't running, or anything goes wrong, it prints nothing and the
+  terminal prompt is the one that counts. Allow
   once adds nothing to your permission rules, and Deny tells Claude you said no. Dashbar can only answer prompts
   Claude Code would show you anyway. Remove takes out only Dashbar's hook. With more than one account, Labs lists
   each one: Add puts the hook in that account's own `settings.json`, and a prompt says which account it came from.

@@ -14,21 +14,28 @@ import Foundation
 /// or harmlessly does nothing, whatever happens to the app). While Dashbar is running it leaves the request in a
 /// folder only the user can read, and waits a bounded time for Dashbar's answer. Safety rules, all enforced by the script:
 /// - It never answers by itself. Only an answer file Dashbar writes when the user clicks Allow or Deny makes it print.
-/// - On a timeout, with Dashbar not running, or on any error it prints nothing, so the terminal prompt appears.
+/// - On a timeout, with Dashbar not running, or on any error it prints nothing, leaving the terminal prompt to answer.
+///
+/// Claude Code shows its own prompt in the terminal at once and runs the hook beside it (checked live with Claude Code
+/// 2.1.325): whichever answers first wins, and an answer in the terminal leaves the hook running, which Dashbar notices
+/// from the session file (`PermissionRequest.answeredInTerminal`). So the wait only bounds how long Dashbar offers an
+/// answer; it never holds the terminal back.
 /// - Request IDs are 128 random bits, files are user-only (0700 folder, 0600 files), and the folder must be the user's.
 ///
 /// Any process running as the user could write an answer file, but such a process could equally type into the terminal
 /// or edit Claude Code's settings, so this opens nothing that wasn't already open to it.
 enum PermissionBridge {
     static let scriptName = "claude-permission-bridge.sh"
-    /// What Claude Code shows in its spinner while the script waits, if it shows one.
+    /// What Claude Code shows while the script runs, if it shows anything: in practice its own prompt covers it.
     static let statusMessage = "Waiting for an answer in Dashbar"
     /// Longest the script waits for an answer, whatever the setting says. The hook's own timeout sits above this, so
     /// Claude Code never has to cancel it.
     static let maxWait = 300
     static let hookTimeout = 330
     static let waitChoices = [30, 60, 120, 300]
-    static let defaultWait = 60
+    /// Long by default: the terminal prompt is up the whole time, so waiting costs nothing, and someone away from the
+    /// terminal can still answer from the notification minutes later.
+    static let defaultWait = 300
     static let denyMessage = "The user denied this in Dashbar."
 
     /// `$DASHBAR_PERMISSION_DIR` overrides the folder (tests use it). Everything the script runs is an absolute path to a
@@ -76,7 +83,7 @@ enum PermissionBridge {
       case $tool in ''|AskUserQuestion|ExitPlanMode) return 0 ;; esac
 
       limit=$(/usr/bin/sed -n 's/^wait=\([0-9][0-9]*\)$/\1/p' "$beat" | /usr/bin/head -n 1)
-      [ -n "$limit" ] || limit=60
+      [ -n "$limit" ] || limit=300
       [ "$limit" -le 300 ] || limit=300
       [ "$limit" -ge 5 ] || limit=5
 
@@ -321,7 +328,7 @@ enum PermissionBridge {
         // The script and the queue are shared: they go only with the last account's hook.
         guard !isInUse(paths) else { return }
         try? fm.removeItem(at: paths.script)
-        // Any script still waiting sees its request gone and stops, so Claude Code asks in the terminal.
+        // Any script still waiting sees its request gone and stops; the terminal prompt is still there to answer.
         try? fm.removeItem(at: paths.queue)
     }
 
@@ -654,6 +661,24 @@ struct PermissionQueue {
 }
 
 extension PermissionRequest {
+    /// Requests answered in the terminal. Claude Code shows its own prompt at once, beside the waiting hook, and doesn't
+    /// stop the hook when the prompt is answered there, so Dashbar watches the session file instead: once it has said
+    /// "permission prompt" for a request (`seen`) and then says anything else, the prompt was answered. `seen` keeps
+    /// only the ids of requests still pending.
+    static func answeredInTerminal(_ requests: [PermissionRequest], sessions raw: [LiveSession], seen: inout Set<String>) -> [String] {
+        var answered: [String] = []
+        for r in requests {
+            guard let s = raw.first(where: { $0.id == r.sessionId }) else { continue }
+            if s.isWaiting && s.waitingFor == "permission prompt" {
+                seen.insert(r.id)
+            } else if seen.contains(r.id) {
+                answered.append(r.id)
+            }
+        }
+        seen.formIntersection(requests.map(\.id).filter { !answered.contains($0) })
+        return answered
+    }
+
     /// Sessions with a pending request read as "Needs permission" from the moment the request arrives (Claude Code's
     /// own session file may say so a little later), waiting since the request. Sorted as `ClaudeSessions` sorts them.
     static func marking(_ sessions: [LiveSession], with requests: [PermissionRequest], now: Date = Date()) -> [LiveSession] {

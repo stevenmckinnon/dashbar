@@ -543,6 +543,37 @@ private func permissionGroups(_ p: PermissionBridge.Paths) throws -> [[String: A
         #expect(throws: PermissionQueue.Failure.self) { try queue.answer("../x", .allow) }
     }
 
+    @Test func aPromptAnsweredInTheTerminalIsNoticedFromTheSessionFile() {
+        let r = PermissionRequest.parse(json())!   // session s1
+        func session(_ status: String, _ waitingFor: String? = nil) -> LiveSession {
+            LiveSession(id: "s1", pid: 1, name: "n", cwd: "/x", status: status, since: now, entrypoint: "cli", root: "/x",
+                        waitingFor: waitingFor)
+        }
+        var seen = Set<String>()
+        // The hook can arrive before Claude Code's file says it is waiting: still busy is not an answer.
+        #expect(PermissionRequest.answeredInTerminal([r], sessions: [session("busy")], seen: &seen).isEmpty)
+        #expect(PermissionRequest.answeredInTerminal([r], sessions: [session("waiting", "permission prompt")], seen: &seen).isEmpty)
+        #expect(seen == [r.id])
+        // Answered there: the session moves on.
+        #expect(PermissionRequest.answeredInTerminal([r], sessions: [session("busy")], seen: &seen) == [r.id])
+        #expect(seen.isEmpty)
+        // A session Dashbar can't see changes nothing.
+        seen = [r.id]
+        #expect(PermissionRequest.answeredInTerminal([r], sessions: [], seen: &seen).isEmpty)
+        // Gone requests are forgotten.
+        #expect(PermissionRequest.answeredInTerminal([], sessions: [session("busy")], seen: &seen).isEmpty)
+        #expect(seen.isEmpty)
+    }
+
+    @Test func markingKeepsTheSessionsAccount() {
+        var s = LiveSession(id: "s1", pid: 1, name: "n", cwd: "/x", status: "busy", since: now, entrypoint: "cli", root: "/x")
+        s.account = "Work"
+        s.configDir = "/Users/x/.claude-work"
+        let marked = PermissionRequest.marking([s], with: [PermissionRequest.parse(json())!], now: now)
+        #expect(marked[0].account == "Work")
+        #expect(marked[0].configDir == "/Users/x/.claude-work")
+    }
+
     @Test func pendingRequestsMarkTheirSessionAsNeedingPermission() {
         let s = LiveSession(id: "s1", pid: 1, name: "n", cwd: "/x", status: "busy", since: now, entrypoint: "cli", root: "/x")
         let other = LiveSession(id: "s2", pid: 2, name: "m", cwd: "/y", status: "idle", since: now, entrypoint: "cli", root: "/y")

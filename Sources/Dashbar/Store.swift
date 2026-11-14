@@ -140,6 +140,8 @@ final class Store: ObservableObject {
     private var heartbeat: Timer?
     /// Requests already notified about, so each gets one notification.
     private var notifiedRequests = Set<String>()
+    /// Requests whose session Claude Code's own file has shown at its permission prompt (see `answeredInTerminal`).
+    private var promptsSeen = Set<String>()
 
     /// `demo` fills the store with invented data and starts nothing: no scanning, timers, watchers or
     /// Keychain access. Used for README and website screenshots (`Dashbar --snapshot out.png --demo`).
@@ -469,6 +471,10 @@ final class Store: ObservableObject {
     }
 
     private func applyPermissions(_ requests: [PermissionRequest]) {
+        // Answered in the terminal: stop the waiting hook and drop the prompt here.
+        let answered = PermissionRequest.answeredInTerminal(requests, sessions: rawSessions, seen: &promptsSeen)
+        for id in answered { try? permissionQueue.answer(id, .terminal) }
+        let requests = requests.filter { !answered.contains($0.id) }
         let live = Set(requests.map(\.id))
         for id in notifiedRequests.subtracting(live) { notifier.removePermission(id) }
         notifiedRequests.formIntersection(live)
@@ -523,9 +529,12 @@ final class Store: ObservableObject {
 
     private func apply(_ r: Worker.LiveResult) {
         rawSessions = r.sessions
-        let sessions = PermissionRequest.marking(r.sessions, with: permissionRequests)
-        trackTransitions(sessions)
-        update(\.sessions, sessions)
+        if permissionRequests.isEmpty {
+            trackTransitions(r.sessions)
+            update(\.sessions, r.sessions)
+        } else {
+            applyPermissions(permissionRequests)   // marks their sessions, and drops prompts answered in the terminal
+        }
         update(\.sessionsWarning, r.sessionsWarning)
         update(\.contexts, r.contexts)
         if let a = r.agents { update(\.otherAgents, a) }

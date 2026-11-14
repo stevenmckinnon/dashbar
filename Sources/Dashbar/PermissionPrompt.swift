@@ -21,7 +21,7 @@ struct PermissionPrompt: View {
                     Text(Self.remaining(request.expires, now: ctx.date))
                         .font(.system(size: UI.Size.caption).monospacedDigit())
                         .foregroundStyle(UI.textSecondary)
-                        .help("If you don't answer here, Claude Code asks in the terminal")
+                        .help("Time left to answer here. The session's terminal is asking too, and still will after this")
                 }
             }
             if let detail = request.detail() {
@@ -65,7 +65,7 @@ struct PermissionPrompt: View {
         return text
     }
 
-    /// "0:42": time left before Claude Code asks in the terminal instead.
+    /// "0:42": time left to answer here (the terminal asks too, and keeps asking after).
     static func remaining(_ expires: Date, now: Date) -> String {
         let s = max(0, Int(expires.timeIntervalSince(now).rounded(.up)))
         return String(format: "%d:%02d", s / 60, s % 60)

@@ -126,7 +126,7 @@ final class AppSettings: ObservableObject {
     @Published private(set) var claudePermissionsStatus: PermissionBridge.Status = .notInstalled
     /// Each added Claude account's hook, by folder.
     @Published private(set) var accountPermissions: [String: PermissionBridge.Status] = [:]
-    /// How long the hook waits for an answer in Dashbar before Claude Code asks in the terminal.
+    /// How long Dashbar offers an answer. The terminal's own prompt is up the whole time.
     @Published var permissionWait: Int { didSet { defaults.set(permissionWait, forKey: Key.permissionWait) } }
 
     var showsMenuBarStats: Bool { menuCPU || menuMemory || menuNetwork }
@@ -484,9 +484,9 @@ private struct LabsSettings: View {
             : Fmt.tilde(PermissionBridge.Paths.default().settings.path)
         return "Adding this puts one hook, PermissionRequest, in \(file), pointing at a small script. When Claude Code is about "
             + "to ask you to allow a tool, Dashbar shows what it wants to do, with Allow once and Deny. Dashbar can only answer "
-            + "prompts Claude Code already shows you, never changes your permission rules and never answers by itself. If you "
-            + "don't answer in time, or Dashbar isn't running, Claude Code asks in the terminal as usual. While Dashbar waits, "
-            + "the terminal's prompt may hold back; Open Session hands it straight back. Requests stay in a folder only you can "
+            + "prompts Claude Code already shows you, never changes your permission rules and never answers by itself. The "
+            + "terminal keeps its own prompt the whole time, so you can answer in either place; after the wait, or if Dashbar "
+            + "isn't running, the terminal is the only place. Requests stay in a folder only you can "
             + "read, and nothing is sent anywhere. A backup of the file is kept, and Remove takes out only Dashbar's hook."
     }
 
