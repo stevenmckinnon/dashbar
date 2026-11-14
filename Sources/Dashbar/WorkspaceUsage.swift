@@ -21,6 +21,8 @@ struct WorkspaceUsage: Equatable {
         var count = 0
         var cpu: Double = 0
         var memory: UInt64 = 0
+        /// The processes in the group, so the window can offer to quit them.
+        var pids: [pid_t] = []
     }
 }
 
@@ -95,11 +97,12 @@ final class WorkspaceSampler {
             group.count += 1
             group.cpu += share
             group.memory += usage.ri_resident_size
+            group.pids.append(pid)
             groups[root, default: [:]][name] = group
         }
 
         for root in roots {
-            result[root]?.processes = (groups[root] ?? [:]).values.sorted { ($0.cpu, $0.memory) > ($1.cpu, $1.memory) }
+            result[root]?.processes = (groups[root] ?? [:]).values.map { var g = $0; g.pids.sort(); return g }.sorted { ($0.cpu, $0.memory) > ($1.cpu, $1.memory) }
             if previousAt != nil, energyReported, elapsed > 0 {
                 result[root]?.watts = Double(energy[root] ?? 0) / 1e9 / elapsed
             }

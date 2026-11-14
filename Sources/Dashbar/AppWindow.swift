@@ -28,6 +28,8 @@ final class AppWindowModel: ObservableObject {
     @Published var page: AppPage {
         didSet { UserDefaults.standard.set(page.key, forKey: Self.pageKey) }
     }
+    /// Bumped by the Go menu's "Filter Workspaces" (⌘K); the view focuses its filter field.
+    @Published var filterRequests = 0
 
     init(page: AppPage? = nil) {
         self.page = page ?? UserDefaults.standard.string(forKey: Self.pageKey).flatMap(AppPage.init(key:)) ?? .tab(.overview)
@@ -68,6 +70,18 @@ final class AppWindow: NSObject, NSWindowDelegate {
         } else {
             show(store: store)
         }
+    }
+
+    /// The Go menu's page items. They only act on the window while it's in front: with the panel open instead, its own
+    /// shortcuts take the key first anyway.
+    func go(to page: AppPage) {
+        guard let window, window.isKeyWindow else { return }
+        model.page = page
+    }
+
+    func focusFilter() {
+        guard let window, window.isKeyWindow else { return }
+        model.filterRequests += 1
     }
 
     /// Applies the "keep on top" setting to the open window.
