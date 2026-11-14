@@ -22,6 +22,7 @@ struct SubagentSummary: View {
                 .buttonStyle(PressStyle())
                 .help(agents.tooltip())
                 .accessibilityLabel(agents.summary)
+                .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
                 .accessibilityHint(isExpanded ? "Hides the subagents" : "Lists the subagents")
             if isExpanded {
                 VStack(alignment: .leading, spacing: 0) {

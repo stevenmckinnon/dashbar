@@ -47,6 +47,7 @@ struct NowCard: View {
                         .help(workspace.memory > 0 ? "Its dev servers and the memory they use. The Dashbar window shows the whole workspace's." : "")
                 }
                 Image(systemName: "chevron.right").font(.system(size: UI.Size.micro, weight: .semibold)).foregroundStyle(UI.textSecondary)
+                    .accessibilityHidden(true)
             }
             .contentShape(Rectangle())
     }
@@ -80,6 +81,7 @@ struct StatusPill: View {
             .padding(.horizontal, 8).padding(.vertical, 4)
             .background(Capsule().fill(waiting != nil ? UI.attention.opacity(0.14)
                                        : (busy != nil ? Color.green : Color.primary).opacity(busy != nil ? 0.12 : 0.06)))
+            .accessibilityElement(children: .combine)   // "Working, 4m" as one, not a bare time
         }
     }
 }
@@ -95,7 +97,7 @@ struct NowSessionLine: View {
             Image(systemName: session.agent.symbol)
                 .font(.system(size: UI.Size.caption, weight: .semibold))
                 .foregroundStyle(session.agent.tint)
-                .accessibilityHidden(true)
+                .accessibilityLabel(session.agent.name)   // the tile is what names the agent; VoiceOver hears it too
                 .frame(width: 24, height: 24)
                 .background(RoundedRectangle(cornerRadius: UI.innerRadius, style: .continuous).fill(session.agent.tint.opacity(0.12)))
                 .help(session.agent.name)

@@ -21,6 +21,7 @@ struct TileRow: View {
             }
             .buttonStyle(PressStyle())
             .help("Show agents (⌘2)")
+            .accessibilityLabel(agentsLabel)
             Button { open(.servers) } label: {
                 Tile(title: "Servers", badge: store.devListeners.isEmpty ? nil : "Live",
                      value: "\(Set(store.devListeners.map(\.pid)).count)", unit: nil, selected: false) {
@@ -31,6 +32,7 @@ struct TileRow: View {
             }
             .buttonStyle(PressStyle())
             .help("Show servers (⌘3)")
+            .accessibilityLabel(serversLabel)
             Button { open(.cleanup) } label: {
                 let (v, u) = store.cleanupScanned ? Fmt.bytesSplit(store.cleanupTotal) : ("…", "")
                 Tile(title: "Clean-up", badge: nil, value: v, unit: u, selected: false) {
@@ -41,6 +43,21 @@ struct TileRow: View {
             .help("Show clean-up (⌘5)")
             .accessibilityLabel(store.cleanupScanned ? "Clean-up, \(Fmt.diskBytes(store.cleanupTotal)) reclaimable" : "Clean-up, measuring")
         }
+    }
+
+    /// "Agents, 4 sessions, 1 needs you": the number with what it counts.
+    private var agentsLabel: String {
+        let n = store.sessions.count
+        var text = "Agents, \(n) \(n == 1 ? "session" : "sessions")"
+        if store.waitingCount > 0 { text += ", \(store.waitingCount) \(store.waitingCount == 1 ? "needs" : "need") you" }
+        else if store.busyCount > 0 { text += ", \(store.busyCount) working" }
+        return text
+    }
+
+    /// "Servers, 4 dev servers using 980 MB"
+    private var serversLabel: String {
+        let n = Set(store.devListeners.map(\.pid)).count
+        return "Servers, \(n) dev \(n == 1 ? "server" : "servers")" + (store.serverMemory > 0 ? " using \(Fmt.bytes(store.serverMemory))" : "")
     }
 }
 
