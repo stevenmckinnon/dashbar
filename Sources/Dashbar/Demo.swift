@@ -115,11 +115,24 @@ enum DemoData {
         claude.topProjects = [Ranked(name: "storefront-web", value: 92_000_000), Ranked(name: "billing-api", value: 38_000_000),
                               Ranked(name: "docs-site", value: 12_000_000), Ranked(name: "notes-ios", value: 6_000_000)]
         claude.topModels = [Ranked(name: "Opus 5.5", value: 112_000_000), Ranked(name: "Sonnet 5.5", value: 36_000_000)]
-        func period(_ t: TokenTotals, _ f: Double) -> PeriodUsage {
-            PeriodUsage(totals: t,
-                        models: claude.topModels.map { Ranked(name: $0.name, value: Int(Double($0.value) * f)) },
-                        projects: claude.topProjects.map { Ranked(name: $0.name, value: Int(Double($0.value) * f)) })
+        // Costs come from the real price table: each model's share of the period's tokens, priced as that model.
+        let demoModelIDs = ["Opus 5.5": "claude-opus-5-5", "Sonnet 5.5": "claude-sonnet-5-5", "gpt-5-codex": "gpt-5-codex"]
+        func priced(_ t: TokenTotals, _ models: [Ranked], _ projects: [Ranked], _ f: Double) -> PeriodUsage {
+            let modelSum = Double(models.reduce(0) { $0 + $1.value })
+            let projectSum = Double(projects.reduce(0) { $0 + $1.value })
+            var usage = PeriodUsage(totals: t)
+            usage.models = models.map { m in
+                let share = Double(m.value) / max(modelSum, 1)
+                let part = TokenTotals(input: Int(Double(t.input) * share), output: Int(Double(t.output) * share),
+                                       cacheRead: Int(Double(t.cacheRead) * share), cacheWrite: Int(Double(t.cacheWrite) * share))
+                let cost = Pricing.cost(part, model: demoModelIDs[m.name] ?? m.name, oneHourShare: 0.3)
+                usage.cost += cost ?? 0
+                return Ranked(name: m.name, value: Int(Double(m.value) * f), cost: cost)
+            }
+            usage.projects = projects.map { Ranked(name: $0.name, value: Int(Double($0.value) * f), cost: usage.cost * Double($0.value) / max(projectSum, 1)) }
+            return usage
         }
+        func period(_ t: TokenTotals, _ f: Double) -> PeriodUsage { priced(t, claude.topModels, claude.topProjects, f) }
         var fortnight = TokenTotals(); fortnight.input = 9_800_000; fortnight.output = 5_400_000; fortnight.cacheRead = 1_240_000_000; fortnight.cacheWrite = 21_000_000; fortnight.messages = 4_700
         claude.periods = [period(today, 1), period(week, 4.5), period(fortnight, 8.5)]
         store.claude = claude
@@ -134,6 +147,10 @@ enum DemoData {
         codex.sessions24 = 2
         codex.topProjects = [Ranked(name: "ml-notebooks", value: 9_000_000)]
         codex.topModels = [Ranked(name: "gpt-5-codex", value: 9_500_000)]
+        codex.periods = [1.0, 4.5, 8.5].map { f in
+            var t = cToday; t.input = Int(Double(t.input) * f); t.output = Int(Double(t.output) * f); t.cacheRead = Int(Double(t.cacheRead) * f)
+            return priced(t, codex.topModels, codex.topProjects, f)
+        }
         store.codex = codex
         store.codexLimits = [
             RateLimit(label: "5h window", usedPercent: 21, resetsAt: now.addingTimeInterval(3.4 * 3600), window: 5 * 3600),
