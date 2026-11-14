@@ -116,6 +116,23 @@ import Testing
         #expect(PlanHistory.load(from: url)?.samples.count == loaded.samples.count)
     }
 
+    /// Two sources reporting the same moment with different reset times once doubled the file at every save, because
+    /// each save merges the file back in and compaction only compared neighbours.
+    @Test func readingsThatDisagreeOnTheResetDoNotPileUpAcrossSaves() {
+        var h = PlanHistory()
+        let a = t0.addingTimeInterval(3 * hour), b = t0.addingTimeInterval(hour)
+        for round in 0..<6 {
+            let at = t0.addingTimeInterval(Double(round) * 20)
+            h.record([fiveHour(25, reset: a)], provider: .claude, at: at)
+            h.record([fiveHour(21, reset: b)], provider: .claude, at: at)
+            h.record([fiveHour(25, reset: a)], provider: .claude, at: at)
+            let disk = h
+            h.merge(disk, now: t0)   // what a save does
+        }
+        #expect(h.samples.count == 2)
+        #expect(Set(h.samples.map(\.used)) == [25, 21])
+    }
+
     @Test func mergingAnotherCopysHistoryDoesNotDuplicate() {
         var a = PlanHistory(), b = PlanHistory()
         let reset = t0.addingTimeInterval(5 * hour)

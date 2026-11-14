@@ -127,16 +127,22 @@ struct PlanHistory: Codable, Equatable {
             guard let kind = Self.kind(of: limit) else { continue }
             if let reset = limit.resetsAt, reset <= at { continue }
             let s = Sample(series: Series(provider, kind, account: account), at: at, used: min(max(limit.usedPercent, 0), 100), resetsAt: limit.resetsAt)
-            if let i = samples.lastIndex(where: { $0.series == s.series }) {
+            // Every sample of this series in the same slot, newest first (samples are appended in time order).
+            let slot = Self.slot(s.at)
+            var handled = false
+            for i in samples.indices.reversed() where samples[i].series == s.series {
                 let last = samples[i]
-                if last.at == s.at { continue }   // the same reading again
-                if last.at < s.at, Self.slot(last.at) == Self.slot(s.at), Self.sameWindow(last, s, lastUsed: last.used) {
+                if Self.slot(last.at) != slot { break }
+                if last.at == s.at && last.resetsAt == s.resetsAt { handled = true; break }   // the same reading again
+                if last.at <= s.at, Self.sameWindow(last, s, lastUsed: last.used) {
                     // Same slot, same window: one sample, holding the highest reading and the latest time.
                     let merged = Sample(series: s.series, at: s.at, used: max(last.used, s.used), resetsAt: s.resetsAt ?? last.resetsAt)
                     if merged != last { samples[i] = merged; changed = true }
-                    continue
+                    handled = true
+                    break
                 }
             }
+            if handled { continue }
             samples.append(s)
             changed = true
         }
@@ -153,17 +159,19 @@ struct PlanHistory: Codable, Equatable {
     /// One sample per series per slot (per window), readings older than `sampleDays` folded into window summaries,
     /// summaries older than `windowDays` dropped.
     mutating func compact(now: Date = Date()) {
+        // Every sample already kept in a series' slot is a candidate, not only the latest: two sources can report the
+        // same moment with different reset times, and comparing only neighbours let such pairs pile up (each save merges
+        // the file back in, so they doubled every time).
         var kept: [Sample] = []
-        var lastIndex: [Series: Int] = [:]
+        var inSlot: [SlotKey: [Int]] = [:]
         for s in samples.sorted(by: { $0.at < $1.at }) {
-            if let i = lastIndex[s.series] {
+            let key = SlotKey(series: s.series, slot: Self.slot(s.at))
+            if let i = inSlot[key]?.first(where: { kept[$0] == s || Self.sameWindow(kept[$0], s, lastUsed: kept[$0].used) }) {
                 let last = kept[i]
-                if Self.slot(last.at) == Self.slot(s.at), Self.sameWindow(last, s, lastUsed: last.used) {
-                    kept[i] = Sample(series: s.series, at: s.at, used: max(last.used, s.used), resetsAt: s.resetsAt ?? last.resetsAt)
-                    continue
-                }
+                kept[i] = Sample(series: s.series, at: max(last.at, s.at), used: max(last.used, s.used), resetsAt: s.resetsAt ?? last.resetsAt)
+                continue
             }
-            lastIndex[s.series] = kept.count
+            inSlot[key, default: []].append(kept.count)
             kept.append(s)
         }
         let cutoff = now.addingTimeInterval(-Self.sampleDays * 86400)
@@ -201,6 +209,7 @@ struct PlanHistory: Codable, Equatable {
     // MARK: Grouping
 
     private static func slot(_ date: Date) -> Int { Int(floor(date.timeIntervalSince1970 / bucket)) }
+    private struct SlotKey: Hashable { let series: Series; let slot: Int }
 
     /// Whether `next` (taken after `prev`) belongs to the same window. With reset times, they must agree; without,
     /// a drop in usage or a gap longer than the window means a new one.

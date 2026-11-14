@@ -311,6 +311,36 @@ enum SettingsOpener {
         UserDefaults.standard.set(tab.rawValue, forKey: SettingsTab.key)
         NSApp.activate(ignoringOtherApps: true)
         if let open = openSettings ?? action { open() } else { NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) }
+        // SwiftUI creates or reuses the window after this returns.
+        DispatchQueue.main.async { bringForward() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { bringForward() }
+    }
+
+    /// SwiftUI's Settings window, once it exists.
+    static var window: NSWindow? {
+        NSApp.windows.first { $0.identifier?.rawValue.contains("Settings") == true || $0.frameAutosaveName.contains("Settings") }
+    }
+
+    /// Keeps the window at the content's width (only its height drags; a frame saved by an older build could be any
+    /// shape) and puts it in front of everything, the Dashbar window included. An accessory app's windows otherwise
+    /// open behind the frontmost app, and SwiftUI only orders the window front the first time.
+    static func bringForward() {
+        guard let window else { return }
+        let width = SettingsView.width
+        window.contentMinSize = NSSize(width: width, height: SettingsView.minHeight)
+        window.contentMaxSize = NSSize(width: width, height: .greatestFiniteMagnitude)
+        let content = window.contentRect(forFrameRect: window.frame)
+        if abs(content.width - width) > 1 || content.height < SettingsView.minHeight {
+            let height = content.height < SettingsView.minHeight || content.height < content.width * 0.6
+                ? SettingsView.idealHeight : content.height
+            window.setContentSize(NSSize(width: width, height: height))
+            window.center()
+        }
+        // Above the Dashbar window when that one is kept on top.
+        window.level = UserDefaults.standard.bool(forKey: AppWindow.floatKey) ? .floating : .normal
+        NSApp.activate()
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
     }
 }
 
@@ -369,6 +399,7 @@ struct SettingsView: View {
         .onAppear {
             // An accessory app's windows open behind the frontmost app unless we activate.
             NSApp.activate(ignoringOtherApps: true)
+            DispatchQueue.main.async { SettingsOpener.bringForward() }
         }
     }
 
