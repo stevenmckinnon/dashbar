@@ -80,15 +80,18 @@ final class AppSettings: ObservableObject {
         }
     }
 
-    /// Stops reading an added account. Its status line bridge, if any, is taken out first, so nothing is left behind.
+    /// Stops reading an added account. Its status line bridge and permission hook, if any, are taken out first, so
+    /// nothing is left behind.
     func removeAccount(_ account: ResolvedAccount) -> String? {
-        var problem: String?
         if account.kind == .claude, accountStatusLines[account.path]?.isInstalled == true {
-            problem = setStatusLine(false, account: account)
-            if problem != nil { return problem }
+            if let problem = setStatusLine(false, account: account) { return problem }
+        }
+        if account.kind == .claude, accountPermissions[account.path]?.isInstalled == true {
+            if let problem = setPermissions(false, account: account) { return problem }
         }
         accounts.removeAll { $0.kind == account.kind && AgentAccounts.normalise($0.path) == account.path }
         accountStatusLines[account.path] = nil
+        accountPermissions[account.path] = nil
         return nil
     }
 
@@ -117,8 +120,12 @@ final class AppSettings: ObservableObject {
     }
     /// Dashbar's hook is in Claude Code's PermissionRequest hooks, so Dashbar can answer permission prompts. Like the
     /// status line, this mirrors Claude Code's settings file rather than being a preference.
+    /// True while any account has the hook.
     @Published private(set) var claudePermissions = false
+    /// The default account's hook.
     @Published private(set) var claudePermissionsStatus: PermissionBridge.Status = .notInstalled
+    /// Each added Claude account's hook, by folder.
+    @Published private(set) var accountPermissions: [String: PermissionBridge.Status] = [:]
     /// How long the hook waits for an answer in Dashbar before Claude Code asks in the terminal.
     @Published var permissionWait: Int { didSet { defaults.set(permissionWait, forKey: Key.permissionWait) } }
 
@@ -145,24 +152,47 @@ final class AppSettings: ObservableObject {
         return problem
     }
 
-    /// Re-reads whether Dashbar's permission hook is in Claude Code's settings, and refreshes its script if it is.
+    /// Re-reads whether Dashbar's permission hook is in each account's Claude Code settings, and refreshes the shared
+    /// script and queue while any account has it.
     func refreshClaudePermissions(paths: PermissionBridge.Paths = .default()) {
         guard !CommandLine.arguments.contains("--demo") else { return }
         let status = PermissionBridge.status(paths)
-        if status.isInstalled {
+        var others: [String: PermissionBridge.Status] = [:]
+        for account in claudeAccounts where !account.isDefault {
+            others[account.path] = PermissionBridge.status(.forAccount(account))
+        }
+        let any = status.isInstalled || others.values.contains(where: \.isInstalled)
+        if any {
             try? PermissionBridge.writeScript(paths)
             try? PermissionBridge.prepareQueue(paths)
         }
         if status != claudePermissionsStatus { claudePermissionsStatus = status }
-        if status.isInstalled != claudePermissions { claudePermissions = status.isInstalled }
+        if others != accountPermissions { accountPermissions = others }
+        if any != claudePermissions { claudePermissions = any }
     }
 
-    /// Adds or removes Dashbar's permission hook. Returns what went wrong, phrased for the user.
+    /// Adds or removes Dashbar's permission hook in the default account. Returns what went wrong, phrased for the user.
     func setClaudePermissions(_ on: Bool, paths: PermissionBridge.Paths = .default()) -> String? {
         var problem: String?
         do { on ? try PermissionBridge.install(paths) : try PermissionBridge.uninstall(paths) }
         catch { problem = error.localizedDescription }
         refreshClaudePermissions(paths: paths)
+        return problem
+    }
+
+    /// One account's permission hook status.
+    func permissionStatus(_ account: ResolvedAccount) -> PermissionBridge.Status {
+        account.isDefault ? claudePermissionsStatus : accountPermissions[account.path] ?? .notInstalled
+    }
+
+    /// Adds or removes Dashbar's permission hook in one account's settings.json.
+    func setPermissions(_ on: Bool, account: ResolvedAccount) -> String? {
+        if account.isDefault { return setClaudePermissions(on) }
+        var problem: String?
+        let paths = PermissionBridge.Paths.forAccount(account)
+        do { on ? try PermissionBridge.install(paths) : try PermissionBridge.uninstall(paths) }
+        catch { problem = error.localizedDescription }
+        refreshClaudePermissions()
         return problem
     }
 
@@ -369,7 +399,11 @@ private struct LabsSettings: View {
                     .foregroundStyle(.secondary)
             }
             Section {
-                permissionsRow
+                if settings.claudeAccounts.count > 1 {
+                    ForEach(settings.claudeAccounts) { accountPermissionsRow($0) }
+                } else {
+                    permissionsRow
+                }
                 if settings.claudePermissions {
                     Picker("Wait for an answer", selection: $settings.permissionWait) {
                         ForEach(PermissionBridge.waitChoices, id: \.self) { seconds in
@@ -422,18 +456,38 @@ private struct LabsSettings: View {
         }
     }
 
+    /// With more than one account: a row per account, each added or removed in that account's own settings.json.
+    @ViewBuilder private func accountPermissionsRow(_ account: ResolvedAccount) -> some View {
+        LabeledContent {
+            switch settings.permissionStatus(account) {
+            case .installed:
+                Button("Remove") { permissionProblem = settings.setPermissions(false, account: account) }
+            case .notInstalled:
+                Button("Add") { permissionProblem = settings.setPermissions(true, account: account) }
+                    .help("Adds the hook to \(Fmt.tilde(account.settingsFile.path)), after a backup.")
+            case .unreadable(let message):
+                Button("Check Again") { permissionProblem = nil; settings.refreshClaudePermissions() }
+                    .help(message)
+            }
+        } label: {
+            Text(account.label)
+            switch settings.permissionStatus(account) {
+            case .installed: Text("Answering in Dashbar")
+            case .notInstalled: Text("Asks in the terminal")
+            case .unreadable(let message): Text(message)
+            }
+        }
+    }
+
     private var permissionsExplanation: String {
-        let file = Fmt.tilde(PermissionBridge.Paths.default().settings.path)
+        let file = settings.claudeAccounts.count > 1 ? "that account's settings.json"
+            : Fmt.tilde(PermissionBridge.Paths.default().settings.path)
         return "Adding this puts one hook, PermissionRequest, in \(file), pointing at a small script. When Claude Code is about "
             + "to ask you to allow a tool, Dashbar shows what it wants to do, with Allow once and Deny. Dashbar can only answer "
             + "prompts Claude Code already shows you, never changes your permission rules and never answers by itself. If you "
             + "don't answer in time, or Dashbar isn't running, Claude Code asks in the terminal as usual. While Dashbar waits, "
             + "the terminal's prompt may hold back; Open Session hands it straight back. Requests stay in a folder only you can "
             + "read, and nothing is sent anywhere. A backup of the file is kept, and Remove takes out only Dashbar's hook."
-            // TODO: install the hook per account (each account's settings.json, a record file per account, and the
-            // shared script and queue removed only when no account still uses them), like the status line bridge.
-            + (settings.claudeAccounts.count > 1
-                ? " This covers your default account only; other accounts' prompts stay in the terminal." : "")
     }
 
     @ViewBuilder private var statusLineRow: some View {

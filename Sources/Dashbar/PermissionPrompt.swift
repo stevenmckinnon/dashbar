@@ -60,6 +60,8 @@ struct PermissionPrompt: View {
         var text = request.action
         if showsProject, !request.project.isEmpty { text += " in \(request.project)" }
         if let agent = request.agentType { text += " (\(agent))" }
+        // Under a session row the row already names the account.
+        if showsProject, let account = store.accountLabel(for: request) { text += " · \(account)" }
         return text
     }
 

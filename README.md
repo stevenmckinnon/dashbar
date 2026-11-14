@@ -84,8 +84,8 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
   and waits up to a minute (adjustable) for your answer. It never answers by itself: if you don't answer, Dashbar
   isn't running, or anything goes wrong, it prints nothing and Claude Code asks in the terminal as usual. Allow
   once adds nothing to your permission rules, and Deny tells Claude you said no. Dashbar can only answer prompts
-  Claude Code would show you anyway. Remove takes out only Dashbar's hook. With more than one account it covers
-  the default account for now; other accounts' prompts stay in the terminal.
+  Claude Code would show you anyway. Remove takes out only Dashbar's hook. With more than one account, Labs lists
+  each one: Add puts the hook in that account's own `settings.json`, and a prompt says which account it came from.
 
 The menu bar shows the number of working Claude sessions beside the icon, and the icon's bar fills while any are working.
 

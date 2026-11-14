@@ -60,6 +60,12 @@ final class Store: ObservableObject {
         permissionRequests.first { $0.sessionId == session.id }
     }
 
+    /// Which account a permission request came from, only while more than one Claude Code account is read.
+    func accountLabel(for request: PermissionRequest) -> String? {
+        if let label = sessions.first(where: { $0.id == request.sessionId })?.account { return label }
+        return request.accountLabel(in: claudeAccounts)
+    }
+
     /// Requests whose session Dashbar can't see (no session file), shown on their own so none goes unanswered.
     var unmatchedPermissionRequests: [PermissionRequest] {
         let ids = Set(sessions.map(\.id))
@@ -163,6 +169,7 @@ final class Store: ObservableObject {
             .sink { [weak self] _ in
                 guard let self else { return }
                 self.setAccounts(claude: self.settings.claudeAccounts, codex: self.settings.codexAccounts)
+                self.settings.refreshClaudePermissions()
                 self.refresh(usage: true, servers: false, panel: self.panelVisible)
             }
             .store(in: &subscriptions)
@@ -468,7 +475,8 @@ final class Store: ObservableObject {
         update(\.permissionRequests, requests)
         let marked = PermissionRequest.marking(rawSessions, with: requests)
         for r in requests where notifiedRequests.insert(r.id).inserted {
-            notifier.permission(r, session: marked.first { $0.id == r.sessionId })
+            let session = marked.first { $0.id == r.sessionId }
+            notifier.permission(r, session: session, account: session?.account ?? r.accountLabel(in: claudeAccounts))
         }
         trackTransitions(marked)
         update(\.sessions, marked)

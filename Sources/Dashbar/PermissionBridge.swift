@@ -35,7 +35,7 @@ enum PermissionBridge {
     /// tool every Mac has; `plutil` reads and writes the JSON.
     static let script = #"""
     #!/bin/sh
-    # Dashbar's Claude Code permission bridge (version 1). Dashbar added it with your consent.
+    # Dashbar's Claude Code permission bridge (version 2). Dashbar added it with your consent.
     # Claude Code runs this when it is about to ask you to allow a tool. If Dashbar is running, this shows the request
     # there and waits a short while for you to click Allow or Deny, then hands Claude Code that answer. If you don't
     # answer in Dashbar, if Dashbar isn't running, or if anything goes wrong, it prints nothing and Claude Code asks you
@@ -44,6 +44,9 @@ enum PermissionBridge {
     dir="${DASHBAR_PERMISSION_DIR:-$HOME/Library/Application Support/Dashbar/Permissions}"
     umask 077
     id=
+    # Which Claude Code account (config folder) this hook is in, so Dashbar can say so. Hex digits only.
+    account=
+    case $1 in --account=*) account=$(printf '%s' "${1#--account=}" | /usr/bin/tr -cd 'a-f0-9') ;; esac
 
     cleanup() {
       [ -n "$id" ] && /bin/rm -f "$dir/requests/$id.json" "$dir/requests/.$id.tmp" "$dir/decisions/$id"
@@ -98,7 +101,8 @@ enum PermissionBridge {
         /usr/bin/plutil -insert tool_input -json "$ti" "$tmp" &&
         /usr/bin/plutil -insert session_id -string "$(field session_id)" "$tmp" &&
         /usr/bin/plutil -insert cwd -string "$(field cwd)" "$tmp" &&
-        /usr/bin/plutil -insert agent_type -string "$(field agent_type)" "$tmp" || return 0
+        /usr/bin/plutil -insert agent_type -string "$(field agent_type)" "$tmp" &&
+        /usr/bin/plutil -insert account -string "$account" "$tmp" || return 0
       /bin/mv -f "$tmp" "$dir/requests/$id.json" || return 0
 
       end=$((created + limit))
@@ -137,17 +141,29 @@ enum PermissionBridge {
         var settings: URL
         /// Dashbar's own folder for scripts and backups, shared with the status line bridge.
         var support: URL
+        /// Which account this is for (`ResolvedAccount.key`): nil for the default account, which keeps the original
+        /// record name and command, so a hook added before accounts existed carries on as it was. The script and the
+        /// queue are shared by every account.
+        var account: String? = nil
 
         var script: URL { support.appendingPathComponent(PermissionBridge.scriptName) }
         /// Where requests and answers pass between the script and Dashbar. User-only.
         var queue: URL { support.appendingPathComponent("Permissions") }
-        var record: URL { support.appendingPathComponent("claude-permission-install.json") }
+        var record: URL {
+            support.appendingPathComponent(account.map { "claude-permission-install-\($0).json" } ?? "claude-permission-install.json")
+        }
         /// The status line bridge's paths, for its settings editing and backups.
         var editing: StatusLineBridge.Paths { StatusLineBridge.Paths(settings: settings, support: support) }
 
         static func `default`(environment: [String: String] = ProcessInfo.processInfo.environment) -> Paths {
             let p = StatusLineBridge.Paths.default(environment: environment)
             return Paths(settings: p.settings, support: p.support)
+        }
+
+        /// One account's settings.json and its own install record.
+        static func forAccount(_ account: ResolvedAccount) -> Paths {
+            let p = StatusLineBridge.Paths.forAccount(account)
+            return Paths(settings: p.settings, support: p.support, account: p.account)
         }
     }
 
@@ -172,9 +188,11 @@ enum PermissionBridge {
 
     // MARK: The command and the hook entry
 
-    /// `/bin/sh '<script>'`: shell form, which every Claude Code version with hooks runs, and which keeps working if the
-    /// script loses its executable bit.
-    static func command(_ paths: Paths) -> String { "/bin/sh " + StatusLineBridge.shellQuote(paths.script.path) }
+    /// `/bin/sh '<script>' [--account=<key>]`: shell form, which every Claude Code version with hooks runs, and which
+    /// keeps working if the script loses its executable bit. The account tells Dashbar which account a request is from.
+    static func command(_ paths: Paths) -> String {
+        "/bin/sh " + StatusLineBridge.shellQuote(paths.script.path) + (paths.account.map { " --account=" + $0 } ?? "")
+    }
 
     static func isOurs(_ command: String) -> Bool { command.contains(scriptName) }
 
@@ -227,7 +245,11 @@ enum PermissionBridge {
             guard let hooks = try? StatusLineBridge.object(hooksMember.raw) else {
                 throw StatusLineBridge.Failure.invalidSettings("its hooks setting isn't an object")
             }
-            if ourHandlerCount(in: hooks) > 0 { return nil }   // already added
+            if ourHandlerCount(in: hooks) > 0 {
+                // Already added. Keep a record, so the shared script stays while this account uses it.
+                if Record.load(paths.record) == nil { try Record(settingsPath: paths.settings.path, hadHooks: true).save(paths.record) }
+                return nil
+            }
             try Record(settingsPath: paths.settings.path, hadHooks: true).save(paths.record)
             let hooksDoc = try StatusLineBridge.Document(hooksMember.raw)
             let hooksPad = lineIndent(doc.bytesText, at: hooksMember.start) ?? ""
@@ -295,10 +317,18 @@ enum PermissionBridge {
             }
         }
         let fm = FileManager.default
-        try? fm.removeItem(at: paths.script)
         try? fm.removeItem(at: paths.record)
+        // The script and the queue are shared: they go only with the last account's hook.
+        guard !isInUse(paths) else { return }
+        try? fm.removeItem(at: paths.script)
         // Any script still waiting sees its request gone and stops, so Claude Code asks in the terminal.
         try? fm.removeItem(at: paths.queue)
+    }
+
+    /// Some account still has Dashbar's hook, going by the install records.
+    static func isInUse(_ paths: Paths) -> Bool {
+        ((try? FileManager.default.contentsOfDirectory(atPath: paths.support.path)) ?? [])
+            .contains { $0.hasPrefix("claude-permission-install") && $0.hasSuffix(".json") }
     }
 
     /// Whether settings.json had a `hooks` setting before Dashbar added one, so removing puts back exactly that.
@@ -440,6 +470,8 @@ struct PermissionRequest: Identifiable, Equatable {
     let expires: Date
     /// The waiting script's process, so a request whose script has gone (Claude Code quit, the session ended) is dropped.
     let pid: Int32
+    /// The account whose hook sent it (`ResolvedAccount.key`), nil for the default account.
+    var account: String? = nil
 
     enum Answer: String { case allow, deny, terminal = "ask" }
 
@@ -465,11 +497,20 @@ struct PermissionRequest: Identifiable, Equatable {
             }
         }
         let agent = (o["agent_type"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        let account = (o["account"] as? String).flatMap { a in
+            !a.isEmpty && a.utf8.count <= 64 && a.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }) ? a : nil
+        }
         return PermissionRequest(id: id, sessionId: o["session_id"] as? String ?? "", cwd: o["cwd"] as? String ?? "",
                                  tool: tool, input: input, agentType: agent,
                                  created: Date(timeIntervalSince1970: created),
                                  expires: Date(timeIntervalSince1970: created + wait),
-                                 pid: (o["pid"] as? NSNumber)?.int32Value ?? 0)
+                                 pid: (o["pid"] as? NSNumber)?.int32Value ?? 0, account: account)
+    }
+
+    /// The name of the account it came from, only while Dashbar reads more than one Claude Code account.
+    func accountLabel(in accounts: [ResolvedAccount]) -> String? {
+        guard accounts.count > 1 else { return nil }
+        return accounts.first { $0.key == account }?.label
     }
 
     /// Still worth showing: not timed out, and its script still waiting.
@@ -621,7 +662,8 @@ extension PermissionRequest {
         return sessions.map { s in
             guard let r = first[s.id], !(s.isWaiting && s.waitingFor == "permission prompt") else { return s }
             return LiveSession(id: s.id, pid: s.pid, name: s.name, cwd: s.cwd, status: "waiting", since: r.created,
-                               entrypoint: s.entrypoint, root: s.root, waitingFor: "permission prompt")
+                               entrypoint: s.entrypoint, root: s.root, waitingFor: "permission prompt",
+                               account: s.account, configDir: s.configDir)
         }
         .sorted { ($0.urgency, $1.since) < ($1.urgency, $0.since) }
     }

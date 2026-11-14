@@ -172,6 +172,58 @@ private func permissionGroups(_ p: PermissionBridge.Paths) throws -> [[String: A
         #expect(FileManager.default.fileExists(atPath: line.script.path))
     }
 
+    @Test func eachAccountGetsItsOwnHookAndTheSharedFilesGoWithTheLast() throws {
+        let fx = try Fixture(); defer { fx.remove() }
+        let personal = try paths(fx)
+        let work = PermissionBridge.Paths(settings: try fx.dir("claude-work").appendingPathComponent("settings.json"),
+                                          support: personal.support, account: "1a2b3c4d")
+        try PermissionBridge.install(personal, now: now)
+        try PermissionBridge.install(work, now: now)
+        #expect(PermissionBridge.status(personal) == .installed)
+        #expect(PermissionBridge.status(work) == .installed)
+        let handler = try #require((try permissionGroups(work)[0]["hooks"] as? [[String: Any]])?.first)
+        #expect(handler["command"] as? String == "/bin/sh '\(work.script.path)' --account=1a2b3c4d")
+        #expect(PermissionBridge.command(personal) == "/bin/sh '\(personal.script.path)'")
+        #expect(work.record.lastPathComponent == "claude-permission-install-1a2b3c4d.json")
+        #expect(personal.record.lastPathComponent == "claude-permission-install.json")
+        #expect(FileManager.default.fileExists(atPath: work.record.path))
+
+        // Removing one account's hook leaves the other's, and the script and queue it still needs.
+        try PermissionBridge.uninstall(personal, now: now)
+        #expect(try settings(personal)["hooks"] == nil)
+        #expect(PermissionBridge.status(work) == .installed)
+        #expect(FileManager.default.fileExists(atPath: work.script.path))
+        #expect(FileManager.default.fileExists(atPath: work.queue.appendingPathComponent("requests").path))
+
+        try PermissionBridge.uninstall(work, now: now)
+        #expect(try settings(work)["hooks"] == nil)
+        #expect(!FileManager.default.fileExists(atPath: work.script.path))
+        #expect(!FileManager.default.fileExists(atPath: work.queue.path))
+        #expect(!PermissionBridge.isInUse(work))
+    }
+
+    @Test func aHookAlreadyThereGetsARecordSoTheScriptStays() throws {
+        let fx = try Fixture(); defer { fx.remove() }
+        let personal = try paths(fx)
+        let work = PermissionBridge.Paths(settings: try fx.dir("claude-work").appendingPathComponent("settings.json"),
+                                          support: personal.support, account: "1a2b3c4d")
+        try PermissionBridge.install(personal, now: now)
+        try PermissionBridge.install(work, now: now)
+        try FileManager.default.removeItem(at: work.record)   // lost, or from before records were kept
+        try PermissionBridge.install(work, now: now)          // Add again (or the refresh) puts the record back
+        try PermissionBridge.uninstall(personal, now: now)
+        #expect(FileManager.default.fileExists(atPath: work.script.path))
+    }
+
+    @Test func forAccountUsesThatAccountsSettingsAndKey() {
+        let work = ResolvedAccount(kind: .claude, path: "/tmp/x/.claude-work", label: "Work", isDefault: false)
+        let p = PermissionBridge.Paths.forAccount(work)
+        #expect(p.settings.path == "/tmp/x/.claude-work/settings.json")
+        #expect(p.account == work.key)
+        let main = ResolvedAccount(kind: .claude, path: "/tmp/x/.claude", label: "Default", isDefault: true)
+        #expect(PermissionBridge.Paths.forAccount(main).account == nil)
+    }
+
     @Test func claudeConfigDirIsHonoured() {
         let p = PermissionBridge.Paths.default(environment: ["CLAUDE_CONFIG_DIR": "/tmp/alt-claude"])
         #expect(p.settings.path == "/tmp/alt-claude/settings.json")
@@ -197,7 +249,7 @@ private func permissionGroups(_ p: PermissionBridge.Paths) throws -> [[String: A
              whileWaiting: ((PermissionRequest) throws -> Void)? = nil) throws -> Run {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/bin/sh")
-        proc.arguments = [p.script.path]
+        proc.arguments = [p.script.path] + (p.account.map { ["--account=" + $0] } ?? [])
         proc.environment = ["HOME": p.support.deletingLastPathComponent().path, "PATH": "/usr/bin:/bin",
                             "DASHBAR_PERMISSION_DIR": (dir ?? p.queue).path]
         let input = Pipe(), output = Pipe()
@@ -261,6 +313,22 @@ private func permissionGroups(_ p: PermissionBridge.Paths) throws -> [[String: A
         #expect(d["behavior"] as? String == "allow")
         #expect(d.count == 1)   // no updatedInput, no updatedPermissions: allow once, nothing saved
         #expect(leftovers(p).isEmpty)
+    }
+
+    @Test func aRequestSaysWhichAccountsHookSentIt() throws {
+        let fx = try Fixture(); defer { fx.remove() }
+        var (p, queue) = try setUp(fx)
+        let plain = try run(p, stdin: sample()) { request in
+            #expect(request.account == nil)
+            try queue.answer(request.id, .terminal)
+        }
+        #expect(plain.output.isEmpty)
+        p.account = "1a2b3c4d"
+        let work = try run(p, stdin: sample()) { request in
+            #expect(request.account == "1a2b3c4d")
+            try queue.answer(request.id, .allow)
+        }
+        #expect(try decision(work.output)["behavior"] as? String == "allow")
     }
 
     @Test func denyPrintsADenyWithAReason() throws {
@@ -401,6 +469,22 @@ private func permissionGroups(_ p: PermissionBridge.Paths) throws -> [[String: A
         #expect(r.agentType == nil)
         #expect(r.expires == r.created.addingTimeInterval(60))
         #expect(r.oneLine == "Run a command: npm test")
+    }
+
+    @Test func theAccountIsNamedOnlyWithMoreThanOne() throws {
+        var o = try #require(JSONSerialization.jsonObject(with: json()) as? [String: Any])
+        let personal = ResolvedAccount(kind: .claude, path: "/tmp/x/.claude", label: "Personal", isDefault: true)
+        let work = ResolvedAccount(kind: .claude, path: "/tmp/x/.claude-work", label: "Work", isDefault: false)
+        let plain = try #require(PermissionRequest.parse(json()))
+        #expect(plain.account == nil)
+        #expect(plain.accountLabel(in: [personal]) == nil)
+        #expect(plain.accountLabel(in: [personal, work]) == "Personal")
+        o["account"] = try #require(work.key)
+        let fromWork = try #require(PermissionRequest.parse(try JSONSerialization.data(withJSONObject: o)))
+        #expect(fromWork.accountLabel(in: [personal, work]) == "Work")
+        #expect(fromWork.accountLabel(in: [personal]) == nil)
+        o["account"] = "../etc"
+        #expect(PermissionRequest.parse(try JSONSerialization.data(withJSONObject: o))?.account == nil)
     }
 
     @Test func rejectsBadIdsAndMissingTools() {

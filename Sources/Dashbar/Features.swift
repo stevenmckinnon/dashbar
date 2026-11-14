@@ -423,11 +423,11 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     var answerPermission: ((String, PermissionRequest.Answer) -> Void)?
 
     /// "Claude needs permission in shop" with what it wants to do, and Allow Once / Deny on the notification itself.
-    func permission(_ r: PermissionRequest, session: LiveSession?) {
+    func permission(_ r: PermissionRequest, session: LiveSession?, account: String? = nil) {
         guard available, UserDefaults.standard.bool(forKey: Self.waitingKey) else { return }
         let content = UNMutableNotificationContent()
         content.title = session?.name ?? (r.project.isEmpty ? "Claude Code" : r.project)
-        content.subtitle = "Claude needs permission" + (r.project.isEmpty ? "" : " in \(r.project)")
+        content.subtitle = "Claude needs permission" + (r.project.isEmpty ? "" : " in \(r.project)") + (account.map { " (\($0))" } ?? "")
         content.body = r.oneLine
         content.sound = .default
         content.categoryIdentifier = Self.permissionCategory
