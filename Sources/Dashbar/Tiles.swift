@@ -46,7 +46,7 @@ struct TileRow: View {
                 let biggest = store.cleanupScanned ? Self.biggest(store.cleanup) : nil
                 Tile(title: "Clean-up", badge: nil, value: v, unit: u,
                      quiet: store.cleanupScanned && store.cleanupTotal == 0, selected: false,
-                     detail: biggest.map { [$0.name + " " + Fmt.diskBytes($0.size), $0.name] }) {
+                     detail: biggest.map { [$0.name + " " + Fmt.diskBytes($0.size), Self.folderCount(store.cleanup.count)] }) {
                     EmptyView()
                 }
             }
@@ -63,6 +63,9 @@ struct TileRow: View {
         return (top.project, top.size)
     }
 
+    /// What Clean-up found, counted in the Clean-up tab's own word: "1 folder", "6 folders".
+    static func folderCount(_ n: Int) -> String { "\(n) \(n == 1 ? "folder" : "folders")" }
+
     /// "Agents, 4 sessions: 1 needs you, 1 working, 2 idle": the number with what it counts, as the dots show it.
     private var agentsLabel: String {
         SessionDots.label(waiting: store.waitingCount, working: store.busyCount,
@@ -75,12 +78,13 @@ struct TileRow: View {
         return "Servers, \(n) dev \(n == 1 ? "server" : "servers")" + (store.serverMemory > 0 ? " using \(Fmt.bytes(store.serverMemory))" : "")
     }
 
-    /// "Clean-up, 6.99 GB reclaimable, the largest Xcode at 2.3 GB"
+    /// "Clean-up, 6.99 GB reclaimable in 6 folders, the largest Xcode at 2.3 GB": everything the tile can show,
+    /// whichever of it fits on screen.
     private var cleanupLabel: String {
         guard store.cleanupScanned else { return "Clean-up, measuring" }
         let base = "Clean-up, \(Fmt.diskBytes(store.cleanupTotal)) reclaimable"
         guard let top = Self.biggest(store.cleanup) else { return base }
-        return base + ", the largest \(top.name) at \(Fmt.diskBytes(top.size))"
+        return base + " in \(Self.folderCount(store.cleanup.count)), the largest \(top.name) at \(Fmt.diskBytes(top.size))"
     }
 }
 
@@ -152,7 +156,8 @@ struct Tile<Accessory: View>: View {
     var quiet = false
     let selected: Bool
     var accessoryWidth: CGFloat = 44
-    /// Quiet text in the badge's place, longest first; the first that fits is shown ("Xcode 2.3 GB", then "Xcode").
+    /// Quiet text in the badge's place, longest first; the first that fits is shown ("Xcode 2.3 GB", then
+    /// "6 folders"), or nothing when none fits, never a clipped word.
     var detail: [String]? = nil
     @ViewBuilder var accessory: Accessory
 
@@ -166,7 +171,7 @@ struct Tile<Accessory: View>: View {
                 else if let detail, !detail.isEmpty {
                     ViewThatFits(in: .horizontal) {
                         ForEach(detail, id: \.self) { Text($0).lineLimit(1).fixedSize() }
-                        Text(detail.last ?? "").lineLimit(1).truncationMode(.tail)
+                        Color.clear.frame(width: 0, height: 0)
                     }
                     .font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
                 }
