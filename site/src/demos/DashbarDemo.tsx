@@ -157,7 +157,7 @@ function Overview() {
         </div>
         <div className="dd-session">
           <span className="dd-claude"><Asterisk size={14} strokeWidth={2} /></span>
-          <div className="dd-grow"><b>Add Stripe checkout and webhooks</b><small>Claude Code · CLI · runs :3000</small></div>
+          <div className="dd-grow"><b>Add Stripe checkout and webhooks</b><small>Terminal · runs :3000</small></div>
           <div className="dd-context"><span className="dd-meter"><i style={{ width: '34%' }} /></span><b>34%</b><small>context</small></div>
         </div>
         <div className="dd-actions">
@@ -167,9 +167,9 @@ function Overview() {
 
       <div className="dd-card">
         <CardHead icon={<Layers size={14} strokeWidth={1.75} />} tone="violet" title="Other workspaces" count="4" />
-        <WorkspaceRow tone="green" letter="B" name="billing-api" sub="Claude idle for 38m" port=":4000" />
-        <WorkspaceRow tone="red" letter="D" name="docs-site" sub="Claude idle for 1h 35m" port=":5173" />
-        <WorkspaceRow tone="magenta" letter="N" name="notes-ios" sub="Claude idle for 2h 50m" wideOnly />
+        <WorkspaceRow tone="green" letter="B" name="billing-api" sub="Claude idle for 38m" port=":4000" note="server 186 MB" />
+        <WorkspaceRow tone="red" letter="D" name="docs-site" sub="Claude idle for 1h 35m" port=":5173" note="server 144 MB" />
+        <WorkspaceRow tone="magenta" letter="N" name="notes-ios" sub="Claude idle for 2h 50m" note="1 agent" wideOnly />
         <FillerRow />
         <FillerRow />
       </div>
@@ -197,12 +197,17 @@ export function CardHead({ icon, tone, title, count }: { icon: React.ReactNode; 
   )
 }
 
-export function WorkspaceRow({ tone, letter, name, sub, port, working, wideOnly }: { tone: string; letter: string; name: string; sub: string; port?: string; working?: boolean; wideOnly?: boolean }) {
+export function WorkspaceRow({ tone, letter, name, sub, port, note, working, attention, wideOnly }: { tone: string; letter: string; name: string; sub: string; port?: string; note?: string; working?: boolean; attention?: boolean; wideOnly?: boolean }) {
   return (
     <div className="dd-ws" data-wide-only={wideOnly || undefined}>
-      <span className={`dd-mono dd-mono--${tone}`}>{letter}{working && <i className="dd-dot" />}</span>
-      <div className="dd-grow"><b>{name}</b><small data-working={working || undefined}>{sub}</small></div>
-      {port && <span className="dd-port-text">{port}</span>}
+      <span className={`dd-mono dd-mono--${tone}`}>{letter}{(working || attention) && <i className="dd-dot" data-attention={attention || undefined} />}</span>
+      <div className="dd-grow"><b>{name}</b><small data-working={working || undefined} data-attention={attention || undefined}>{sub}</small></div>
+      {(port || note) && (
+        <span className="dd-ws-end">
+          {port && <span className="dd-port-text">{port}</span>}
+          {note && <small>{note}</small>}
+        </span>
+      )}
       <ChevronRight size={14} strokeWidth={1.75} className="dd-chevron" />
     </div>
   )
@@ -210,7 +215,7 @@ export function WorkspaceRow({ tone, letter, name, sub, port, working, wideOnly 
 
 /* ---------- Agents: the plan limits ---------- */
 
-export function Limit({ label, resets, used, mark, verdict, tone, s }: { label: string; resets: string; used: number; mark: number; verdict: string; tone: 'claude' | 'codex'; s: { limits: boolean; marks: boolean } }) {
+export function Limit({ label, resets, used, mark, verdict, tone, attention, s }: { label: string; resets: string; used: number; mark: number; verdict: string; tone: 'claude' | 'codex'; attention?: boolean; s: { limits: boolean; marks: boolean } }) {
   return (
     <div className="dd-limit" data-tone={tone}>
       <div className="dd-limit-top">
@@ -220,7 +225,7 @@ export function Limit({ label, resets, used, mark, verdict, tone, s }: { label: 
           <span>used</span>
         </span>
       </div>
-      <small className="dd-verdict" data-show={s.marks || undefined}>{verdict}</small>
+      <small className="dd-verdict" data-show={s.marks || undefined} data-attention={attention || undefined}>{verdict}</small>
       <div className="dd-bar">
         <i style={{ width: s.limits ? `${used}%` : 0 }} />
         <u data-show={s.marks || undefined} style={{ left: `${mark}%` }} />
@@ -234,17 +239,18 @@ function Agents({ s }: { s: S }) {
     <>
       <div className="dd-card" data-target="limits">
         <CardHead icon={<Gauge size={14} strokeWidth={1.75} />} tone="green" title="Plan limits" />
-        <div className="dd-who"><Asterisk size={14} strokeWidth={2} className="dd-claude-ink" /><b>Claude · Max 5x</b><Badge>Experimental</Badge></div>
+        <div className="dd-who"><Asterisk size={14} strokeWidth={2} className="dd-claude-ink" /><b>Claude</b></div>
         <Limit s={s} tone="claude" label="5-hour" resets="resets in 2 hours" used={55} mark={56} verdict="On pace to last until it resets" />
         <Limit s={s} tone="claude" label="Weekly" resets="resets in 4 days" used={38} mark={50} verdict="Well under pace" />
         <div className="dd-who"><Code size={14} strokeWidth={2} className="dd-codex-ink" /><b>Codex</b></div>
         <Limit s={s} tone="codex" label="5h window" resets="resets in 3 hours" used={21} mark={40} verdict="Well under pace" />
+        <Limit s={s} tone="codex" label="7d window" resets="resets in 4 days" used={34} mark={42} verdict="On pace to last until it resets" />
       </div>
       <div className="dd-card">
         <CardHead icon={<Layers size={14} strokeWidth={1.75} />} tone="violet" title="Workspaces" count="5" />
-        <WorkspaceRow tone="blue" letter="S" name="storefront-web" sub="Claude is working · 4m" port=":3000" working />
-        <WorkspaceRow tone="green" letter="B" name="billing-api" sub="Claude idle for 38m" port=":4000" />
-        <WorkspaceRow tone="magenta" letter="N" name="notes-ios" sub="Claude idle for 2h 50m" />
+        <WorkspaceRow tone="blue" letter="S" name="storefront-web" sub="Claude is working · 4m" port=":3000" note="server 412 MB" working />
+        <WorkspaceRow tone="green" letter="B" name="billing-api" sub="Claude idle for 38m" port=":4000" note="server 186 MB" />
+        <WorkspaceRow tone="magenta" letter="N" name="notes-ios" sub="Claude idle for 2h 50m" note="1 agent" />
         <FillerRow />
       </div>
     </>
@@ -254,10 +260,10 @@ function Agents({ s }: { s: S }) {
 /* ---------- Servers ---------- */
 
 const SERVERS = [
-  { port: ':3000', name: 'storefront-web', by: 'Started by Claude', up: 'up 52m', mem: '412 MB', idle: false },
-  { port: ':4000', name: 'billing-api', by: '', up: 'up 20h', mem: '186 MB', idle: true },
-  { port: ':5173', name: 'docs-site', by: 'Started by Claude', up: 'up 3h', mem: '144 MB', idle: false },
-  { port: ':8888', name: 'ml-notebooks', by: '', up: 'up 1d', mem: '238 MB', idle: true },
+  { port: ':3000', name: 'storefront-web', by: 'Started by Claude', up: 'up 52m', cmd: 'node next dev', mem: '412 MB', idle: false },
+  { port: ':4000', name: 'billing-api', by: '', up: 'up 20h 0m', cmd: 'node server.js', mem: '186 MB', idle: true },
+  { port: ':5173', name: 'docs-site', by: 'Started by Claude', up: 'up 3h 0m', cmd: 'node vite', mem: '144 MB', idle: false },
+  { port: ':8888', name: 'ml-notebooks', by: '', up: 'up 1d', cmd: 'python jupyter-lab', mem: '238 MB', idle: true },
 ]
 
 const LISTENERS = [96, 70, 120, 84, 110, 76, 100, 88]
@@ -282,6 +288,7 @@ export function Servers({ s }: { s: { rows: number; flags: boolean } }) {
               ) : (
                 <>{v.by} · {v.up}</>
               )}
+              <span className="dd-cmd"> · <code>{v.cmd}</code></span>
             </small>
           </div>
           <span className="dd-faint">{v.mem}</span>

@@ -46,3 +46,5 @@ Reuses the hero's cards, limits and server rows (exported from `DashbarDemo.tsx`
 - Gate (film.mjs `--gate`, playground, Chrome) at 592 and 390: agents, limits, servers and system pass. Cleanup passes except the kit `Count`'s own re-centring of its digit strip, reported as "settle snap" (the digits repeat, so nothing visible moves; checked on the contact sheet).
 - The system charts' draw-in is a kit part; its "same-box content change" lines are manual-inspection prompts, looked at on the sheet.
 - Not checked: axe on the page with the new demos, light mode contact sheets, Safari/Firefox, a real screen reader pass.
+
+Updated for the app as of the permission prompts, cost and History work: the agents demo now shows a permission prompt answered with Allow once (cursor; the poster is the prompt itself, before the click), the limits demo shows the status line reading (no plan name or Experimental badge) and Codex's 7d window, and a sixth demo shows a usage card with its cost estimate. Checked in headless Chrome at 390, 905, 1000, 1180 and 1280, light and dark, reduced motion and played through; the film gate was not re-run.

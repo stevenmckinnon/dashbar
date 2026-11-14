@@ -1,4 +1,4 @@
-import { Asterisk, Code, Compass, Cpu, Folder, LayoutGrid, Package, Pause, Pin, RotateCw, Search, Server, Settings, Sparkles, Terminal } from 'lucide-react'
+import { ChartColumn, ChevronRight, CircleStop, Code, Compass, Copy, Cpu, Folder, LayoutGrid, Package, Pause, Pin, RotateCw, Search, Server, Settings, Sparkles, SquareArrowOutUpRight, Terminal } from 'lucide-react'
 import { Badge, Count, Stage, type Act } from '../stageshow/kit'
 import { CardHead, Mark } from './DashbarDemo'
 import './dashbar-demo.css'
@@ -75,8 +75,9 @@ const PAGES = [
   { name: 'Overview', Icon: LayoutGrid },
   { name: 'Agents', Icon: Sparkles, badge: '4' },
   { name: 'Servers', Icon: Server, badge: '4' },
-  { name: 'System', Icon: Cpu, badge: '34%' },
+  { name: 'System', Icon: Cpu, badge: 'CPU 34%' },
   { name: 'Clean-up', Icon: Package, badge: '7 GB' },
+  { name: 'History', Icon: ChartColumn },
 ]
 
 const WORKSPACES = [
@@ -140,7 +141,7 @@ function Head({ s }: { s: S }) {
 /* ---------- Overview ---------- */
 
 const CARDS = [
-  { letter: 'S', name: 'storefront-web', status: 'Claude is working · 4m', working: true, cpu: '12%', mem: '1.1 GB', energy: '3.1 W', port: ':3000' },
+  { letter: 'S', name: 'storefront-web', status: 'Claude is working · 4m', working: true, cpu: '12%', mem: '1.11 GB', energy: '3.1 W', port: ':3000' },
   { letter: 'B', name: 'billing-api', status: 'Claude idle for 38m', cpu: '0.3%', mem: '512 MB', energy: '0.20 W', port: ':4000' },
   { letter: 'D', name: 'docs-site', status: 'Claude idle for 1h 35m', cpu: '2%', mem: '610 MB', energy: '0.60 W', port: ':5173' },
   { letter: 'N', name: 'notes-ios', status: 'Claude idle for 2h 50m', cpu: '0.1%', mem: '296 MB', energy: '0.05 W' },
@@ -170,6 +171,7 @@ function Overview() {
             <div className="dd-now-top">
               <span className="dd-mono">{c.letter}{c.working && <i className="dd-dot" />}</span>
               <div className="dd-grow"><b>{c.name}</b><small data-working={c.working || undefined}>{c.status}</small></div>
+              <ChevronRight size={14} strokeWidth={1.75} className="dd-chevron" />
             </div>
             <div className="wd-figures">
               <Figure label="CPU" value={c.cpu} />
@@ -207,6 +209,7 @@ function Workspace({ s }: { s: S }) {
         <span><Terminal size={14} strokeWidth={1.75} />Ghostty</span>
         <span><Folder size={14} strokeWidth={1.75} />Finder</span>
         <span className="wd-wide-only"><Compass size={14} strokeWidth={1.75} />localhost:3000</span>
+        <span className="wd-wide-only"><Copy size={14} strokeWidth={1.75} />Copy path</span>
       </div>
       <div className="wd-tiles">
         <Tile label="Uptime" caption="Since 10:14" on={s.tiles}><strong>52m</strong></Tile>
@@ -214,7 +217,7 @@ function Workspace({ s }: { s: S }) {
           <strong><Count value={s.tiles ? 12 : 0} format={(n) => String(n)} /><small>%</small></strong>
         </Tile>
         <Tile label="Memory" caption="9 processes" on={s.tiles} line>
-          <strong><Count value={s.tiles ? 119 : 0} format={(n) => (n / 100).toFixed(2)} /><small>GB</small></strong>
+          <strong><Count value={s.tiles ? 111 : 0} format={(n) => (n / 100).toFixed(2)} /><small>GB</small></strong>
         </Tile>
         <Tile label="Energy" caption="Moderate · avg 2.5 W" on={s.tiles} bars={ENERGY}>
           <strong><Count value={s.tiles ? 31 : 0} format={(n) => (n / 10).toFixed(1)} /><small>W</small></strong>
@@ -227,13 +230,17 @@ function Workspace({ s }: { s: S }) {
             <span className="dd-port">:3000</span>
             <div className="dd-grow"><b className="wd-mono">node next dev</b><small>Started by Claude · up 52m</small></div>
             <span className="dd-faint">412 MB</span>
+            <span className="wd-row-actions">
+              <SquareArrowOutUpRight size={14} strokeWidth={1.75} />
+              <CircleStop size={14} strokeWidth={1.75} />
+            </span>
           </div>
         </div>
         <div className="dd-card">
           <CardHead icon={<Sparkles size={14} strokeWidth={1.75} />} tone="violet" title="Agents" count="1" />
           <div className="dd-session wd-agent">
-            <span className="dd-claude"><Asterisk size={14} strokeWidth={2} /></span>
-            <div className="dd-grow"><b>Add Stripe checkout and webhooks</b><small>Working 4m · CLI · runs :3000</small></div>
+            <span className="wd-agent-dot" />
+            <div className="dd-grow"><b>Add Stripe checkout and webhooks</b><small>Working 4m · Terminal · runs :3000</small></div>
             <div className="dd-context"><span className="dd-meter"><i style={{ width: '34%' }} /></span><b>34%</b><small>context</small></div>
           </div>
         </div>

@@ -592,4 +592,43 @@
     font-style: normal;
     color: var(--ss-text);
   }
+
+  /* ---------- Later additions: what the app shows today ---------- */
+  /* Amber is "needs you", as in the app (UI.attention) */
+  .dd-dot[data-attention] { background: var(--ss-warning); }
+  .dd-grow small[data-attention] { color: var(--ss-warning-text); }
+  .dd-ok[data-attention] { color: var(--ss-warning-text); }
+
+  /* A workspace row's right side: its port, then what it runs */
+  .dd-ws-end {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1px;
+    flex: none;
+  }
+  .dd-ws-end small {
+    font-size: 12px;
+    line-height: 1.3;
+    color: var(--ss-text);
+    white-space: nowrap;
+  }
+
+  /* A server's command, cut off as the app cuts it */
+  .dd-srv .dd-grow small {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .dd-cmd code,
+  .dd-code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11.5px;
+    background: none;
+    padding: 0;
+    border-radius: 0;
+    color: inherit;
+  }
 }
+
+.dd .dd-pane > * { min-width: 0; }
