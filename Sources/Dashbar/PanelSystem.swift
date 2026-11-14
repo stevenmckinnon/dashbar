@@ -284,8 +284,28 @@ struct AppIcon: View {
 
     private static func icon(for path: String) -> NSImage {
         if let hit = cache[path] { return hit }
-        let image = NSWorkspace.shared.icon(forFile: path)
+        var image = NSWorkspace.shared.icon(forFile: path)
+        // App icons can carry high dynamic range. On screen that's fine, but in a `--snapshot` picture one icon turns
+        // the whole PNG into 16-bit PQ (HDR), which viewers and web pages show washed out. Snapshots draw a flat copy.
+        if CommandLine.arguments.contains("--snapshot") { image = standardRange(image) }
         cache[path] = image
         return image
+    }
+
+    /// The icon redrawn into an 8-bit sRGB bitmap, at 64 px (drawn at 20 pt, 2x).
+    private static func standardRange(_ icon: NSImage) -> NSImage {
+        let px = 64
+        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: px, pixelsHigh: px, bitsPerSample: 8,
+                                         samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)?
+                .retagging(with: .sRGB),
+              let ctx = NSGraphicsContext(bitmapImageRep: rep) else { return icon }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = ctx
+        icon.draw(in: NSRect(x: 0, y: 0, width: px, height: px))
+        NSGraphicsContext.restoreGraphicsState()
+        let flat = NSImage(size: NSSize(width: 20, height: 20))
+        flat.addRepresentation(rep)
+        return flat
     }
 }
