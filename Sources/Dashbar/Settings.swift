@@ -477,7 +477,7 @@ private struct NotificationSettings: View {
             } header: {
                 Text("Island")
             } footer: {
-                Text("A small black pill on the notch, or below the menu bar, with your agents' status. It opens briefly when something happens, and lists your sessions on hover.")
+                Text("A banner grows out of the notch (or below the menu bar) when an agent finishes or needs you, then folds away. Between moments nothing is drawn, unless you keep the small status beside the notch.")
                     .settingsFooter()
             }
         }
