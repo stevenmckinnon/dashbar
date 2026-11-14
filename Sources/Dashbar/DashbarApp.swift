@@ -3,7 +3,9 @@ import AppKit
 
 @main
 struct DashbarApp: App {
-    @StateObject private var store = Store()
+    /// A snapshot run renders from its own store (`Snapshot`), so the menu bar item gets invented data and nothing is
+    /// collected twice.
+    @StateObject private var store = Store(demo: CommandLine.arguments.contains("--snapshot"))
 
     init() {
         Onboarding.decideAtLaunch()   // before anything this launch saves a preference
@@ -38,46 +40,5 @@ struct DashbarApp: App {
         // The window keeps its width and can be dragged taller or shorter; each tab scrolls when it runs long.
         .windowResizability(.contentMinSize)
         .commands { WindowCommands() }
-    }
-}
-
-struct MenuBarLabel: View {
-    @ObservedObject var store: Store
-    @ObservedObject private var settings = AppSettings.shared
-
-    var body: some View {
-        let busy = store.busyCount
-        HStack(spacing: 4) {
-            Image(nsImage: BrandMark.menuBarImage(working: busy > 0))
-            if let text = stats(busy: busy) {
-                text.monospacedDigit()
-            }
-        }
-    }
-
-    /// Working agents first, then whichever stats the user turned on, each led by its symbol.
-    private func stats(busy: Int) -> Text? {
-        let s = store.system
-        var parts: [Text] = []
-        if busy > 0 { parts.append(Text("\(busy)")) }
-        let waiting = store.waitingCount
-        if waiting > 0 { parts.append(Text("\(Image(systemName: "hand.raised.fill")) \(waiting)")) }
-        if settings.menuCPU {
-            parts.append(Text("\(Image(systemName: "cpu")) \(Int((s.cpu * 100).rounded()))%"))
-        }
-        if settings.menuMemory {
-            let used = Int((Double(s.memUsed) / Double(max(s.memTotal, 1)) * 100).rounded())
-            parts.append(Text("\(Image(systemName: "memorychip")) \(used)%"))
-        }
-        if settings.menuNetwork {
-            parts.append(Text("\(Image(systemName: "arrow.down")) \(Fmt.shortRate(s.netDown))"))
-        }
-        if settings.menuLimit, settings.showsClaudeLimits, store.claudePlan?.problem == nil,
-           let r = ClaudePlanLimits.menuBarReading(store.claudePlan?.limits ?? []) {
-            parts.append(Text("\(Image(systemName: r.atRisk ? "exclamationmark.triangle.fill" : "gauge.with.needle")) \(r.name) \(r.leftPercent)% left"))
-        }
-        guard var text = parts.first else { return nil }
-        for part in parts.dropFirst() { text = text + Text("  ") + part }
-        return text
     }
 }

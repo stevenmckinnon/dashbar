@@ -51,8 +51,9 @@ placeholders); use `--hosted` for those. Look at a render or the running app bef
 `Resources/AppIcon.svg` is the source. `build.sh` renders it with WebKit (`scripts/render-svg.swift`,
 which keeps the SVG's glow and shadow filters that macOS's own SVG renderer drops) and packages
 `Resources/AppIcon.icns` whenever the SVG changes. The menu bar glyph is drawn in code from the same
-proportions (`Sources/Dashbar/Brand.swift`) as a template image; its bar fills up while agents are working.
-`Dashbar --snapshot glyphs.png --glyphs` previews it on light and dark menu bars.
+proportions (`Sources/Dashbar/Brand.swift`); `MenuBarStatus.swift` draws the whole item (a template image unless the
+status needs amber or green) and sweeps the bar while agents work. `Dashbar --snapshot glyphs.png --glyphs` previews the
+glyph, and `Dashbar --snapshot states.png --demo --menubar all` every state of the item, on light and dark menu bars.
 
 ## Rules for changes
 
