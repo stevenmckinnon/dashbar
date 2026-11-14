@@ -260,4 +260,75 @@ import Testing
         #expect(IslandNeighbours.obstacles(in: [release], ownPID: 2, isLocalBuild: true, primaryHeight: 982, band: band).count == 1)
         #expect(IslandNeighbours.obstacles(in: [local], ownPID: 1, isLocalBuild: false, primaryHeight: 982, band: band).isEmpty)
     }
+
+    // MARK: Ears
+
+    let widths = IslandEars.Widths(mark: 39, full: 94, count: 45, dot: 33)
+
+    @Test func theWidestEarThatFitsIsChosenAndShrinksAsRoomRunsOut() {
+        // Measured room on the right: full words when they fit, then the count, then a dot, then nothing.
+        #expect(IslandEars.fit(leftGap: 60, rightGap: 200, widths: widths, allowFull: true).right == .full)
+        #expect(IslandEars.fit(leftGap: 60, rightGap: 99, widths: widths, allowFull: true).right == .count)
+        #expect(IslandEars.fit(leftGap: 60, rightGap: 50, widths: widths, allowFull: true).right == .dot)
+        let tight = IslandEars.fit(leftGap: 60, rightGap: 38, widths: widths, allowFull: true)
+        #expect(tight.right == .none && tight.rightWidth == 0)
+        // Unmeasured room never shows the full words.
+        #expect(IslandEars.fit(leftGap: 60, rightGap: 500, widths: widths, allowFull: false).right == .count)
+    }
+
+    @Test func theMarkHidesWhenTheLeftIsTooTight() {
+        let room = IslandEars.fit(leftGap: 45, rightGap: 60, widths: widths, allowFull: false)
+        #expect(room.showsMark && room.leftWidth == 39)
+        let none = IslandEars.fit(leftGap: 44, rightGap: 60, widths: widths, allowFull: false)
+        #expect(!none.showsMark && none.leftWidth == 0)
+    }
+
+    @Test func theAssumedRoomFitsTheMarkAndACount() {
+        let ears = IslandEars.fit(leftGap: IslandEars.assumedLeft, rightGap: IslandEars.assumedRight, widths: widths, allowFull: false)
+        #expect(ears.showsMark && ears.right == .count)
+    }
+
+    @Test func gapsRunFromTheNotchToTheNearestItem() {
+        let notch = macBook.notch!
+        // Every item seen: the gap is exact, and measured.
+        let items = [CGRect(x: 900, y: 950, width: 30, height: 32), CGRect(x: 1000, y: 950, width: 40, height: 32),
+                     CGRect(x: 600, y: 950, width: 40, height: 32)]
+        let g = IslandEars.gaps(notch: notch, screen: macBook.frame, items: items, itemsAreComplete: true)
+        #expect(g.right == 900 - 848.5 && g.measuredRight)
+        #expect(g.left == 663.5 - 640)
+        // An unseen item may be nearer: capped by the assumed room, and not called measured.
+        let partial = IslandEars.gaps(notch: notch, screen: macBook.frame, items: [CGRect(x: 1100, y: 950, width: 30, height: 32)],
+                                      itemsAreComplete: false)
+        #expect(partial.right == IslandEars.assumedRight && !partial.measuredRight)
+        #expect(partial.left == IslandEars.assumedLeft)
+        // Dashbar's own item nearer than the assumption still limits it.
+        let own = IslandEars.gaps(notch: notch, screen: macBook.frame, items: [CGRect(x: 870, y: 950, width: 30, height: 32)],
+                                  itemsAreComplete: false)
+        #expect(own.right == 870 - 848.5)
+        // A window below the menu bar is not a menu bar item.
+        let below = IslandEars.gaps(notch: notch, screen: macBook.frame, items: [CGRect(x: 860, y: 500, width: 30, height: 32)],
+                                    itemsAreComplete: true)
+        #expect(below.right == IslandEars.assumedRight)
+    }
+
+    @Test func statusItemsAreReadFromLayer25InTheMenuBar() {
+        func w(_ layer: Int, pid: Int, x: Double, y: Double, width: Double, height: Double) -> [String: Any] {
+            [kCGWindowOwnerPID as String: pid, kCGWindowLayer as String: layer,
+             kCGWindowBounds as String: ["X": x, "Y": y, "Width": width, "Height": height] as [String: Any]]
+        }
+        let found = IslandEars.statusItems(in: [
+            w(25, pid: 5, x: 900, y: 0, width: 30, height: 33),     // an item
+            w(25, pid: 1, x: 950, y: 0, width: 30, height: 33),     // our own
+            w(24, pid: 6, x: 0, y: 0, width: 1512, height: 33),     // the menu bar
+            w(25, pid: 7, x: 532, y: 0, width: 448, height: 472),   // a menu bar app's open panel
+        ], ownPID: 1, primaryHeight: 982, menuBarHeight: 33)
+        #expect(found == [CGRect(x: 900, y: 949, width: 30, height: 33)])
+    }
+
+    @Test func unevenEarsMoveTheIslandOffTheNotchCentre() {
+        let p = IslandPlacement.place(on: macBook, position: .automatic)
+        // A 39-point mark ear and no right ear: the island ends at the notch's right edge.
+        let f = p.frame(for: CGSize(width: 39 + 185, height: 32), ears: (left: 39, right: 0))
+        #expect(f.minX == 663.5 - 39 && f.maxX == 848.5)
+    }
 }
