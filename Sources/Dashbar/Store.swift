@@ -572,8 +572,10 @@ final class Store: ObservableObject {
             islandEvents.send(IslandEvent(kind: .permission(requestID: r.id), sessionID: r.sessionId))
             notifier.permission(r, session: session, account: session?.account ?? r.accountLabel(in: claudeAccounts))
         }
-        trackTransitions(marked)
+        // Sessions first: the island checks a moment against them as it arrives, and would drop "finished" for a
+        // session it still saw working.
         update(\.sessions, marked)
+        trackTransitions(marked)
     }
 
     /// Allow once, Deny, or hand the prompt back to Claude Code's terminal. A request that has gone (answered in the
@@ -618,8 +620,8 @@ final class Store: ObservableObject {
     private func apply(_ r: Worker.LiveResult) {
         rawSessions = r.sessions
         if permissionRequests.isEmpty {
-            trackTransitions(r.sessions)
             update(\.sessions, r.sessions)
+            trackTransitions(r.sessions)
         } else {
             applyPermissions(permissionRequests)   // marks their sessions, and drops prompts answered in the terminal
         }
