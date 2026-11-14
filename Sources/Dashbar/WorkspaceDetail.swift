@@ -40,9 +40,9 @@ struct UsageTile: View {
     }
 }
 
-/// Recent samples, newest on the right and in the info colour. Bars suit bursty figures (CPU, energy) and are scaled
-/// to their own peak: they show the shape of the last few minutes, the figure above gives the size. A line suits
-/// figures that drift (memory): it spans the recent low to high, and sits flat in the middle when nothing changes.
+/// Recent samples, newest on the right and darkest. Bars suit bursty figures (CPU, energy) and are scaled to their own
+/// peak: they show the shape of the last few minutes, the figure above gives the size. A line suits figures that drift
+/// (memory): its scale spans at least 10% either side of the average, so a small drift draws as a small slope.
 struct Sparkbars: View {
     enum Style { case bars, line, none }
     static let count = 24
@@ -59,8 +59,9 @@ struct Sparkbars: View {
     }
 
     private var line: some View {
-        let lo = values.min() ?? 0, hi = values.max() ?? 0
-        let flat = hi <= 0 || (hi - lo) / hi < 0.02
+        let domain = Self.lineDomain(values)
+        let lo = domain.lowerBound, hi = domain.upperBound
+        let flat = hi <= lo
         return GeometryReader { g in
             let step = g.size.width / CGFloat(Self.count - 1)
             let offset = CGFloat(Self.count - values.count)
@@ -79,12 +80,20 @@ struct Sparkbars: View {
                 }
                 if !values.isEmpty {
                     let last = point(values.count - 1)
-                    Circle().fill(UI.textInfo).frame(width: 5, height: 5).position(last)
+                    Circle().fill(UI.dataNow).frame(width: 5, height: 5).position(last)
                 }
             }
         }
         .frame(height: height)
         .accessibilityHidden(true)
+    }
+
+    /// The line's vertical scale: the samples' range, widened to at least ±10% of their average, so the slope is
+    /// honest about how big a change is. Empty or all-zero samples give an empty range (drawn flat).
+    static func lineDomain(_ values: [Double]) -> ClosedRange<Double> {
+        guard let lo = values.min(), let hi = values.max(), hi > 0 else { return 0...0 }
+        let mean = values.reduce(0, +) / Double(values.count)
+        return min(lo, mean * 0.9)...max(hi, mean * 1.1)
     }
 
     private var bars: some View {
@@ -99,7 +108,7 @@ struct Sparkbars: View {
                         let index = i - (Self.count - values.count)
                         let v = index >= 0 ? values[index] : 0
                         RoundedRectangle(cornerRadius: min(1, w / 2))
-                            .fill(index == values.count - 1 ? UI.textInfo : Color.secondary.opacity(0.5))
+                            .fill(index == values.count - 1 ? UI.dataNow : UI.dataPast)
                             .frame(width: w, height: index >= 0 && peak > 0 ? max(2, height * v / peak) : 0)
                     }
                 }

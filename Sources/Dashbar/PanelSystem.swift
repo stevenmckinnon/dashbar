@@ -12,50 +12,53 @@ struct SystemPage: View {
         let h = store.history
         VStack(spacing: UI.gap) {
             // CPU
-            MetricCard(title: "CPU", icon: "cpu", tint: .blue, trailing: "up \(Fmt.ago(Date().addingTimeInterval(-s.uptime)))",
+            MetricCard(title: "CPU", icon: "cpu", tint: .secondary, trailing: "up \(Fmt.ago(Date().addingTimeInterval(-s.uptime)))",
                        caption: "\(s.cores) cores · \(s.chip)",
                        value: "\(Int((s.cpu * 100).rounded()))", unit: "%") {
                 StatRow([("User", "\(Int((s.cpuUser * 100).rounded()))%"),
                          ("System", "\(Int((s.cpuSystem * 100).rounded()))%"),
                          ("Load", String(format: "%.2f", s.load[0]))])
-                BarHistory(values: h.cpu, tint: .blue, maxValue: 1, label: "CPU, last \(h.cpu.count) samples")
+                BarHistory(values: h.cpu, maxValue: 1, label: "CPU, last \(h.cpu.count) samples")
             }
             // Memory
-            MetricCard(title: "Memory", icon: "memorychip", tint: .purple, trailing: nil,
+            MetricCard(title: "Memory", icon: "memorychip", tint: .secondary, trailing: nil,
                        caption: "In use of \(Fmt.bytes(s.memTotal))",
                        value: Fmt.bytesSplit(s.memUsed, style: .memory).0, unit: Fmt.bytesSplit(s.memUsed, style: .memory).1,
                        badge: PressureBadge(pressure: s.pressure)) {
                 StatRow([("App", Fmt.bytes(s.memApp)), ("Wired", Fmt.bytes(s.memWired)),
                          ("Compressed", Fmt.bytes(s.memCompressed))] + (s.swapUsed > 0 ? [("Swap", Fmt.bytes(s.swapUsed))] : []))
-                BarHistory(values: h.memory, tint: .purple, maxValue: 1, label: "Memory, last \(h.memory.count) samples")
+                BarHistory(values: h.memory, maxValue: 1, label: "Memory, last \(h.memory.count) samples")
             }
             // Network
-            MetricCard(title: "Network", icon: "network", tint: .teal, trailing: nil,
+            MetricCard(title: "Network", icon: "network", tint: .secondary, trailing: nil,
                        caption: "Download", value: Fmt.rate(s.netDown).split(separator: " ").first.map(String.init) ?? "0",
                        unit: Fmt.rate(s.netDown).split(separator: " ").dropFirst().joined(separator: " ")) {
                 StatRow([("Upload", Fmt.rate(s.netUp)),
                          ("Peak download", Fmt.rate(h.down.max() ?? 0))])
-                BarHistory(values: h.down, tint: .teal, maxValue: nil, label: "Download, last \(h.down.count) samples")
+                BarHistory(values: h.down, maxValue: nil, label: "Download, last \(h.down.count) samples")
             }
             // GPU
             if let gpu = s.gpu {
-                MetricCard(title: "GPU", icon: "square.stack.3d.up.fill", tint: .pink, trailing: nil,
+                MetricCard(title: "GPU", icon: "square.stack.3d.up.fill", tint: .secondary, trailing: nil,
                            caption: s.chip, value: "\(Int((gpu * 100).rounded()))", unit: "%") {
                     StatRow([("Average", "\(Int(((h.gpu.reduce(0, +) / Double(max(h.gpu.count, 1))) * 100).rounded()))%"),
                              ("Peak", "\(Int(((h.gpu.max() ?? 0) * 100).rounded()))%")])
-                    BarHistory(values: h.gpu, tint: .pink, maxValue: 1, label: "GPU, last \(h.gpu.count) samples")
+                    BarHistory(values: h.gpu, maxValue: 1, label: "GPU, last \(h.gpu.count) samples")
                 }
             }
             // Disk and battery
             HStack(spacing: UI.gap) {
                 if s.diskTotal > 0 {
-                    MiniMetric(title: "Disk", icon: "internaldrive", tint: .orange,
+                    // The figure is the free space, so the bar fills the free share, as Battery's fills the charge left.
+                    let free = Double(s.diskFree) / Double(s.diskTotal)
+                    MiniMetric(title: "Disk", icon: "internaldrive", tint: free < 0.10 ? UI.textDanger : UI.meterFill,
                                value: Self.split(Fmt.driveBytes(s.diskFree)).0, unit: Self.split(Fmt.driveBytes(s.diskFree)).1 + " free",
-                               fraction: 1 - Double(s.diskFree) / Double(s.diskTotal), detail: "of \(Fmt.driveBytes(s.diskTotal))")
+                               fraction: free, detail: "of \(Fmt.driveBytes(s.diskTotal))",
+                               spokenValue: "\(Fmt.driveBytes(s.diskFree)) free of \(Fmt.driveBytes(s.diskTotal))")
                 }
                 if let b = s.battery {
                     MiniMetric(title: s.charging ? "Battery · charging" : "Battery", icon: s.charging ? "battery.100.bolt" : "battery.75",
-                               tint: b < 20 && !s.charging ? UI.textDanger : .green,
+                               tint: b < 20 && !s.charging ? UI.textDanger : UI.meterFill,
                                value: "\(b)", unit: "%", fraction: Double(b) / 100,
                                detail: s.batteryMinutes.map { Fmt.minutes($0) + (s.charging ? " to full" : " left") }
                                    ?? (s.onAC ? "On power" : "Estimating…"))
@@ -115,8 +118,9 @@ struct PressureBadge: View {
     var body: some View {
         let (symbol, color): (String, Color) = {
             switch pressure {
-            case .normal: return ("checkmark", UI.textSuccess)
-            case .warning: return ("exclamationmark", .orange)
+            // Green is for working agents, so a normal reading stays neutral; amber is "soon", red a real problem.
+            case .normal: return ("checkmark", UI.textSecondary)
+            case .warning: return ("exclamationmark", UI.textAttention)
             case .critical: return ("exclamationmark.triangle.fill", UI.textDanger)
             }
         }()
@@ -124,7 +128,7 @@ struct PressureBadge: View {
             .font(.system(size: UI.Size.caption, weight: .semibold))
             .foregroundStyle(color)
             .padding(.horizontal, 8).padding(.vertical, 3)
-            .background(Capsule().fill(color.opacity(0.14)))
+            .background(Capsule().fill(pressure == .warning ? UI.attention.opacity(0.16) : pressure == .normal ? Color.primary.opacity(0.07) : color.opacity(0.14)))
             .help("Memory pressure: how hard macOS is working to find free memory. Normal is fine even when usage looks high.")
     }
 }
@@ -145,10 +149,10 @@ struct StatRow: View {
     }
 }
 
-/// Recent samples as small vertical bars, newest on the right; empty slots show as faint stubs.
+/// Recent samples as small vertical bars, newest on the right and darkest; empty slots show as faint stubs.
+/// Neutral: a system figure isn't an agent's, so it takes no colour.
 struct BarHistory: View {
     let values: [Double]
-    let tint: Color
     /// Fixed scale (e.g. 1 for percentages); nil scales to the largest value shown.
     let maxValue: Double?
     let label: String
@@ -165,7 +169,7 @@ struct BarHistory: View {
                     let index = i - (n - values.count)
                     let v = index >= 0 ? values[index] : 0
                     RoundedRectangle(cornerRadius: min(1.5, w / 2))
-                        .fill(index >= 0 ? tint.opacity(i == n - 1 ? 1 : 0.7) : tint.opacity(0.14))
+                        .fill(index >= 0 ? (i == n - 1 ? UI.dataNow : UI.dataPast) : Color.primary.opacity(0.06))
                         .frame(width: w, height: index >= 0 ? max(2, height * min(v / peak, 1)) : 2)
                 }
             }
@@ -173,7 +177,7 @@ struct BarHistory: View {
         }
         .frame(height: height)
         .padding(.horizontal, 8).padding(.vertical, 6)
-        .background(RoundedRectangle(cornerRadius: UI.innerRadius, style: .continuous).fill(tint.opacity(0.08)))
+        .background(RoundedRectangle(cornerRadius: UI.innerRadius, style: .continuous).fill(Color.primary.opacity(0.04)))
         .accessibilityElement()
         .accessibilityLabel(label)
     }
@@ -187,6 +191,8 @@ struct MiniMetric: View {
     let unit: String
     let fraction: Double
     let detail: String
+    /// What VoiceOver reads as the value; by default the figure and its unit.
+    var spokenValue: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -200,8 +206,8 @@ struct MiniMetric: View {
             }
             GeometryReader { g in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(tint.opacity(0.16))
-                    Capsule().fill(tint).frame(width: max(4, g.size.width * min(max(fraction, 0), 1)))
+                    Capsule().fill(UI.track)
+                    Capsule().fill(tint).frame(width: Meter.width(fraction, in: g.size.width, minimum: 3))
                 }
             }
             .frame(height: 5)
@@ -210,6 +216,9 @@ struct MiniMetric: View {
         .padding(UI.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .surface()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue((spokenValue ?? "\(value) \(unit)") + ", " + detail)
     }
 }
 
@@ -221,7 +230,7 @@ struct BusiestApps: View {
         let q = query.lowercased().trimmingCharacters(in: .whitespaces)
         let shown = q.isEmpty ? apps : apps.filter { $0.name.lowercased().contains(q) }
         let peak = max(shown.first?.cpu ?? 0, 0.01)
-        Card(title: "Busiest right now", icon: "flame", tint: .orange, count: nil, trailing: "share of all CPU") {
+        Card(title: "Busiest right now", icon: "flame", tint: .secondary, count: nil, trailing: "share of all CPU") {
             if apps.isEmpty {
                 EmptyRow(text: "Measuring… this fills in after a few seconds.")
             } else if shown.isEmpty {
@@ -235,8 +244,8 @@ struct BusiestApps: View {
                             Spacer(minLength: 8)
                             GeometryReader { g in
                                 ZStack(alignment: .leading) {
-                                    Capsule().fill(Color.blue.opacity(0.14))
-                                    Capsule().fill(Color.blue).frame(width: max(3, g.size.width * app.cpu / peak))
+                                    Capsule().fill(UI.track)
+                                    Capsule().fill(UI.meterFill).frame(width: Meter.width(app.cpu / peak, in: g.size.width, minimum: 3))
                                 }
                             }
                             .frame(width: 70, height: 5)
