@@ -92,7 +92,7 @@ const ITEMS = [
   { name: "Working agents", Demo: AgentsDemo, w: 792, h: 276,
     body: <>Each Claude Code session by project: working or idle, for how long, and how full its context window is. It reads the session files and transcripts under <code>~/.claude</code>, and nothing else.</> },
   { name: "Plan limits, with pace", Demo: LimitsDemo, w: 792, h: 616,
-    body: <>Your 5-hour and weekly limits, with a mark for where an even pace would be and a projection of when you would run out at the current rate. Codex’s limits come from its own logs. Claude’s are experimental and off by default: turn them on and they read Claude Code’s sign-in from your Keychain, the same way Claude Code does.</> },
+    body: <>Your 5-hour and weekly limits, with a mark for where an even pace would be and a projection of when you would run out at the current rate. Codex’s limits come from its own logs. Claude’s come from Claude Code’s status line: add Dashbar to it in Settings and your usage updates after each Claude Code reply, with no network request.</> },
   { name: "Idle servers", Demo: ServersDemo, w: 792, h: 336,
     body: <>Dev servers grouped under the project that owns them. One that has been up for over an hour and is barely using the CPU is marked, and so is one an agent started.</> },
   { name: "System", Demo: SystemDemo, w: 792, h: 400,
@@ -275,13 +275,14 @@ function Privacy() {
             <li>Codex’s session logs: <code>~/.codex/sessions</code></li>
             <li>The listening ports on your Mac and the processes behind them, through the system’s own process API</li>
             <li>The folders you choose, to size the caches in clean-up</li>
+            <li>If you add Dashbar to Claude Code’s status line: the plan usage Claude Code passes it after each reply. Dashbar changes only that one setting, keeps a backup, and puts your previous status line back when you remove it.</li>
           </ul>
         </div>
         <div className="sends">
           <h3>Sends</h3>
           <p>Nothing, with two exceptions. There is no account and no analytics.</p>
           <ul>
-            <li>If you turn on Claude plan limits: one request to <code>api.anthropic.com</code> with Claude Code’s own sign-in. Dashbar never refreshes or stores that sign-in.</li>
+            <li>If you turn on the experimental way of reading Claude plan limits: one request to <code>api.anthropic.com</code> with Claude Code’s own sign-in. Dashbar never refreshes or stores that sign-in. The status line way sends nothing.</li>
             <li>Update checks, from version 0.3.0: a small feed fetched from GitHub to see whether a newer version exists.</li>
           </ul>
           <p style={{ marginTop: 14 }}>The code is <a href={REPO}>on GitHub</a> if you want to check.</p>

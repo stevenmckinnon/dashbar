@@ -75,7 +75,13 @@ images stay clean.
 
 **Privacy and safety (the product's promise: it sends nothing)**
 - Never add analytics, accounts or network calls. The only allowed requests are Sparkle update checks to
-  GitHub and the opt-in Claude plan limits request to `api.anthropic.com`.
+  GitHub and the opt-in, experimental Claude plan limits request to `api.anthropic.com`.
+- Claude plan limits come first from Claude Code's status line (`StatusLineBridge.swift`). Dashbar edits
+  Claude Code's settings only when the user presses Add (or Remove), only the `statusLine` key, after a backup,
+  re-reading the file just before writing, and refuses invalid JSON. The bridge script saves only `rate_limits`
+  and a timestamp (never prompts, paths, session ids or tokens), must always run the user's previous status line
+  unchanged, and sends nothing. Never touch the real `~/.claude` in tests or while developing: the installer
+  takes the settings path as a parameter, so use temp folders.
 - Never read, print, log or store Claude Code's token. Dashbar only reads its Keychain entry, with
   `/usr/bin/security` as Claude Code does (the entry trusts that tool, so macOS doesn't ask; reading it directly
   asked again after every renewal, since Claude Code rewrites the entry), keeps it in memory, makes one read-only request, and never refreshes or saves the sign-in. The reading it shares between
