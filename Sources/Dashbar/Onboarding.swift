@@ -142,6 +142,7 @@ final class OnboardingWindow: NSObject, NSWindowDelegate {
             self.window = window
         }
         NotificationPermission.shared.refresh()
+        window?.collectionBehavior.insert(.moveToActiveSpace)
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }

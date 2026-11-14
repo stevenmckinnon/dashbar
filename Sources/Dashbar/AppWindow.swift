@@ -63,6 +63,8 @@ final class AppWindow: NSObject, NSWindowDelegate {
         NSApp.setActivationPolicy(.regular)
         BuildInfo.applyLocalIcon()
         applyLevel()
+        // Come to the desktop being looked at, not the one the window was left on (see `SettingsOpener.bringForward`).
+        window.collectionBehavior.insert([.moveToActiveSpace, .fullScreenAuxiliary])
         window.makeKeyAndOrderFront(nil)
         // AppKit would put the cursor in the sidebar's filter field; it waits for ⌘K or a click instead.
         DispatchQueue.main.async { window.makeFirstResponder(nil) }

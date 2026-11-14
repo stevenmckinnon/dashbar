@@ -373,6 +373,9 @@ enum SettingsOpener {
                 }
             }
         }
+        // Dashbar's menu bar item is on every desktop, so activating it never switches desktops: without this the window
+        // would come forward on the desktop it was first opened on, out of sight. Over a full-screen app too.
+        window.collectionBehavior.insert([.moveToActiveSpace, .fullScreenAuxiliary])
         NSApp.activate(ignoringOtherApps: true)   // the plain call is only a request, often refused for an accessory app
         window.makeKeyAndOrderFront(nil)
         window.orderFrontRegardless()
