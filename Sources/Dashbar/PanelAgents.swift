@@ -72,7 +72,10 @@ struct UsageCard: View {
                         RankList(title: "Accounts", items: Self.byAccount(accounts, period), tint: tint, showCost: showCost)
                     }
                     if !limits.isEmpty {
-                        VStack(spacing: 6) { LimitList(limits: limits, tint: tint) }
+                        LimitList(limits: limits, tint: tint)
+                        if limits.contains(where: { $0.paceMark() != nil }) {
+                            PaceKey().frame(maxWidth: .infinity, alignment: .trailing)
+                        }
                     }
                 }
             }
@@ -250,9 +253,10 @@ struct LimitBar: View {
     let tint: Color
     var body: some View {
         let used = min(max(limit.usedPercent, 0), 100)
-        let expected = limit.expectedPercent()
         let pace = limit.pace()
-        VStack(alignment: .leading, spacing: 4) {
+        // The even-pace mark only where there's a pace reading to go with it (never on a row whose caption is hidden).
+        let mark = limit.paceMark()
+        VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline) {
                 Text(limit.label).font(.system(size: UI.Size.caption, weight: .medium))
                 if let r = limit.resetsAt {
@@ -264,15 +268,18 @@ struct LimitBar: View {
                     .font(.system(size: UI.Size.caption, weight: .semibold).monospacedDigit())
                     .foregroundStyle(used >= 90 ? UI.textDanger : Color.primary)
             }
+            .padding(.bottom, 2)
             GeometryReader { g in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(tint.opacity(0.16)).frame(height: 6)
-                    Capsule().fill(used >= 90 ? UI.textDanger : tint).frame(width: max(4, g.size.width * used / 100), height: 6)
+                    Capsule().fill(UI.track).frame(height: 6)
+                    // Drawn from the figure as shown, so "0% used" draws nothing and "1% used" a sliver.
+                    Capsule().fill(Self.fill(used: used, pace: pace, tint: tint))
+                        .frame(width: Meter.width(Self.shownFraction(limit.usedPercent), in: g.size.width, minimum: 3), height: 6)
                     // Where usage would be if spread evenly over the window.
-                    if let expected {
-                        Capsule().fill(Color.primary.opacity(0.55))
+                    if let mark {
+                        Capsule().fill(PaceKey.color)
                             .frame(width: 2, height: 10)
-                            .offset(x: min(g.size.width - 2, max(0, g.size.width * expected / 100 - 1)))
+                            .offset(x: min(g.size.width - 2, max(0, g.size.width * mark / 100 - 1)))
                     }
                 }
                 .frame(maxHeight: .infinity)
@@ -284,11 +291,35 @@ struct LimitBar: View {
                     .foregroundStyle(Self.color(pace))
             }
         }
-        .help(([expected.map { "The mark shows where an even pace would be by now: \(Int($0.rounded()))% used." },
+        .help(([mark.map { "The mark shows where an even pace would be by now: \(Int($0.rounded()))% used." },
                 Self.sourceNote(limit)] as [String?]).compactMap { $0 }.joined(separator: "\n"))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(limit.label) limit, \(Int(max(0, limit.usedPercent).rounded())) percent used" + (pace.map { ". " + Self.text($0) } ?? ""))
+        .accessibilityValue(mark.map { "Even pace would be \(Int($0.rounded())) percent by now" } ?? "")
         .accessibilityHint(Self.sourceNote(limit) ?? "")
+    }
+
+    /// The share the fill draws: the percentage as the row prints it, so the bar and the figure agree.
+    static func shownFraction(_ usedPercent: Double) -> Double {
+        Double(Int(min(max(usedPercent, 0), 100).rounded())) / 100
+    }
+
+    /// The fill follows the colour rules: red once a limit is (nearly) used up, amber while it's on course to run
+    /// out before it resets, otherwise the agent's own colour.
+    static func fill(used: Double, pace: RateLimit.Pace?, tint: Color) -> Color {
+        switch fillState(used: used, pace: pace) {
+        case .problem: return UI.textDanger
+        case .attention: return UI.attention
+        case .normal: return tint
+        }
+    }
+
+    enum FillState: Equatable { case normal, attention, problem }
+
+    static func fillState(used: Double, pace: RateLimit.Pace?) -> FillState {
+        if used >= 90 || pace == .usedUp { return .problem }
+        if case .runsOut? = pace { return .attention }
+        return .normal
     }
 
     /// The provider's own name for a limit whose label was made from it: "Reported as gemini-argon-wtu-weekly".
@@ -328,19 +359,36 @@ struct LimitList: View {
 
     var body: some View {
         let fold = RateLimit.fold(limits)
-        ForEach(expanded ? limits : fold.shown) { LimitBar(limit: $0, tint: tint) }
-        if !fold.folded.isEmpty {
-            Button { expanded.toggle() } label: {
-                HStack(spacing: 3) {
-                    Text(expanded ? "Show fewer" : "\(fold.folded.count) more at 0%")
-                    Image(systemName: expanded ? "chevron.up" : "chevron.down").font(.system(size: UI.Size.micro - 1, weight: .semibold))
+        // Rows sit apart from each other while each pace caption stays tight under its own bar.
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(expanded ? limits : fold.shown) { LimitBar(limit: $0, tint: tint) }
+            if !fold.folded.isEmpty {
+                Button { expanded.toggle() } label: {
+                    HStack(spacing: 3) {
+                        Text(expanded ? "Show fewer" : "\(fold.folded.count) more at 0%")
+                        Image(systemName: expanded ? "chevron.up" : "chevron.down").font(.system(size: UI.Size.micro - 1, weight: .semibold))
+                    }
+                    .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+                    .contentShape(Rectangle())
                 }
-                .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
-                .contentShape(Rectangle())
+                .buttonStyle(PressStyle())
+                .help(expanded ? "Hide the limits at 0% used" : fold.folded.map(\.label).joined(separator: ", "))
             }
-            .buttonStyle(PressStyle())
-            .help(expanded ? "Hide the limits at 0% used" : fold.folded.map(\.label).joined(separator: ", "))
         }
+    }
+}
+
+/// The key to the mark on limit bars: a tick, then "even pace". Shown once per card, only when a bar draws the mark.
+struct PaceKey: View {
+    static let color = Color.primary.opacity(0.55)
+    var body: some View {
+        HStack(spacing: 4) {
+            Capsule().fill(Self.color).frame(width: 2, height: 9)
+            Text("even pace").font(.system(size: UI.Size.micro)).foregroundStyle(UI.textSecondary)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("The tick on each bar marks an even pace")
+        .help("The tick on a bar shows where usage would be by now if it were spread evenly until the reset.")
     }
 }
 
@@ -352,7 +400,8 @@ struct PlanLimitsCard: View {
     @ObservedObject private var antigravity = AntigravitySettings.shared
 
     var body: some View {
-        Card(title: "Plan limits", icon: "gauge.with.needle", tint: .green, count: nil) {
+        Card(title: "Plan limits", icon: "gauge.with.needle", tint: .green, count: nil,
+             accessory: showsPaceMark ? AnyView(PaceKey()) : nil) {
             VStack(alignment: .leading, spacing: 12) {
                 claude
                 ForEach(store.claudeAccountLimits) { ClaudeAccountLimitsView(account: $0) }
@@ -367,6 +416,17 @@ struct PlanLimitsCard: View {
                 }
             }
         }
+    }
+
+    /// Whether any bar in the card draws the even-pace mark, so the key appears only when there's a mark to explain.
+    private var showsPaceMark: Bool {
+        var limits: [RateLimit] = []
+        if settings.showsClaudeLimits, store.claudePlan?.problem == nil { limits += store.claudePlan?.limits ?? [] }
+        limits += store.claudeAccountLimits.filter { $0.problem == nil }.flatMap(\.limits)
+        limits += store.codexAccountLimits.isEmpty ? (store.codex.found ? store.codexLimits : []) : store.codexAccountLimits.flatMap(\.limits)
+        if store.antigravityLimits?.problem == nil { limits += store.antigravityLimits?.flattened ?? [] }
+        let now = Date()
+        return limits.contains { $0.paceMark(now: now) != nil }
     }
 
     /// Under limits kept from an earlier reading: "Updated 2m ago · trying again in 3m".
@@ -438,7 +498,7 @@ struct PlanLimitsCard: View {
                     }
                 }
             } else if let limits = store.claudePlan?.limits, !limits.isEmpty {
-                LimitList(limits: limits, tint: UI.claude)
+                LimitList(limits: limits, tint: UI.claudeFill)
                 if let stale = store.claudePlan?.stale, let fetched = store.claudePlan?.fetchedAt {
                     // Worked out live, so "2m ago" keeps counting and the countdown says when it will refresh.
                     TimelineView(.periodic(from: .now, by: 1)) { ctx in
@@ -477,14 +537,14 @@ struct PlanLimitsCard: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Image(systemName: "chevron.left.forwardslash.chevron.right").font(.system(size: UI.Size.caption, weight: .bold))
-                    .foregroundStyle(.teal).accessibilityHidden(true)
+                    .foregroundStyle(UI.codex).accessibilityHidden(true)
                 Text(["Codex", label].compactMap { $0 }.joined(separator: " · ")).font(.system(size: UI.Size.body, weight: .medium)).accessibilityAddTraits(.isHeader)
             }
             if limits.isEmpty {
                 Text("Codex hasn't reported limits yet. They appear after your next Codex session.")
                     .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
             } else {
-                LimitList(limits: limits, tint: .teal)
+                LimitList(limits: limits, tint: UI.codex)
             }
         }
     }
@@ -508,7 +568,7 @@ struct ClaudeAccountLimitsView: View {
                 }
                 .font(.system(size: UI.Size.caption))
             } else if !account.limits.isEmpty {
-                LimitList(limits: account.limits, tint: UI.claude)
+                LimitList(limits: account.limits, tint: UI.claudeFill)
                 if let fetched = account.fetchedAt {
                     TimelineView(.periodic(from: .now, by: 30)) { ctx in
                         if let line = ClaudeStatusLine.ageLine(writtenAt: fetched, now: ctx.date) {

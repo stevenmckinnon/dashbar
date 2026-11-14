@@ -264,7 +264,7 @@ struct ContextLabel: View {
         VStack(alignment: .trailing, spacing: 0) {
             Text("\(Int((context.fraction * 100).rounded()))%")
                 .font(.system(size: UI.Size.caption, weight: .semibold).monospacedDigit())
-                .foregroundStyle(ContextRing.color(context.fraction))
+                .foregroundStyle(ContextRing.textColor(context.fraction))
             Text("context used")
                 .font(.system(size: UI.Size.micro))
                 .foregroundStyle(UI.textSecondary)
@@ -308,12 +308,28 @@ struct ContextRing: View {
     let fraction: Double
     var size: CGFloat = 16
     var lineWidth: CGFloat = 2.5
-    /// Two states only: fine, or nearly full. Orange stays reserved for the Claude brand.
-    static func color(_ f: Double) -> Color { f < 0.85 ? UI.textInfo : UI.textDanger }
+    enum Level: Equatable { case fine, filling, nearlyFull }
+    /// Fine (neutral), getting full (amber, from 70%: compaction is coming soon) and nearly full (red, from 85%).
+    static func level(_ f: Double) -> Level { f >= 0.85 ? .nearlyFull : f >= 0.70 ? .filling : .fine }
+    static func color(_ f: Double) -> Color {
+        switch level(f) {
+        case .fine: return UI.meterFill
+        case .filling: return UI.attention
+        case .nearlyFull: return UI.textDanger
+        }
+    }
+    /// The same levels in text ink, for the percentage beside the bar.
+    static func textColor(_ f: Double) -> Color {
+        switch level(f) {
+        case .fine: return .primary
+        case .filling: return UI.textAttention
+        case .nearlyFull: return UI.textDanger
+        }
+    }
 
     var body: some View {
         ZStack {
-            Circle().stroke(Self.color(fraction).opacity(0.15), lineWidth: lineWidth)
+            Circle().stroke(UI.track, lineWidth: lineWidth)
             Circle().trim(from: 0, to: fraction)
                 .stroke(Self.color(fraction), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
@@ -329,8 +345,8 @@ struct ContextBar: View {
     var body: some View {
         GeometryReader { g in
             ZStack(alignment: .leading) {
-                Capsule().fill(ContextRing.color(fraction).opacity(0.15))
-                Capsule().fill(ContextRing.color(fraction)).frame(width: max(4, g.size.width * fraction))
+                Capsule().fill(UI.track)
+                Capsule().fill(ContextRing.color(fraction)).frame(width: Meter.width(fraction, in: g.size.width, minimum: 3))
             }
         }
         .frame(height: 4)
@@ -349,7 +365,7 @@ struct QuickActions: View {
                 ActionTile(symbol: "chart.bar.xaxis", help: "Show in the Dashbar window") { openWorkspace(workspace.root) }
             }
             if let editor = Launcher.editor {
-                ActionTile(symbol: "chevron.left.forwardslash.chevron.right", help: "Open in \(editor.name)") {
+                ActionTile(symbol: "curlybraces", help: "Open in \(editor.name)") {
                     Launcher.open(workspace.root, in: editor)
                 }
             }

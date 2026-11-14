@@ -435,7 +435,7 @@ private struct AgentsPage: View {
         UsageCard(title: "Claude Code", icon: "asterisk", tint: UI.claude, summary: store.claude, loading: store.usageLoading,
                   accounts: store.claudeAccountUsage)
         if store.codex.found {
-            UsageCard(title: "Codex", icon: "chevron.left.forwardslash.chevron.right", tint: .teal, summary: store.codex, loading: false,
+            UsageCard(title: "Codex", icon: "chevron.left.forwardslash.chevron.right", tint: UI.codex, summary: store.codex, loading: false,
                       accounts: store.codexAccountUsage)
         }
         if store.google.found {
@@ -623,7 +623,7 @@ private struct WorkspaceActions: View {
         GlassGroup {
         HStack(spacing: 6) {
             if let editor = Launcher.editor {
-                ActionButton(symbol: "chevron.left.forwardslash.chevron.right", title: "Open in \(editor.name)") {
+                ActionButton(symbol: "curlybraces", title: "Open in \(editor.name)") {
                     Launcher.open(workspace.root, in: editor)
                 }
             }

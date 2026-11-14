@@ -520,6 +520,13 @@ extension RateLimit {
         return min(100, max(0, (1 - remaining / window) * 100))
     }
 
+    /// Where the even-pace mark goes on this limit's bar (% of the window), or nil when the bar shouldn't draw one:
+    /// only alongside a pace reading, so a mark never appears on a row whose pace caption is hidden.
+    func paceMark(now: Date = Date()) -> Double? {
+        guard pace(now: now) != nil else { return nil }
+        return expectedPercent(now: now)
+    }
+
     /// Projects the current rate to the reset. Nil when too little of the window has passed to tell.
     func pace(now: Date = Date()) -> Pace? {
         if usedPercent >= 100 { return .usedUp }
