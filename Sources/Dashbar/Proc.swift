@@ -55,6 +55,14 @@ enum Proc {
         return (pid_t(info.pbi_ppid), started)
     }
 
+    /// The user that owns the process. The short BSD info answers for other users' processes too.
+    static func uid(_ pid: pid_t) -> uid_t? {
+        var info = proc_bsdshortinfo()
+        let size = Int32(MemoryLayout<proc_bsdshortinfo>.size)
+        guard proc_pidinfo(pid, PROC_PIDT_SHORTBSDINFO, 0, &info, size) == size else { return nil }
+        return info.pbsi_uid
+    }
+
     /// Total CPU time the process has used since it started, in seconds.
     static func cpuSeconds(_ pid: pid_t) -> Double? {
         var info = proc_taskinfo()

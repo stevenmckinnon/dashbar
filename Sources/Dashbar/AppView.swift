@@ -23,12 +23,25 @@ struct AppView: View {
         .background { if !snapshot { WindowVisibilityReader { store.setPanelVisible($0, surface: "window") } } }
         .onAppear { store.setPanelVisible(true, surface: "window") }
         .onDisappear { store.setPanelVisible(false, surface: "window") }
-        .background {
-            Button("") { searchFocused = true }.keyboardShortcut("k").opacity(0)
-            // ⌘1…⌘5 open the pages, as they switch tabs in the panel.
+        .environment(\.inWindow, true)
+        // ⌘1…⌘5 and ⌘K are items in the app's Go menu (WindowCommands); ⌘K arrives here as a request.
+        .onChange(of: model.filterRequests) { _, _ in searchFocused = true }
+    }
+}
+
+/// The window's keyboard shortcuts as real menu items, so the menu bar lists them while the window is open.
+/// Dashbar has no menu bar otherwise (it's an accessory app until the window opens). The panel keeps its own
+/// shortcuts: as the key window it gets each key first.
+struct WindowCommands: Commands {
+    var body: some Commands {
+        CommandMenu("Go") {
             ForEach(Array(PanelTab.allCases.enumerated()), id: \.offset) { i, t in
-                Button("") { model.page = .tab(t) }.keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command).opacity(0)
+                Button(t.title) { AppWindow.shared.go(to: .tab(t)) }
+                    .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command)
             }
+            Divider()
+            Button("Filter Workspaces") { AppWindow.shared.focusFilter() }
+                .keyboardShortcut("k")
         }
     }
 }
@@ -71,12 +84,17 @@ private struct AppSidebar: View {
     private func badge(_ t: PanelTab) -> Text? {
         switch t {
         case .overview: return nil
-        case .agents: return store.sessions.isEmpty ? nil : Text("\(store.sessions.count)")
+        case .agents:
+            // An agent waiting for you outranks the count, in amber like everywhere else.
+            if store.waitingCount > 0 {
+                return Text("\(store.waitingCount) \(store.waitingCount == 1 ? "needs" : "need") you").foregroundStyle(UI.textAttention)
+            }
+            return store.sessions.isEmpty ? nil : Text("\(store.sessions.count)")
         case .servers:
             let n = Set(store.devListeners.map(\.pid)).count
             return n == 0 ? nil : Text("\(n)")
-        case .system: return Text("\(Int((store.system.cpu * 100).rounded()))%")
-        case .cleanup: return store.cleanupScanned && store.cleanupTotal > 0 ? Text(Fmt.bytes(store.cleanupTotal)) : nil
+        case .system: return Text("CPU \(Int((store.system.cpu * 100).rounded()))%")
+        case .cleanup: return store.cleanupScanned && store.cleanupTotal > 0 ? Text(Fmt.diskBytes(store.cleanupTotal)) : nil
         }
     }
 }
@@ -481,6 +499,7 @@ private struct WorkspacePage: View {
         if let usage, !usage.processes.isEmpty {
             ProcessList(groups: usage.processes, shown: 10)
         }
+        WorkspaceCleanup(root: workspace.root, name: workspace.name)
         Text("Counts its agents, its dev servers, everything they started (MCP servers too) and anything else running inside this folder.")
             .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -500,7 +519,7 @@ private struct WorkspacePage: View {
                   values: history.cpu,
                   caption: measuring ? "Measuring…" : "Peak \(UsageText.percent(history.cpu.max() ?? 0))% · \(window)",
                   help: "Share of your Mac's total CPU. Peak is the highest in the last \(window).")
-        let (mem, memUnit) = Fmt.bytesSplit(usage?.memory ?? 0)
+        let (mem, memUnit) = Fmt.bytesSplit(usage?.memory ?? 0, style: .memory)
         let count = usage?.processes.reduce(0) { $0 + $1.count } ?? 0
         UsageTile(title: "Memory", value: usage == nil ? "–" : mem, unit: usage == nil ? "" : memUnit,
                   values: history.memory, style: .line,
@@ -531,6 +550,43 @@ private struct WorkspacePage: View {
             groups[l.pid, default: []].append(l)
         }
         return order.compactMap { groups[$0]?.sorted { $0.port < $1.port } }
+    }
+}
+
+/// This workspace's rebuildable folders, from the clean-up scan: each with its own Trash button, or all at once after
+/// a confirm. Only ever moves them to the Trash. Hidden when the scan found nothing here.
+private struct WorkspaceCleanup: View {
+    @EnvironmentObject var store: Store
+    let root: String
+    let name: String
+    @State private var confirmAll = false
+
+    var body: some View {
+        let items = Cleanup.items(in: root, from: store.cleanup)
+        if store.cleanupScanned, !items.isEmpty {
+            let total = items.reduce(0) { $0 + $1.size }
+            Card(title: "Clean-up", icon: "shippingbox", tint: .orange, count: nil, trailing: Fmt.diskBytes(total)) {
+                VStack(spacing: 1) { ForEach(items) { CleanupRow(item: $0) } }
+                HStack(spacing: 8) {
+                    Text("Moves to the Trash. Reinstall deps or rebuild to get them back.")
+                        .font(.system(size: UI.Size.micro)).foregroundStyle(UI.textSecondary)
+                    Spacer()
+                    if confirmAll {
+                        ConfirmButton(title: "Move \(items.count == 1 ? "it" : "all \(items.count)") to Trash (\(Fmt.diskBytes(total)))") {
+                            for item in items { store.trash(item) }
+                            confirmAll = false
+                        }
+                        IconButton(symbol: "xmark", help: "Cancel") { confirmAll = false }
+                    } else if items.count > 1 {
+                        Button("Clean up \(name)…") { confirmAll = true }
+                            .buttonStyle(PressStyle())
+                            .font(.system(size: UI.Size.caption, weight: .medium)).foregroundStyle(UI.textInfo)
+                            .help("Move all \(items.count) folders here to the Trash, after you confirm")
+                    }
+                }
+                .padding(.top, 4)
+            }
+        }
     }
 }
 

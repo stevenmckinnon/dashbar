@@ -202,10 +202,19 @@ struct OpenWorkspaceKey: EnvironmentKey {
     static let defaultValue: ((String) -> Void)? = nil
 }
 
+/// Set by the Dashbar window: it has room, so row actions stay visible instead of waiting for a hover.
+struct InWindowKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
 extension EnvironmentValues {
     var openWorkspace: ((String) -> Void)? {
         get { self[OpenWorkspaceKey.self] }
         set { self[OpenWorkspaceKey.self] = newValue }
+    }
+    var inWindow: Bool {
+        get { self[InWindowKey.self] }
+        set { self[InWindowKey.self] = newValue }
     }
 }
 
@@ -435,7 +444,11 @@ struct TileRow: View {
     var body: some View {
         HStack(spacing: UI.gap) {
             Button { open(.agents) } label: {
-                Tile(title: "Agents", badge: store.busyCount > 0 ? "\(store.busyCount) working" : nil,
+                // Someone waiting outranks work in progress: amber "needs you" until it's answered.
+                Tile(title: "Agents",
+                     badge: store.waitingCount > 0 ? "\(store.waitingCount) \(store.waitingCount == 1 ? "needs" : "need") you"
+                          : store.busyCount > 0 ? "\(store.busyCount) working" : nil,
+                     badgeTint: store.waitingCount > 0 ? UI.textAttention : UI.textSuccess,
                      value: "\(store.sessions.count)", unit: nil, selected: false) {
                     HourBars(points: Array(store.claude.last24.suffix(12)), tint: UI.accent, height: 16)
                 }
@@ -460,7 +473,7 @@ struct TileRow: View {
             }
             .buttonStyle(PressStyle())
             .help("Show clean-up (⌘5)")
-            .accessibilityLabel(store.cleanupScanned ? "Clean-up, \(Fmt.bytes(store.cleanupTotal)) reclaimable" : "Clean-up, measuring")
+            .accessibilityLabel(store.cleanupScanned ? "Clean-up, \(Fmt.diskBytes(store.cleanupTotal)) reclaimable" : "Clean-up, measuring")
         }
     }
 }
@@ -468,6 +481,7 @@ struct TileRow: View {
 struct Tile<Accessory: View>: View {
     let title: String
     let badge: String?
+    var badgeTint: Color = UI.textSuccess
     let value: String
     let unit: String?
     let selected: Bool
@@ -478,7 +492,7 @@ struct Tile<Accessory: View>: View {
             HStack {
                 Text(title).font(.system(size: UI.Size.caption, weight: .medium)).foregroundStyle(selected ? .primary : .secondary)
                 Spacer(minLength: 2)
-                if let badge { Text(badge).font(.system(size: UI.Size.caption, weight: .medium)).foregroundStyle(UI.textSuccess).lineLimit(1) }
+                if let badge { Text(badge).font(.system(size: UI.Size.caption, weight: .medium)).foregroundStyle(badgeTint).lineLimit(1) }
             }
             HStack(alignment: .lastTextBaseline, spacing: 2) {
                 Text(value)
@@ -556,7 +570,7 @@ struct CleanupMeter: View {
     private func legend(_ groups: [(String, Double)], colored: Bool) -> String {
         let names = ["blue", "purple", "orange"]
         return groups.enumerated().map { i, g in
-            (colored ? names[i] + ": " : "") + g.0 + " " + Fmt.bytes(UInt64(g.1))
+            (colored ? names[i] + ": " : "") + g.0 + " " + Fmt.diskBytes(UInt64(g.1))
         }.joined(separator: "\n")
     }
 }
@@ -598,6 +612,7 @@ struct NowCard: View {
                     Text(workspace.name).font(.system(size: UI.Size.title, weight: .semibold)).lineLimit(1)
                         .help("\(workspace.name) — \(Fmt.tilde(workspace.root))")
                     Text(subtitle).font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary).lineLimit(1)
+                        .help(workspace.memory > 0 ? "Its dev servers and the memory they use. The Dashbar window shows the whole workspace's." : "")
                 }
                 Image(systemName: "chevron.right").font(.system(size: UI.Size.micro, weight: .semibold)).foregroundStyle(UI.textSecondary)
             }
@@ -610,6 +625,7 @@ struct NowCard: View {
             return "\(name) :" + String(l.port)
         }
         var parts = servers
+        // Straight after the server's name, so it reads as that server's memory (the tooltip says so too).
         if workspace.memory > 0 { parts.append(Fmt.bytes(workspace.memory)) }
         return parts.isEmpty ? Fmt.tilde(workspace.root) : parts.joined(separator: " · ")
     }
@@ -652,8 +668,8 @@ struct NowSessionLine: View {
                 .background(RoundedRectangle(cornerRadius: UI.innerRadius, style: .continuous).fill(UI.claude.opacity(0.12)))
             VStack(alignment: .leading, spacing: 1) {
                 Text(session.name).font(.system(size: UI.Size.body, weight: .medium)).lineLimit(1)
-                    .help(session.name)
-                Text("Claude Code · \(session.surface)"
+                    .help("\(session.name)\n\(OpenSession.hint(session))")
+                Text("Claude Code \(HostApp.info(for: session).map { "in " + $0.name } ?? "· " + session.surface)"
                      + (store.spawned[session.pid]?.portsText.map { " · " + $0 } ?? "")
                      + (extra > 0 ? " · \(extra) more" : ""))
                     .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary).lineLimit(1)
@@ -670,6 +686,7 @@ struct NowSessionLine: View {
                 .accessibilityLabel(context.accessibilityText)
             }
         }
+        .modifier(OpenSession(session: session))
     }
 }
 
@@ -874,9 +891,15 @@ struct WorkspaceRow: View {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(verbatim: portsLabel).font(.system(size: UI.Size.caption, weight: .medium).monospacedDigit())
                     if workspace.memory > 0 {
-                        Text(Fmt.bytes(workspace.memory)).font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
+                        // Only its dev servers' memory: the window's workspace figures add up everything else too.
+                        Text(Self.serverMemory(workspace)).font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
+                            .help("Memory its dev servers are using. The Dashbar window shows the whole workspace's.")
                     }
                 }
+            } else if !workspace.sessions.isEmpty {
+                // No server to show: say what it has, so the row doesn't end in a gap.
+                Text(workspace.sessions.count == 1 ? "1 agent" : "\(workspace.sessions.count) agents")
+                    .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
             }
             Image(systemName: "chevron.right")
                 .font(.system(size: UI.Size.micro, weight: .semibold))
@@ -888,6 +911,11 @@ struct WorkspaceRow: View {
             .fill(Color.primary.opacity(hover ? UI.rowHover : 0)))
         .contentShape(Rectangle())
         .onHover { hover = $0 }
+    }
+
+    /// "server 412 MB", "servers 1.2 GB".
+    static func serverMemory(_ w: Workspace) -> String {
+        (Set(w.servers.map(\.pid)).count > 1 ? "servers " : "server ") + Fmt.bytes(w.memory)
     }
 
     private var portsLabel: String {
@@ -946,8 +974,8 @@ struct SessionLine: View {
                 StatusDot(active: session.isBusy, waiting: session.isWaiting, size: 7)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(session.name).font(.system(size: UI.Size.body, weight: .medium)).lineLimit(1)
-                        .help("\(session.name)\n\(Fmt.tilde(session.cwd))")
-                    Text("\(session.isWaiting ? session.waitingLabel : session.isBusy ? "Working" : session.status.capitalized) \(Fmt.ago(session.since, now: ctx.date)) · \(session.surface)"
+                        .help("\(session.name)\n\(Fmt.tilde(session.cwd))\n\(OpenSession.hint(session))")
+                    Text("\(session.isWaiting ? session.waitingLabel : session.isBusy ? "Working" : session.status.capitalized) \(Fmt.ago(session.since, now: ctx.date)) · \(HostApp.info(for: session)?.name ?? session.surface)"
                          + (store.spawned[session.pid]?.portsText.map { " · " + $0 } ?? ""))
                         .font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary).lineLimit(1)
                         .help(store.spawned[session.pid]?.tooltip ?? "")
@@ -964,6 +992,46 @@ struct SessionLine: View {
                 }
             }
             .padding(.vertical, 3)
+        }
+        .modifier(OpenSession(session: session))
+    }
+}
+
+/// A session row's actions: a click goes back to the app the session runs in (its terminal, VS Code, T3 Code, the
+/// Desktop app); the context menu also opens its folder in the editor or Finder.
+struct OpenSession: ViewModifier {
+    let session: LiveSession
+    @State private var hover = false
+
+    /// "Click to open in Ghostty"
+    @MainActor static func hint(_ s: LiveSession) -> String {
+        if let host = HostApp.info(for: s) { return "Click to open in \(host.name)" }
+        if let editor = Launcher.editor { return "Click to open its folder in \(editor.name)" }
+        return "Click to show its folder in Finder"
+    }
+
+    func body(content: Content) -> some View {
+        let host = HostApp.info(for: session)
+        let editor = Launcher.editor
+        Button { HostApp.open(host?.bundle, root: session.root) } label: {
+            content
+                .background(RoundedRectangle(cornerRadius: UI.innerRadius, style: .continuous)
+                    .fill(Color.primary.opacity(hover ? UI.rowHover : 0))
+                    .padding(.horizontal, -4))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(PressStyle())
+        .onHover { hover = $0 }
+        .contextMenu {
+            if let host { Button("Open in \(host.name)") { HostApp.open(host.bundle, root: session.root) } }
+            if let editor { Button("Open folder in \(editor.name)") { Launcher.open(session.root, in: editor) } }
+            Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: session.root)]) }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityHint(Self.hint(session))
+        .accessibilityAction(named: host.map { "Open in \($0.name)" } ?? "Open") { HostApp.open(host?.bundle, root: session.root) }
+        .accessibilityAction(named: "Reveal in Finder") {
+            NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: session.root)])
         }
     }
 }
@@ -1217,22 +1285,11 @@ struct ProcessList: View {
                     Spacer()
                     Text("CPU").frame(width: 48, alignment: .trailing)
                     Text("Memory").frame(width: 64, alignment: .trailing)
+                    Color.clear.frame(width: 22, height: 1)
                 }
                 .font(.system(size: UI.Size.micro, weight: .medium)).foregroundStyle(UI.textSecondary)
                 .padding(.horizontal, 4).padding(.bottom, 4)
-                ForEach(list) { g in
-                    HStack(spacing: 6) {
-                        Text(g.name).font(.system(size: UI.Size.body, design: .monospaced)).lineLimit(1).truncationMode(.middle)
-                        if g.count > 1 {
-                            Text("×\(g.count)").font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
-                        }
-                        Spacer(minLength: 6)
-                        Text(UsageText.percent(g.cpu) + "%").frame(width: 48, alignment: .trailing)
-                        Text(Fmt.bytes(g.memory)).frame(width: 64, alignment: .trailing).foregroundStyle(UI.textSecondary)
-                    }
-                    .font(.system(size: UI.Size.caption).monospacedDigit())
-                    .padding(.horizontal, 4).padding(.vertical, 4)
-                }
+                ForEach(list) { ProcessRow(group: $0) }
                 if groups.count > shown {
                     Button(showAll ? "Show fewer" : "Show \(groups.count - shown) more") { showAll.toggle() }
                         .buttonStyle(PressStyle())
@@ -1242,6 +1299,52 @@ struct ProcessList: View {
                 }
             }
         }
+    }
+}
+
+/// One process group, with "Quit…" behind a confirm that names it. Offered only where `QuitPolicy` allows: the
+/// user's own processes, never the system's or Dashbar's.
+struct ProcessRow: View {
+    @EnvironmentObject var store: Store
+    let group: WorkspaceUsage.ProcessGroup
+    @State private var confirm = false
+    @State private var hover = false
+
+    static func confirmTitle(_ g: WorkspaceUsage.ProcessGroup) -> String {
+        g.pids.count > 1 ? "Quit \(g.pids.count) \(g.name) processes" : "Quit \(g.name)"
+    }
+
+    var body: some View {
+        let quittable = group.pids.contains(where: QuitPolicy.allows)
+        HStack(spacing: 6) {
+            Text(group.name).font(.system(size: UI.Size.body, design: .monospaced)).lineLimit(1).truncationMode(.middle)
+            if group.count > 1 {
+                Text("×\(group.count)").font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
+            }
+            Spacer(minLength: 6)
+            if confirm {
+                ConfirmButton(title: Self.confirmTitle(group)) { store.quit(group); confirm = false }
+                IconButton(symbol: "xmark", help: "Cancel") { confirm = false }
+            } else {
+                Text(UsageText.percent(group.cpu) + "%").frame(width: 48, alignment: .trailing)
+                Text(Fmt.bytes(group.memory)).frame(width: 64, alignment: .trailing).foregroundStyle(UI.textSecondary)
+                if quittable {
+                    IconButton(symbol: "xmark.circle", help: "Quit \(group.name)…") { confirm = true }
+                } else {
+                    Color.clear.frame(width: 22, height: 22)
+                }
+            }
+        }
+        .font(.system(size: UI.Size.caption).monospacedDigit())
+        .padding(.horizontal, 4).padding(.vertical, 2)
+        .background(RoundedRectangle(cornerRadius: UI.innerRadius, style: .continuous)
+            .fill(Color.primary.opacity(hover ? UI.rowHover : 0)))
+        .onHover { hover = $0 }
+        .contextMenu {
+            if quittable { Button("Quit \(group.name)…", role: .destructive) { confirm = true } }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityAction(named: "Quit \(group.name)") { if quittable { confirm = true } }
     }
 }
 
@@ -1304,6 +1407,7 @@ struct ServerRow: View {
     @State private var hover = false
     @State private var confirmStop = false
     @FocusState private var focusedAction: Int?
+    @Environment(\.inWindow) private var inWindow
 
     private var starter: LiveSession? {
         listener.startedBy.flatMap { pid in store.sessions.first { $0.pid == pid } }
@@ -1324,8 +1428,13 @@ struct ServerRow: View {
         return line
     }
 
-    /// Actions show on hover, and also whenever one of them holds keyboard focus.
-    private var revealed: Bool { hover || confirmStop || focusedAction != nil }
+    /// Actions show on hover, and also whenever one of them holds keyboard focus. The window always shows them.
+    private var revealed: Bool { inWindow || hover || confirmStop || focusedAction != nil }
+
+    private var memoryText: some View {
+        Text(Fmt.bytes(listener.memory)).font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
+            .help("Memory this server is using")
+    }
 
     var body: some View {
         HStack(spacing: 9) {
@@ -1347,10 +1456,12 @@ struct ServerRow: View {
                 }
             }
             Spacer(minLength: 4)
+            if inWindow && listener.memory > 0 && !compact && !confirmStop {
+                memoryText.padding(.trailing, 4)
+            }
             ZStack(alignment: .trailing) {
-                if listener.memory > 0 && !compact {
-                    Text(Fmt.bytes(listener.memory)).font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
-                        .opacity(revealed ? 0 : 1)
+                if listener.memory > 0 && !compact && !inWindow {
+                    memoryText.opacity(revealed ? 0 : 1)
                 }
                 HStack(spacing: 2) {
                     if !compact {
@@ -1400,12 +1511,13 @@ struct CleanupCard: View {
 
     private var matching: [CleanupItem] {
         let q = query.lowercased().trimmingCharacters(in: .whitespaces)
-        return q.isEmpty ? store.cleanup : store.cleanup.filter { $0.project.lowercased().contains(q) || $0.kind.lowercased().contains(q) }
+        let all = Cleanup.sorted(store.cleanup)   // largest first, whatever order the items arrived in
+        return q.isEmpty ? all : all.filter { $0.project.lowercased().contains(q) || $0.kind.lowercased().contains(q) }
     }
 
     var body: some View {
         Card(title: "Clean-up", icon: "shippingbox", tint: .orange, count: nil,
-             trailing: store.cleanupScanned ? Fmt.bytes(store.cleanupTotal) : nil) {
+             trailing: store.cleanupScanned ? Fmt.diskBytes(store.cleanupTotal) : nil) {
             if !store.cleanupScanned {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
@@ -1440,7 +1552,9 @@ struct CleanupRow: View {
     @State private var confirm = debugConfirm
     @FocusState private var focusedAction: Int?
 
-    private var revealed: Bool { hover || confirm || focusedAction != nil }
+    @Environment(\.inWindow) private var inWindow
+    /// The window always shows the Trash button; the panel shows it on hover or focus.
+    private var revealed: Bool { inWindow || hover || confirm || focusedAction != nil }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -1456,7 +1570,7 @@ struct CleanupRow: View {
                     .focused($focusedAction, equals: 1)
                 IconButton(symbol: "xmark", help: "Cancel") { confirm = false }
             } else {
-                Text(Fmt.bytes(item.size)).font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
+                Text(Fmt.diskBytes(item.size)).font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
                 IconButton(symbol: "trash", help: "Move \(item.kind) in \(item.project) to the Trash") { confirm = true }
                     .focused($focusedAction, equals: 0)
                     .opacity(revealed ? 1 : 0)
@@ -1738,7 +1852,8 @@ struct PlanLimitsCard: View {
                     Text("Claude doesn't save plan limits on your Mac. An experimental setting can read them through Claude Code's sign-in.")
                         .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    SettingsLink { Text("Settings…") }
+                    SettingsButton(tab: .labs) { Text("Settings…") }
+                        .help("Opens Settings at Labs, where “Show Claude plan limits” is")
                         .buttonStyle(.link).font(.system(size: UI.Size.caption, weight: .medium))
                 }
             } else if let problem = store.claudePlan?.problem {
@@ -1831,7 +1946,7 @@ struct SystemPage: View {
             // Memory
             MetricCard(title: "Memory", icon: "memorychip", tint: .purple, trailing: nil,
                        caption: "In use of \(Fmt.bytes(s.memTotal))",
-                       value: Fmt.bytesSplit(s.memUsed).0, unit: Fmt.bytesSplit(s.memUsed).1,
+                       value: Fmt.bytesSplit(s.memUsed, style: .memory).0, unit: Fmt.bytesSplit(s.memUsed, style: .memory).1,
                        badge: PressureBadge(pressure: s.pressure)) {
                 StatRow([("App", Fmt.bytes(s.memApp)), ("Wired", Fmt.bytes(s.memWired)),
                          ("Compressed", Fmt.bytes(s.memCompressed))] + (s.swapUsed > 0 ? [("Swap", Fmt.bytes(s.swapUsed))] : []))

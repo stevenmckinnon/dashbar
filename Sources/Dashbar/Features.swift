@@ -182,11 +182,23 @@ enum Cleanup {
             let parts = line.split(separator: "\t", maxSplits: 1)
             if parts.count == 2, let kb = UInt64(parts[0]) { sizes[String(parts[1])] = kb * 1024 }
         }
-        return found.compactMap { item in
+        return sorted(found.compactMap { item in
             var item = item
             item.size = sizes[item.path] ?? 0
             return item.size > 1_000_000 ? item : nil
-        }.sorted { $0.size > $1.size }
+        })
+    }
+
+    /// Largest first, so the folders worth clearing lead; ties in path order so the list holds still.
+    static func sorted(_ items: [CleanupItem]) -> [CleanupItem] {
+        items.sorted { ($0.size, $1.path) > ($1.size, $0.path) }
+    }
+
+    /// The rebuildable folders inside one workspace (its worktrees included), largest first.
+    static func items(in root: String, from items: [CleanupItem]) -> [CleanupItem] {
+        let base = root.hasSuffix("/") ? String(root.dropLast()) : root
+        guard !base.isEmpty else { return [] }
+        return sorted(items.filter { $0.path.hasPrefix(base + "/") })
     }
 
     private static func projectLabel(_ parent: String, root: URL) -> String {
@@ -305,6 +317,67 @@ enum HostApp {
         } else {
             Launcher.reveal(root)
         }
+    }
+}
+
+extension HostApp {
+    struct Info: Equatable {
+        /// Nil in demo renders, where the name is invented and clicking falls back to the editor.
+        let bundle: String?
+        let name: String
+    }
+
+    /// "/Applications/T3 Code (Beta).app" → "T3 Code (Beta)".
+    static func name(ofBundle bundle: String) -> String {
+        let last = URL(fileURLWithPath: bundle).lastPathComponent
+        return last.hasSuffix(".app") ? String(last.dropLast(4)) : last
+    }
+
+    /// Demo renders never look at real processes (their invented pids could belong to anything): a plausible host
+    /// from the session's entrypoint instead.
+    static func demoInfo(entrypoint: String) -> Info? {
+        switch entrypoint {
+        case "claude-desktop": return Info(bundle: nil, name: "Claude")
+        case let e where e.contains("vscode"): return Info(bundle: nil, name: "VS Code")
+        case "cli", "": return Info(bundle: nil, name: "Terminal")
+        default: return nil
+        }
+    }
+
+    @MainActor private static var cache: [String: Info?] = [:]
+    private static let isDemo = CommandLine.arguments.contains("--demo")
+
+    /// The host app for a live session, looked up once per session and process (rows redraw every second).
+    @MainActor static func info(for session: LiveSession) -> Info? {
+        if isDemo { return demoInfo(entrypoint: session.entrypoint) }
+        let key = session.id + ":" + String(session.pid)
+        if let hit = cache[key] { return hit }
+        let info = find(for: session.pid).map { Info(bundle: $0, name: name(ofBundle: $0)) }
+        if cache.count > 200 { cache.removeAll() }   // ended sessions; cheap to look up again
+        cache[key] = info
+        return info
+    }
+}
+
+// MARK: - Quitting a workspace process
+
+/// Which processes the window may offer to quit. Only the user's own, never the system's, and never Dashbar (either
+/// copy: the release or a local build), since quitting it from itself would only close the window it was asked in.
+enum QuitPolicy {
+    static let systemPrefixes = ["/System/", "/usr/libexec/", "/usr/sbin/", "/sbin/", "/Library/Apple/"]
+
+    static func allows(pid: pid_t, path: String?, uid: uid_t?, ownPID: pid_t, ownUID: uid_t) -> Bool {
+        guard pid > 1, pid != ownPID, let uid, uid == ownUID, uid != 0 else { return false }
+        guard let path, !path.isEmpty else { return false }
+        if systemPrefixes.contains(where: path.hasPrefix) { return false }
+        if path.contains("/Dashbar.app/") || path.contains("/Dashbar Local.app/") { return false }
+        return true
+    }
+
+    /// For the live system: reads the process's owner and executable now, so a pid that has since been reused by
+    /// something else is judged as what it is today.
+    static func allows(_ pid: pid_t) -> Bool {
+        allows(pid: pid, path: Proc.path(pid), uid: Proc.uid(pid), ownPID: getpid(), ownUID: getuid())
     }
 }
 

@@ -29,8 +29,15 @@ enum Fmt {
         }
     }
 
+    /// Memory (RAM, a process's resident size): binary units, as Activity Monitor counts them.
     static func bytes(_ n: UInt64) -> String {
         ByteCountFormatter.string(fromByteCount: Int64(n), countStyle: .memory)
+    }
+
+    /// Space on disk (clean-up folders, free space): decimal units, as Finder counts them. Every clean-up figure uses
+    /// this, so the tile, the list and the sidebar agree.
+    static func diskBytes(_ n: UInt64) -> String {
+        ByteCountFormatter.string(fromByteCount: Int64(n), countStyle: .file)
     }
 
     static func ago(_ date: Date, now: Date = Date()) -> String {
@@ -81,9 +88,9 @@ enum Fmt {
         path.hasPrefix(homeDir.path) ? "~" + path.dropFirst(homeDir.path.count) : path
     }
 
-    /// "16.6 GB" -> ("16.6", "GB")
-    static func bytesSplit(_ n: UInt64) -> (String, String) {
-        let parts = ByteCountFormatter.string(fromByteCount: Int64(n), countStyle: .file).split(separator: " ")
+    /// "16.6 GB" -> ("16.6", "GB"). Disk space by default (`diskBytes`); pass `.memory` for memory, to match `bytes`.
+    static func bytesSplit(_ n: UInt64, style: ByteCountFormatter.CountStyle = .file) -> (String, String) {
+        let parts = ByteCountFormatter.string(fromByteCount: Int64(n), countStyle: style).split(separator: " ")
         return (String(parts.first ?? "0"), parts.count > 1 ? String(parts[1]) : "")
     }
 

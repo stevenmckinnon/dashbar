@@ -70,14 +70,35 @@ final class AppSettings: ObservableObject {
 
 // MARK: - Settings window
 
-struct SettingsView: View {
+enum SettingsTab: String {
+    case general, menuBar, folders, labs, about
+    static let key = "settingsTab"
+}
+
+/// "Settings…" that opens on the tab where the setting lives, rather than wherever Settings was left.
+struct SettingsButton<Label: View>: View {
+    let tab: SettingsTab
+    @ViewBuilder var label: Label
+    @Environment(\.openSettings) private var openSettings
+
     var body: some View {
-        TabView {
-            GeneralSettings().tabItem { Label("General", systemImage: "gearshape") }
-            MenuBarSettings().tabItem { Label("Menu Bar", systemImage: "menubar.rectangle") }
-            FolderSettings().tabItem { Label("Folders", systemImage: "folder") }
-            LabsSettings().tabItem { Label("Labs", systemImage: "flask") }
-            AboutSettings().tabItem { Label("About", systemImage: "info.circle") }
+        Button {
+            UserDefaults.standard.set(tab.rawValue, forKey: SettingsTab.key)
+            openSettings()
+        } label: { label }
+    }
+}
+
+struct SettingsView: View {
+    @AppStorage(SettingsTab.key) private var tab: SettingsTab = .general
+
+    var body: some View {
+        TabView(selection: $tab) {
+            GeneralSettings().tabItem { Label("General", systemImage: "gearshape") }.tag(SettingsTab.general)
+            MenuBarSettings().tabItem { Label("Menu Bar", systemImage: "menubar.rectangle") }.tag(SettingsTab.menuBar)
+            FolderSettings().tabItem { Label("Folders", systemImage: "folder") }.tag(SettingsTab.folders)
+            LabsSettings().tabItem { Label("Labs", systemImage: "flask") }.tag(SettingsTab.labs)
+            AboutSettings().tabItem { Label("About", systemImage: "info.circle") }.tag(SettingsTab.about)
         }
         .frame(width: 440)
         .onAppear {

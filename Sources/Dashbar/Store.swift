@@ -285,6 +285,20 @@ final class Store: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.refresh(usage: false, servers: true, panel: true) }
     }
 
+    /// Asks a workspace's processes to quit (SIGTERM, as `kill` does), after the window's confirm. Each pid is checked
+    /// again here, so one reused since the last sample, a system process or Dashbar itself is left alone.
+    func quit(_ group: WorkspaceUsage.ProcessGroup) {
+        guard !isDemo else { return }
+        let pids = group.pids.filter {
+            QuitPolicy.allows($0) && WorkspaceSampler.displayName(Proc.name($0), path: Proc.path($0)) == group.name
+        }
+        let failed = pids.filter { kill($0, SIGTERM) != 0 }
+        if pids.isEmpty || failed.count == pids.count {
+            notice = "Couldn't quit \(group.name). It may have already exited, so refresh to check."
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.refresh(usage: false, servers: true, panel: true) }
+    }
+
     func scanCleanup() {
         guard !isDemo else { return }
         let roots = settings.scanRoots.map { URL(fileURLWithPath: $0) }
