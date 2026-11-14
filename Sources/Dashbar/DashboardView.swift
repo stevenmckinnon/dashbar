@@ -410,6 +410,7 @@ struct BottomBar: View {
                     .keyboardShortcut(",")
                 Divider()
                 Toggle("Notify when an agent finishes", isOn: $notify)
+                    .onChange(of: notify) { _, on in if on { NotificationPermission.shared.request() } }
                 Divider()
                 if updater.isAvailable {
                     Button("Check for Updates…") { updater.checkForUpdates() }.disabled(!updater.canCheck)
@@ -418,6 +419,7 @@ struct BottomBar: View {
                 Button("Rescan for clean-up") { store.scanCleanup() }
                 Button("Refresh now") { store.refreshNow() }
                 Divider()
+                Button("Welcome…") { OnboardingWindow.shared.show(store: store) }
                 Button("Quit Dashbar") { NSApp.terminate(nil) }.keyboardShortcut("q")
             } label: {
                 Image(systemName: "gearshape").font(.system(size: UI.Size.emphasis))

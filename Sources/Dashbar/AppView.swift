@@ -173,6 +173,7 @@ private struct SidebarFooter: View {
                 Button("Rescan for clean-up") { store.scanCleanup() }
                 Button("Refresh now") { store.refreshNow() }
                 Divider()
+                Button("Welcome…") { OnboardingWindow.shared.show(store: store) }
                 Button("Quit Dashbar") { NSApp.terminate(nil) }
             } label: {
                 Image(systemName: "gearshape").font(.system(size: UI.Size.emphasis))

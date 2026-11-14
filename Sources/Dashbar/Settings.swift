@@ -94,9 +94,36 @@ final class AppSettings: ObservableObject {
 
 // MARK: - Settings window
 
+/// Settings' tabs. The selected one is saved under `key`, which is how every "Settings…" link opens Settings at a tab.
 enum SettingsTab: String {
-    case general, menuBar, folders, labs, about
     static let key = "settingsTab"
+    case general, menuBar, folders, labs, about
+}
+
+/// The one way to open Settings at a tab. Settings opens through SwiftUI's `openSettings`, which only works from a view
+/// inside one of the app's scenes: views pass their own (`SettingsButton`), and the menu bar label hands its over when it
+/// appears (`capturesSettingsOpener`), so AppKit windows such as the first run can open Settings too.
+@MainActor
+enum SettingsOpener {
+    static var action: OpenSettingsAction?
+
+    static func open(_ tab: SettingsTab, using openSettings: OpenSettingsAction? = nil) {
+        UserDefaults.standard.set(tab.rawValue, forKey: SettingsTab.key)
+        NSApp.activate(ignoringOtherApps: true)
+        if let open = openSettings ?? action { open() } else { NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) }
+    }
+}
+
+extension View {
+    /// Hands this scene's `openSettings` to `SettingsOpener`.
+    func capturesSettingsOpener() -> some View { modifier(CaptureSettingsOpener()) }
+}
+
+private struct CaptureSettingsOpener: ViewModifier {
+    @Environment(\.openSettings) private var openSettings
+    func body(content: Content) -> some View {
+        content.onAppear { SettingsOpener.action = openSettings }
+    }
 }
 
 /// "Settings…" that opens on the tab where the setting lives, rather than wherever Settings was left.
@@ -106,10 +133,7 @@ struct SettingsButton<Label: View>: View {
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
-        Button {
-            UserDefaults.standard.set(tab.rawValue, forKey: SettingsTab.key)
-            openSettings()
-        } label: { label }
+        Button { SettingsOpener.open(tab, using: openSettings) } label: { label }
     }
 }
 
@@ -169,6 +193,7 @@ private struct GeneralSettings: View {
                     .help("When Claude stops to ask for permission or an answer.")
                 Toggle("Notify when a plan limit runs low", isOn: $notifyLimits)
                     .help("At 80%, when it's on course to run out before it resets, and when it's used up. Once per window.")
+                NotificationPermissionNote(wanted: notify || notifyWaiting || notifyLimits)
                 Toggle("Open the window with \(GlobalShortcut.display)", isOn: $shortcut)
                     .onChange(of: shortcut) { _, on in
                         GlobalShortcut.shared.setEnabled(on)
@@ -187,6 +212,10 @@ private struct GeneralSettings: View {
         }
         .formStyle(.grouped)
         .fixedSize(horizontal: false, vertical: true)
+        // Turning a notification on is when macOS is asked, never at launch.
+        .onChange(of: [notify, notifyWaiting, notifyLimits]) { old, new in
+            if zip(old, new).contains(where: { !$0 && $1 }) { NotificationPermission.shared.request() }
+        }
     }
 }
 
@@ -375,6 +404,8 @@ private struct AboutSettings: View {
                 .padding(.top, 4)
             Text("Not affiliated with Anthropic or OpenAI.")
                 .font(.footnote).foregroundStyle(.secondary)
+            Button("Welcome…") { OnboardingWindow.shared.show(store: nil) }
+                .padding(.top, 4)
         }
         .padding(24)
         .frame(maxWidth: .infinity)

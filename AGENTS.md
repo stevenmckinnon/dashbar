@@ -43,6 +43,7 @@ DASHBAR_DEMO_RATE_LIMITED=1 Dashbar --snapshot out.png --demo  # the Claude plan
 DASHBAR_APP_PAGE=storefront-web Dashbar --snapshot out.png --demo --app  # the Dashbar window (a tab name or a workspace)
 Dashbar --snapshot x --demo --app --onscreen   # the window on screen for 8s (prints its number) for `screencapture -o -l`, which draws Liquid Glass
 Dashbar --snapshot out.png --demo --hosted                    # real scrolling panel, so native controls draw
+Dashbar --snapshot out.png --demo --onboarding [--dark]       # the first-run window, with invented folders
 Dashbar --bench                                               # collector timings
 ```
 
