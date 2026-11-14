@@ -66,10 +66,12 @@ enum Snapshot {
                 return
             }
             if let flag = CommandLine.arguments.firstIndex(of: "--settings") {
-                // A Settings tab, laid out by AppKit so native controls draw. `--settings labs` picks the tab (general,
-                // menuBar, folders, accounts, labs, about); without one it is the whole window, which offline shows General.
+                // A Settings tab, laid out by AppKit so native controls draw. `--settings integrations` picks the tab (general,
+                // notifications, menuBar, folders, accounts, integrations, about) at the window's opening height, or
+                // DASHBAR_SETTINGS_HEIGHT; without one it is the whole window, which offline shows General.
                 let next = CommandLine.arguments.dropFirst(flag + 1).first
-                let root: AnyView = next.flatMap(SettingsTab.init(rawValue:)).map { AnyView(SettingsView.page($0)) } ?? AnyView(SettingsView())
+                let height = ProcessInfo.processInfo.environment["DASHBAR_SETTINGS_HEIGHT"].flatMap(Double.init).map { CGFloat($0) }
+                let root: AnyView = next.flatMap(SettingsTab.init(name:)).map { AnyView(SettingsView.page($0, height: height)) } ?? AnyView(SettingsView())
                 let host = NSHostingView(rootView: root.environment(\.colorScheme, dark ? .dark : .light)
                     .background(Color(nsColor: .windowBackgroundColor)))
                 let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 480, height: 600), styleMask: [.titled], backing: .buffered, defer: false)

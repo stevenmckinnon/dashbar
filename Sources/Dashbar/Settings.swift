@@ -41,7 +41,7 @@ final class AppSettings: ObservableObject {
     @Published var menuCPU: Bool { didSet { defaults.set(menuCPU, forKey: Key.menuCPU) } }
     @Published var menuMemory: Bool { didSet { defaults.set(menuMemory, forKey: Key.menuMemory) } }
     @Published var menuNetwork: Bool { didSet { defaults.set(menuNetwork, forKey: Key.menuNetwork) } }
-    /// What's left of the Claude plan limit, beside the icon. Needs the Labs plan-limits setting.
+    /// What's left of the Claude plan limit, beside the icon. Needs the plan-limits setting in Integrations.
     @Published var menuLimit: Bool { didSet { defaults.set(menuLimit, forKey: Key.menuLimit) } }
     /// Experimental: read Claude Code's sign-in to show plan limits. Off by default.
     @Published var claudeLimits: Bool { didSet { defaults.set(claudeLimits, forKey: Key.claudeLimits) } }
@@ -108,7 +108,7 @@ final class AppSettings: ObservableObject {
         if out != accountStatusLines { accountStatusLines = out }
     }
 
-    /// Adds or removes the bridge in one account's status line: the Labs setting for the default, Accounts for the rest.
+    /// Adds or removes the bridge in one account's status line: the Integrations setting for the default, Accounts for the rest.
     func setStatusLine(_ on: Bool, account: ResolvedAccount) -> String? {
         if account.isDefault { return setClaudeStatusLine(on) }
         let paths = StatusLineBridge.Paths.forAccount(account)
@@ -235,9 +235,56 @@ final class AppSettings: ObservableObject {
 // MARK: - Settings window
 
 /// Settings' tabs. The selected one is saved under `key`, which is how every "Settings…" link opens Settings at a tab.
-enum SettingsTab: String {
+enum SettingsTab: String, CaseIterable {
     static let key = "settingsTab"
-    case general, menuBar, folders, accounts, labs, about
+    case general, notifications, menuBar, folders, accounts, integrations, about
+
+    /// A tab by a saved or typed name, including names from before the tabs were rearranged ("labs" became Integrations).
+    init?(name: String) {
+        if name == "labs" { self = .integrations } else { self.init(rawValue: name) }
+    }
+
+    var title: String {
+        switch self {
+        case .general: "General"
+        case .notifications: "Notifications"
+        case .menuBar: "Menu Bar"
+        case .folders: "Folders"
+        case .accounts: "Accounts"
+        case .integrations: "Integrations"
+        case .about: "About"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .general: "gearshape"
+        case .notifications: "bell.badge"
+        case .menuBar: "menubar.rectangle"
+        case .folders: "folder"
+        case .accounts: "person.2"
+        case .integrations: "puzzlepiece.extension"
+        case .about: "info.circle"
+        }
+    }
+
+    // Where the settings other screens link to live, so every link follows a setting if it moves tab.
+    /// Claude plan limits: the status line, and the experimental endpoint.
+    static let claudeLimits = SettingsTab.integrations
+    /// Answering Claude Code's permission prompts in Dashbar.
+    static let permissionPrompts = SettingsTab.integrations
+    /// Other Claude Code and Codex accounts.
+    static let otherAccounts = SettingsTab.accounts
+    /// The folders the clean-up scans.
+    static let cleanupFolders = SettingsTab.folders
+    /// Notifications and the island.
+    static let alerts = SettingsTab.notifications
+
+    /// A saved tab whose name is gone, moved to where it went (a saved "labs" would otherwise open General).
+    static func migrateSaved(_ defaults: UserDefaults = .standard) {
+        guard let saved = defaults.string(forKey: key), SettingsTab(rawValue: saved) == nil else { return }
+        defaults.set((SettingsTab(name: saved) ?? .general).rawValue, forKey: key)
+    }
 }
 
 /// The one way to open Settings at a tab. Settings opens through SwiftUI's `openSettings`, which only works from a view
@@ -259,9 +306,9 @@ extension View {
     func capturesSettingsOpener() -> some View { modifier(CaptureSettingsOpener()) }
 
     /// A section footer: secondary, and ragged right from the leading edge (grouped forms otherwise set long footers
-    /// flush right, which reads as broken).
+    /// flush right, which reads as broken). A size smaller than the rows, as in System Settings.
     func settingsFooter() -> some View {
-        foregroundStyle(.secondary).multilineTextAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading)
+        font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -286,64 +333,75 @@ struct SettingsButton<Label: View>: View {
 struct SettingsView: View {
     @AppStorage(SettingsTab.key) private var tab: SettingsTab = .general
 
+    /// Every tab shares one size, so switching tabs never resizes the window. Taller content scrolls inside its grouped
+    /// form, and the window's bottom edge drags to make it taller or shorter (down to `minHeight`).
+    static let width: CGFloat = 500
+    static let minHeight: CGFloat = 340
+    /// The opening height: room for the longest tab without scrolling, but never taller than the screen it opens on.
+    @MainActor static var idealHeight: CGFloat {
+        let visible = NSScreen.main?.visibleFrame.height ?? 900
+        return max(minHeight, min(640, visible - 80))
+    }
+
+    init() { SettingsTab.migrateSaved() }
+
     var body: some View {
         TabView(selection: $tab) {
-            GeneralSettings().tabItem { Label("General", systemImage: "gearshape") }.tag(SettingsTab.general)
-            MenuBarSettings().tabItem { Label("Menu Bar", systemImage: "menubar.rectangle") }.tag(SettingsTab.menuBar)
-            FolderSettings().tabItem { Label("Folders", systemImage: "folder") }.tag(SettingsTab.folders)
-            AccountSettings().tabItem { Label("Accounts", systemImage: "person.2") }.tag(SettingsTab.accounts)
-            LabsSettings().tabItem { Label("Labs", systemImage: "flask") }.tag(SettingsTab.labs)
-            AboutSettings().tabItem { Label("About", systemImage: "info.circle") }.tag(SettingsTab.about)
+            ForEach(SettingsTab.allCases, id: \.self) { tab in
+                Self.content(tab).tabItem { Label(tab.title, systemImage: tab.symbol) }.tag(tab)
+            }
         }
-        .frame(width: 440)
+        .frame(width: Self.width)
+        .frame(minHeight: Self.minHeight, idealHeight: Self.idealHeight, maxHeight: .infinity)
         .onAppear {
             // An accessory app's windows open behind the frontmost app unless we activate.
             NSApp.activate(ignoringOtherApps: true)
         }
     }
 
-    /// One tab's page on its own, at the window's width, for `--snapshot … --settings <tab>` (offline renders of the
-    /// TabView only ever draw its first tab).
-    @ViewBuilder static func page(_ tab: SettingsTab) -> some View {
-        Group {
-            switch tab {
-            case .general: GeneralSettings()
-            case .menuBar: MenuBarSettings()
-            case .folders: FolderSettings()
-            case .accounts: AccountSettings()
-            case .labs: LabsSettings()
-            case .about: AboutSettings()
-            }
+    @ViewBuilder private static func content(_ tab: SettingsTab) -> some View {
+        switch tab {
+        case .general: GeneralSettings()
+        case .notifications: NotificationSettings()
+        case .menuBar: MenuBarSettings()
+        case .folders: FolderSettings()
+        case .accounts: AccountSettings()
+        case .integrations: IntegrationSettings()
+        case .about: AboutSettings()
         }
-        .frame(width: 440)
+    }
+
+    /// One tab's page on its own, at the window's opening size, for `--snapshot … --settings <tab>` (offline renders of
+    /// the TabView only ever draw its first tab). `height` overrides the opening height.
+    @MainActor static func page(_ tab: SettingsTab, height: CGFloat? = nil) -> some View {
+        content(tab).frame(width: width, height: height ?? idealHeight)
     }
 }
 
 private struct GeneralSettings: View {
     @ObservedObject private var settings = AppSettings.shared
-    @AppStorage(Notifier.defaultsKey) private var notify = true
-    @AppStorage(Notifier.limitsKey) private var notifyLimits = true
-    @AppStorage(Notifier.waitingKey) private var notifyWaiting = true
     @AppStorage(GlobalShortcut.enabledKey) private var shortcut = true
     @AppStorage(CostLine.showKey) private var showCost = true
-    @AppStorage(IslandSettings.enabledKey) private var island = false
-    @AppStorage(IslandSettings.positionKey) private var islandPosition = IslandPosition.automatic.rawValue
-    @AppStorage(IslandSettings.expandOnFinishKey) private var islandFinish = true
-    @AppStorage(IslandSettings.expandOnNeedsYouKey) private var islandNeedsYou = true
-    @AppStorage(IslandSettings.replacesNotificationsKey) private var islandInstead = false
     @State private var shortcutUnavailable = GlobalShortcut.shared.unavailable
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
         Form {
-            Section("Overview shows") {
-                Toggle("Current workspace", isOn: $settings.showNow)
-                Toggle("Today and this week", isOn: $settings.showWidgets)
-                Toggle("Servers outside projects", isOn: $settings.showServers)
-            }
-            Section("Usage") {
-                Toggle("Estimated cost at API prices", isOn: $showCost)
-                    .help("Works out what your tokens would cost on the pay-as-you-go API at list prices. On a plan you pay the plan's price, not this.")
+            Section {
+                Toggle("Launch at login", isOn: $launchAtLogin)
+                    .onChange(of: launchAtLogin) { _, on in
+                        do { on ? try SMAppService.mainApp.register() : try SMAppService.mainApp.unregister() }
+                        catch { launchAtLogin = SMAppService.mainApp.status == .enabled }
+                    }
+                Toggle("Open the window with \(GlobalShortcut.display)", isOn: $shortcut)
+                    .onChange(of: shortcut) { _, on in
+                        GlobalShortcut.shared.setEnabled(on)
+                        shortcutUnavailable = GlobalShortcut.shared.unavailable
+                    }
+                if shortcut && shortcutUnavailable {
+                    Text("Another app is using \(GlobalShortcut.display), so it won't open Dashbar.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
             Section {
                 AppPicker(title: "Editor", selection: $settings.editorID, candidates: Launcher.editorCandidates)
@@ -355,9 +413,45 @@ private struct GeneralSettings: View {
                     Text("30 seconds").tag(30.0)
                 }
             }
+            Section("Overview shows") {
+                Toggle("Current workspace", isOn: $settings.showNow)
+                Toggle("Today and this week", isOn: $settings.showWidgets)
+                Toggle("Servers outside projects", isOn: $settings.showServers)
+            }
+            Section("Usage") {
+                Toggle("Estimated cost at API prices", isOn: $showCost)
+                    .help("Works out what your tokens would cost on the pay-as-you-go API at list prices. On a plan you pay the plan's price, not this.")
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+/// Notifications, and the island, which can stand in for some of them.
+private struct NotificationSettings: View {
+    @AppStorage(Notifier.defaultsKey) private var notify = true
+    @AppStorage(Notifier.limitsKey) private var notifyLimits = true
+    @AppStorage(Notifier.waitingKey) private var notifyWaiting = true
+    @AppStorage(IslandSettings.enabledKey) private var island = false
+    @AppStorage(IslandSettings.positionKey) private var islandPosition = IslandPosition.automatic.rawValue
+    @AppStorage(IslandSettings.expandOnFinishKey) private var islandFinish = true
+    @AppStorage(IslandSettings.expandOnNeedsYouKey) private var islandNeedsYou = true
+    @AppStorage(IslandSettings.replacesNotificationsKey) private var islandInstead = false
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("When an agent finishes", isOn: $notify)
+                Toggle("When an agent needs you", isOn: $notifyWaiting)
+                    .help("When Claude stops to ask for permission or an answer.")
+                Toggle("When a plan limit runs low", isOn: $notifyLimits)
+                    .help("At 80%, when it's on course to run out before it resets, and when it's used up. Once per window.")
+                NotificationPermissionNote(wanted: notify || notifyWaiting || notifyLimits)
+            } header: {
+                Text("Notify")
+            }
             Section {
                 Toggle("Show the island at the top of the screen", isOn: $island)
-                    .help("A small black pill on the notch (or below the menu bar) with your agents' status. It opens briefly when something happens, and on hover lists your sessions.")
                 if island {
                     Picker("Position", selection: $islandPosition) {
                         Text("Automatic").tag(IslandPosition.automatic.rawValue)
@@ -368,38 +462,18 @@ private struct GeneralSettings: View {
                     .help("Automatic sits on the notch, or just below another app's island when one is already there.")
                     Toggle("Open when an agent finishes", isOn: $islandFinish)
                     Toggle("Open when an agent needs you", isOn: $islandNeedsYou)
-                        .help("With answering permission prompts on (Labs), you can Allow once or Deny right in the island.")
+                        .help("With answering permission prompts on (Integrations), you can Allow once or Deny right in the island.")
                     Toggle("Use the island instead of notifications", isOn: $islandInstead)
                         .help("Leaves out the notification for anything the island opens for. The others still notify.")
                 }
             } header: {
                 Text("Island")
-            }
-            Section {
-                Toggle("Notify when an agent finishes", isOn: $notify)
-                Toggle("Notify when an agent needs you", isOn: $notifyWaiting)
-                    .help("When Claude stops to ask for permission or an answer.")
-                Toggle("Notify when a plan limit runs low", isOn: $notifyLimits)
-                    .help("At 80%, when it's on course to run out before it resets, and when it's used up. Once per window.")
-                NotificationPermissionNote(wanted: notify || notifyWaiting || notifyLimits)
-                Toggle("Open the window with \(GlobalShortcut.display)", isOn: $shortcut)
-                    .onChange(of: shortcut) { _, on in
-                        GlobalShortcut.shared.setEnabled(on)
-                        shortcutUnavailable = GlobalShortcut.shared.unavailable
-                    }
-                if shortcut && shortcutUnavailable {
-                    Text("Another app is using \(GlobalShortcut.display), so it won't open Dashbar.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Toggle("Launch at login", isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { _, on in
-                        do { on ? try SMAppService.mainApp.register() : try SMAppService.mainApp.unregister() }
-                        catch { launchAtLogin = SMAppService.mainApp.status == .enabled }
-                    }
+            } footer: {
+                Text("A small black pill on the notch, or below the menu bar, with your agents' status. It opens briefly when something happens, and lists your sessions on hover.")
+                    .settingsFooter()
             }
         }
         .formStyle(.grouped)
-        .fixedSize(horizontal: false, vertical: true)
         // Turning a notification on is when macOS is asked, never at launch.
         .onChange(of: [notify, notifyWaiting, notifyLimits]) { old, new in
             if zip(old, new).contains(where: { !$0 && $1 }) { NotificationPermission.shared.request() }
@@ -423,16 +497,16 @@ private struct MenuBarSettings: View {
             } footer: {
                 Text("The count of working agents always shows."
                      + (settings.showsClaudeLimits ? " Claude plan left shows a warning symbol when you're nearly out or on course to run out."
-                                                   : " Claude plan left needs Claude plan limits, in Labs."))
+                                                   : " Claude plan left needs Claude plan limits, in Integrations."))
                     .settingsFooter()
             }
         }
         .formStyle(.grouped)
-        .fixedSize(horizontal: false, vertical: true)
     }
 }
 
-private struct LabsSettings: View {
+/// Changes Dashbar can make to other tools' settings: each is off until you add it, and Remove undoes it exactly.
+private struct IntegrationSettings: View {
     @ObservedObject private var settings = AppSettings.shared
     @State private var problem: String?
     @State private var permissionProblem: String?
@@ -450,12 +524,6 @@ private struct LabsSettings: View {
                 Text("Claude plan limits")
             } footer: {
                 Text(statusLineExplanation).settingsFooter()
-            }
-            Section {
-                Toggle("Also ask Anthropic with Claude Code's sign-in", isOn: $settings.claudeLimits)
-            } footer: {
-                Text("Experimental, and only needed if you'd rather not change Claude Code's status line. Reads Claude Code's sign-in from your Keychain, the same way Claude Code does, and asks an undocumented endpoint that may change. Never refreshes or saves the sign-in. When both are on, Dashbar shows the newer reading.")
-                    .settingsFooter()
             }
             Section {
                 if settings.claudeAccounts.count > 1 {
@@ -481,9 +549,17 @@ private struct LabsSettings: View {
                 Text(permissionsExplanation).settingsFooter()
             }
             AntigravityLabsSection()
+            // Last, and labelled: the one setting here that leans on something undocumented.
+            Section {
+                Toggle("Also ask Anthropic with Claude Code's sign-in", isOn: $settings.claudeLimits)
+            } header: {
+                Text("Experimental")
+            } footer: {
+                Text("Another way to get Claude plan limits, only needed if you'd rather not change Claude Code's status line. Reads Claude Code's sign-in from your Keychain, the same way Claude Code does, and asks an undocumented endpoint that may change. Never refreshes or saves the sign-in. When both are on, Dashbar shows the newer reading.")
+                    .settingsFooter()
+            }
         }
         .formStyle(.grouped)
-        .fixedSize(horizontal: false, vertical: true)
         .onAppear {
             settings.refreshClaudeStatusLine()
             settings.refreshClaudePermissions()
@@ -543,10 +619,10 @@ private struct LabsSettings: View {
     private var permissionsExplanation: String {
         let file = settings.claudeAccounts.count > 1 ? "that account's settings.json"
             : Fmt.tilde(PermissionBridge.Paths.default().settings.path)
-        return "Adds one PermissionRequest hook to \(file), pointing at a small script. When Claude Code asks to use a tool, "
-            + "Dashbar shows the request with Allow once and Deny. The terminal asks at the same time, so you can answer in "
-            + "either place. Dashbar never answers by itself or changes your permission rules. Requests stay in a folder only "
-            + "you can read, and nothing is sent anywhere. A backup of the file is kept; Remove takes out only Dashbar's hook."
+        return "Adds one PermissionRequest hook to \(file). When Claude Code asks to use a tool, Dashbar shows Allow once "
+            + "and Deny while the terminal asks too, so you can answer in either place. Dashbar never answers by itself or "
+            + "changes your permission rules. Requests stay in a folder only you can read, and nothing is sent. The file is "
+            + "backed up first; Remove takes out only Dashbar's hook."
     }
 
     @ViewBuilder private var statusLineRow: some View {
@@ -584,9 +660,9 @@ private struct LabsSettings: View {
     private var statusLineExplanation: String {
         let file = Fmt.tilde(StatusLineBridge.Paths.default().settings.path)
         return "Claude Code passes your 5-hour and weekly usage to its status line after each reply (Pro, Max and Ultra plans). "
-            + "Adding Dashbar changes one setting, statusLine in \(file), to a small script that saves just those numbers "
-            + "to a file on this Mac, then runs the status line you had, so it looks the same. A backup of the file is kept. "
-            + "No network, no Keychain. Remove puts your previous status line back exactly."
+            + "Adding Dashbar points statusLine in \(file) at a small script that saves just those numbers on this Mac, "
+            + "then runs the status line you had, so it looks the same. The file is backed up first. No network, no "
+            + "Keychain. Remove puts your previous status line back exactly."
             + (settings.claudeAccounts.count > 1
                 ? " This is \(settings.claudeAccounts[0].label)'s; add other accounts' in Accounts." : "")
     }
@@ -643,7 +719,6 @@ private struct FolderSettings: View {
             }
         }
         .formStyle(.grouped)
-        .fixedSize(horizontal: false, vertical: true)
     }
 
     private func addFolder() {
@@ -677,7 +752,6 @@ private struct AccountSettings: View {
             }
         }
         .formStyle(.grouped)
-        .fixedSize(horizontal: false, vertical: true)
         .onAppear {
             settings.refreshClaudeStatusLine()
             findSuggestions()

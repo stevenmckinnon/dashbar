@@ -46,7 +46,7 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
   `gemini` process, working while its session log is being written) and their tokens and estimated cost per model, read
   incrementally from `~/.gemini/tmp/*/chats/*.jsonl`. The Antigravity app's conversations (working, idle or waiting for you)
   from the status columns of its `~/.gemini/antigravity/conversation_summaries.db`, opened read-only; never titles, previews
-  or transcripts. For the Antigravity CLI (`agy`), Settings → Labs → Antigravity CLI → Add to Status Line points its
+  or transcripts. For the Antigravity CLI (`agy`), Settings → Integrations → Antigravity CLI → Add to Status Line points its
   [status line](https://antigravity.google/docs/cli/statusline/) at a small script that saves only the plan quota and tier
   and each session's folder, model, token totals, estimated cost and state to `~/Library/Caches/Dashbar/antigravity-*`,
   then runs your own status line as before. Dashbar then shows Antigravity's 5-hour and weekly limits per model group with
@@ -62,7 +62,7 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
   pressure), network up/down, GPU utilisation, disk, battery with time remaining, and the busiest apps right
   now with their icons. Recent samples show as small bar charts.
 - **Dashbar window**: the arrow button in the panel header, or ⌃⌥D from anywhere, opens Dashbar as a full window: the panel's pages and every running workspace in a sidebar. A workspace's page shows its uptime, CPU, memory and energy (its servers, agents, what they started and anything else working in its folder), its dev servers and agents, and the processes behind the numbers. There's a pin to keep it on top; ⌃⌥D again closes it.
-- **Island** (Settings → General; on for new installs): a small black pill on the MacBook notch (or just below the middle of the menu bar on other screens) with the most important status: amber "needs you", else green "working", and nothing at all when every agent is idle. It opens for a few seconds when an agent finishes or stops for you, with the session's title and project; with answering permission prompts on, Allow once and Deny work right there. Hover it for your live sessions, click one to go back to it. If another app already draws at the notch, it sits just below that app's (or choose left or right of the notch), and it can stand in for the matching notifications.
+- **Island** (Settings → Notifications; on for new installs): a small black pill on the MacBook notch (or just below the middle of the menu bar on other screens) with the most important status: amber "needs you", else green "working", and nothing at all when every agent is idle. It opens for a few seconds when an agent finishes or stops for you, with the session's title and project; with answering permission prompts on, Allow once and Deny work right there. Hover it for your live sessions, click one to go back to it. If another app already draws at the notch, it sits just below that app's (or choose left or right of the notch), and it can stand in for the matching notifications.
 - **First run**: a short welcome window says what Dashbar reads and lets you turn on notifications, open at login and Claude plan limits. macOS asks about notifications only when you turn one on. It's in the gear menu as Welcome… later.
 - **Notifications** (each can be turned off in Settings): when an agent finishes a stretch of work, when it needs you, and when a plan limit runs low: at 80%, when it's on course to run out before it resets, and when it's used up, once per window.
 - **Tabs**: Overview · Agents · Servers · System · Clean-up (⌘1–⌘5). Overview tiles jump to their tab.
@@ -70,7 +70,7 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
   of your Claude 5-hour or weekly limit, beside the icon.
 - **Plan limits**: Codex's 5-hour and weekly limits from its own logs. Claude's come from Claude Code's
   [status line](https://code.claude.com/docs/en/statusline), which Claude Code passes your usage after each
-  reply (Pro, Max and Ultra plans). Off until you choose Settings → Labs → Add to Status Line: Dashbar then
+  reply (Pro, Max and Ultra plans). Off until you choose Settings → Integrations → Add to Status Line: Dashbar then
   sets `statusLine` in `~/.claude/settings.json` (or `$CLAUDE_CONFIG_DIR`) to a small script,
   `~/Library/Application Support/Dashbar/claude-statusline-bridge.sh`, that saves only the `rate_limits` part
   and the time to `~/Library/Caches/Dashbar/claude-statusline.json`, then runs the status line you had before,
@@ -78,14 +78,14 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
   `~/Library/Application Support/Dashbar/Backups`), and Remove puts your previous status line back exactly. No
   network, no Keychain. The reading is as fresh as your last Claude Code reply, and Dashbar says how old it is.
   Each limit shows a tick for an even pace and a projection of when it would run out at the current rate.
-- **The older, experimental way** (off by default, also in Labs): read Claude Code's sign-in from the Keychain the
+- **The older, experimental way** (off by default, under Experimental in Integrations): read Claude Code's sign-in from the Keychain the
   way Claude Code does (with macOS's `security` tool, so macOS doesn't ask again each time Claude Code renews
   it) and call the same undocumented endpoint as Claude Code's `/usage`. It never refreshes or stores the
   sign-in. If Claude rate-limits the request, Dashbar keeps the last reading and waits before asking again;
   copies of Dashbar on the same Mac share their last reading (`~/Library/Caches/Dashbar/claude-plan.json`,
   percentages and reset times only) so only one of them asks. With both on, Dashbar shows the newer reading
   and doesn't ask while the status line's is current.
-- **Answer permission prompts** (off by default, in Labs): when Claude Code is about to ask you to allow a tool,
+- **Answer permission prompts** (off by default, in Integrations): when Claude Code is about to ask you to allow a tool,
   Dashbar shows what it wants to do (the command, file or address) under that session, in the window and on the
   "needs permission" notification, with Allow once and Deny. Open session hands the prompt back to the terminal
   and takes you there. Choosing Add to Claude Code puts one
@@ -98,7 +98,7 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
   answers by itself: if you don't answer, Dashbar isn't running, or anything goes wrong, it prints nothing and the
   terminal prompt is the one that counts. Allow
   once adds nothing to your permission rules, and Deny tells Claude you said no. Dashbar can only answer prompts
-  Claude Code would show you anyway. Remove takes out only Dashbar's hook. With more than one account, Labs lists
+  Claude Code would show you anyway. Remove takes out only Dashbar's hook. With more than one account, Integrations lists
   each one: Add puts the hook in that account's own `settings.json`, and a prompt says which account it came from.
 
 The menu bar shows the number of working Claude sessions beside the icon, and the icon's bar fills while any are working.
