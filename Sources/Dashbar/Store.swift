@@ -122,10 +122,11 @@ final class Store: ObservableObject {
         settings.$refreshSeconds.dropFirst().removeDuplicates()
             .sink { [weak self] _ in Task { @MainActor in self?.startTimer() } }
             .store(in: &subscriptions)
-        plan.$result.assign(to: &$claudePlan)
-        plan.$loading.assign(to: &$claudePlanLoading)
-        plan.$retryAt.assign(to: &$claudePlanRetryAt)
-        plan.$signingIn.assign(to: &$claudeSigningIn)
+        // Like `update(_:_:)`: pass on only changes, so an unchanged reading never redraws the views.
+        plan.$result.removeDuplicates().assign(to: &$claudePlan)
+        plan.$loading.removeDuplicates().assign(to: &$claudePlanLoading)
+        plan.$retryAt.removeDuplicates().assign(to: &$claudePlanRetryAt)
+        plan.$signingIn.removeDuplicates().assign(to: &$claudeSigningIn)
         plan.onUpdate = { [weak self] in self?.checkLimits() }
         settings.refreshClaudeStatusLine()
         settings.$claudeLimits.removeDuplicates()

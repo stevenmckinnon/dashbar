@@ -13,7 +13,7 @@ enum ClaudePlanLimits {
     static let keychainService = "Claude Code-credentials"
     static let endpoint = URL(string: "https://api.anthropic.com/api/oauth/usage")!
 
-    struct Result {
+    struct Result: Equatable {
         var limits: [RateLimit] = []
         var plan: String?
         /// What went wrong, phrased with what to do next. Nil on success.
