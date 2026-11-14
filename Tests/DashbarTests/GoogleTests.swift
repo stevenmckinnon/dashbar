@@ -172,11 +172,63 @@ import SQLite3
     let now = Date(timeIntervalSince1970: 1_800_000_000)
 
     @Test func bucketIDsSplitIntoGroupAndWindow() {
-        #expect(AntigravityStatusLine.bucket("gemini-weekly") == .init(group: "gemini", groupName: "Gemini", label: "Weekly", window: 7 * 86400))
-        #expect(AntigravityStatusLine.bucket("claude-and-gpt-5h") == .init(group: "claude-and-gpt", groupName: "Claude and GPT", label: "5-hour", window: 5 * 3600))
-        #expect(AntigravityStatusLine.bucket("five_hour") == .init(group: "all", groupName: "All models", label: "5-hour", window: 5 * 3600))
+        func parts(_ id: String) -> [String] {
+            let b = AntigravityStatusLine.bucket(id)
+            return [b.group, b.groupName, b.label, b.window.map { String(Int($0)) } ?? "-"]
+        }
+        #expect(parts("gemini-weekly") == ["gemini", "Gemini", "Weekly", "604800"])
+        #expect(parts("claude-and-gpt-5h") == ["claude-and-gpt", "Claude and GPT", "5-hour", "18000"])
+        #expect(parts("five_hour") == ["all", "All models", "5-hour", "18000"])
         #expect(AntigravityStatusLine.bucket("gemini-pro-burst").window == nil)
-        #expect(AntigravityStatusLine.bucket("gemini-pro-burst").label == "Gemini pro burst")
+        // No window in the ID: labelled with the group's name, known words capitalised, the rest in lower case.
+        #expect(AntigravityStatusLine.bucket("gemini-pro-burst").label == "Gemini Pro burst")
+    }
+
+    /// The IDs the CLI really sends, and two invented ones, come out as names a person can read. Group keys (which
+    /// key plan history) don't change.
+    @Test func bucketNamesFollowARuleNotARenameList() {
+        func name(_ id: String) -> String { AntigravityStatusLine.bucket(id).groupName }
+        #expect(name("gemini-5h") == "Gemini")
+        #expect(name("gemini-weekly") == "Gemini")
+        #expect(name("gemini-argon-wtu-weekly") == "Gemini Argon")          // "wtu" is unknown and short: left out
+        #expect(AntigravityStatusLine.bucket("gemini-argon-wtu-weekly").group == "gemini-argon-wtu")
+        #expect(AntigravityStatusLine.bucket("gemini-argon-wtu-weekly").fullName == "Gemini Argon WTU")
+        #expect(name("3p-5h") == "Other models")
+        #expect(name("3p-weekly") == "Other models")
+        #expect(name("gemini-2.5-flash-zq-daily") == "Gemini 2.5 Flash")     // invented: numbers join, "zq" dropped
+        #expect(name("xk-weekly") == "Other models")                        // invented: nothing known left
+        #expect(name("nebula-pro-5h") == "Nebula Pro")                      // an unknown long word stays, in sentence case
+    }
+
+    @Test func realShapedQuotaReadsAndKeepsTheRawIDForTheTooltip() throws {
+        let json = """
+        {"written_at":\(now.timeIntervalSince1970),"plan_tier":"Google AI Pro","quota":{
+         "3p-5h":{"remaining_fraction":1,"reset_in_seconds":3600},
+         "3p-weekly":{"remaining_fraction":1,"reset_in_seconds":86400},
+         "gemini-5h":{"remaining_fraction":1,"reset_in_seconds":3600},
+         "gemini-argon-wtu-weekly":{"remaining_fraction":0.97,"reset_in_seconds":86400},
+         "gemini-weekly":{"remaining_fraction":1,"reset_in_seconds":86400}}}
+        """
+        let limits = try #require(AntigravityStatusLine.parseLimits(Data(json.utf8), now: now))
+        let rows = limits.flattened
+        #expect(rows.map(\.label) == ["Gemini · 5-hour", "Gemini · Weekly", "Gemini Argon · Weekly",
+                                      "Other models · 5-hour", "Other models · Weekly"])
+        #expect(rows.first { $0.label == "Gemini Argon · Weekly" }?.source == "gemini-argon-wtu-weekly")
+        #expect(LimitBar.sourceNote(rows[2]) == "Reported as gemini-argon-wtu-weekly")
+        // Four at 0% fold away behind the one in use.
+        let fold = RateLimit.fold(rows)
+        #expect(fold.shown.map(\.label) == ["Gemini Argon · Weekly"])
+        #expect(fold.folded.count == 4)
+    }
+
+    @Test func groupsThatWouldReadTheSameKeepTheirUnknownWords() throws {
+        let json = """
+        {"written_at":\(now.timeIntervalSince1970),"quota":{
+         "gemini-abc-weekly":{"remaining_fraction":0.5,"reset_in_seconds":86400},
+         "gemini-xyz-weekly":{"remaining_fraction":0.5,"reset_in_seconds":86400}}}
+        """
+        let limits = try #require(AntigravityStatusLine.parseLimits(Data(json.utf8), now: now))
+        #expect(limits.groups.map(\.name) == ["Gemini ABC", "Gemini XYZ"])
     }
 
     @Test func absentDisabledAndAmountBucketsAreLeftOutWithoutAWarning() throws {

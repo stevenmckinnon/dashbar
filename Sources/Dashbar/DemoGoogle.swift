@@ -51,5 +51,19 @@ extension DemoData {
                 RateLimit(label: "Weekly", usedPercent: 27, resetsAt: now.addingTimeInterval(2.6 * 86400), window: 7 * 86400),
             ]),
         ], fetchedAt: minutes(1))
+        // DASHBAR_DEMO_GOOGLE=quota: the reading as the CLI shapes it, with bucket IDs Dashbar has to name by rule
+        // ("3p-5h", a group with an unknown short word) and most windows at 0%, to see the names and the folded rows.
+        if ProcessInfo.processInfo.environment["DASHBAR_DEMO_GOOGLE"] == "quota" {
+            let reset5 = now.addingTimeInterval(4.6 * 3600).timeIntervalSince1970, resetW = now.addingTimeInterval(5.2 * 86400).timeIntervalSince1970
+            let json = """
+            {"written_at":\(now.addingTimeInterval(-420).timeIntervalSince1970),"plan_tier":"Google AI Pro","quota":{
+             "gemini-5h":{"remaining_fraction":1,"reset_in_seconds":\(reset5 - now.timeIntervalSince1970)},
+             "gemini-weekly":{"remaining_fraction":1,"reset_in_seconds":\(resetW - now.timeIntervalSince1970)},
+             "gemini-argon-wtu-weekly":{"remaining_fraction":0.97,"reset_in_seconds":\(resetW - now.timeIntervalSince1970)},
+             "3p-5h":{"remaining_fraction":1,"reset_in_seconds":\(reset5 - now.timeIntervalSince1970)},
+             "3p-weekly":{"remaining_fraction":1,"reset_in_seconds":\(resetW - now.timeIntervalSince1970)}}}
+            """
+            store.antigravityLimits = AntigravityStatusLine.parseLimits(Data(json.utf8), now: now)
+        }
     }
 }

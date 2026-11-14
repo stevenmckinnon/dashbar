@@ -58,17 +58,20 @@ struct AntigravityLimits: Equatable {
         let key: String
         /// "Gemini", "Claude and GPT".
         let name: String
-        /// "5-hour" and "Weekly" when the bucket says which; the bucket's own name otherwise.
+        /// "5-hour" and "Weekly" when the bucket says which; the group's name otherwise.
         var limits: [RateLimit]
     }
 
     var isEmpty: Bool { groups.allSatisfy(\.limits.isEmpty) }
 
-    /// Every window as one list, each labelled with its group while there is more than one ("Gemini · Weekly").
+    /// Every window as one list, each labelled with its group while there is more than one ("Gemini · Weekly"). A
+    /// window with no length of its own is already labelled with its group's name, so it isn't said twice.
     var flattened: [RateLimit] {
         groups.flatMap { g in
             g.limits.map { l in
-                groups.count > 1 ? RateLimit(label: "\(g.name) · \(l.label)", usedPercent: l.usedPercent, resetsAt: l.resetsAt, window: l.window) : l
+                groups.count > 1 && l.label != g.name
+                    ? RateLimit(label: "\(g.name) · \(l.label)", usedPercent: l.usedPercent, resetsAt: l.resetsAt, window: l.window, source: l.source)
+                    : l
             }
         }
     }

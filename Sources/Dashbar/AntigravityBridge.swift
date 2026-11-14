@@ -278,6 +278,7 @@ enum AntigravityStatusLine {
         }
         var groups: [String: AntigravityLimits.Group] = [:]
         var order: [String] = []
+        var fullNames: [String: String] = [:]
         var recognised = 0
         for id in quota.keys.sorted() {
             guard let bucket = quota[id] as? [String: Any] else { continue }
@@ -291,8 +292,9 @@ enum AntigravityStatusLine {
                 ?? (bucket["reset_in_seconds"] as? NSNumber).map { (written ?? now).addingTimeInterval($0.doubleValue) }
             if let reset, reset <= now { continue }
             let parsed = Self.bucket(id)
-            let limit = RateLimit(label: parsed.label, usedPercent: min(100, max(0, (1 - remaining) * 100)), resetsAt: reset,
-                                  window: parsed.window)
+            fullNames[parsed.group] = parsed.fullName
+            let limit = RateLimit(label: parsed.label, usedPercent: max(0, (1 - remaining) * 100), resetsAt: reset,
+                                  window: parsed.window, source: id)
             if groups[parsed.group] == nil {
                 groups[parsed.group] = .init(key: parsed.group, name: parsed.groupName, limits: [])
                 order.append(parsed.group)
@@ -306,6 +308,14 @@ enum AntigravityStatusLine {
                 return g
             }
         }
+        // Two groups that read the same once unknown words are left out ("gemini-abc", "gemini-xyz") keep those words.
+        let counts = Dictionary(out.groups.map { ($0.name, 1) }, uniquingKeysWith: +)
+        out.groups = out.groups.map { g in
+            guard counts[g.name, default: 0] > 1, let full = fullNames[g.key] else { return g }
+            return .init(key: g.key, name: full, limits: g.limits.map { l in
+                l.label == g.name ? RateLimit(label: full, usedPercent: l.usedPercent, resetsAt: l.resetsAt, window: l.window, source: l.source) : l
+            })
+        }
         if recognised == 0 && !quota.isEmpty { out.problem = unrecognisedMessage }
         return out
     }
@@ -318,13 +328,32 @@ enum AntigravityStatusLine {
     struct Bucket: Equatable {
         /// What the window's IDs share: "gemini" for "gemini-weekly" and "gemini-5h".
         let group: String
+        /// The group as a person reads it: "Gemini", "Gemini Argon", "Other models".
         let groupName: String
         let label: String
         let window: TimeInterval?
+        /// `groupName` keeping the unknown short words, upper-cased ("Gemini Argon WTU"), for when two groups would
+        /// otherwise read the same.
+        var fullName: String? = nil
     }
 
+    /// Words in bucket IDs that are names, and how they are written. Only these are capitalised.
+    static let knownWords: [String: String] = [
+        "gemini": "Gemini", "gemma": "Gemma", "claude": "Claude", "gpt": "GPT", "openai": "OpenAI",
+        "flash": "Flash", "pro": "Pro", "ultra": "Ultra", "lite": "Lite", "nano": "Nano", "argon": "Argon",
+        "image": "Image", "imagen": "Imagen", "veo": "Veo", "opus": "Opus", "sonnet": "Sonnet", "haiku": "Haiku",
+        "thinking": "Thinking", "deep": "Deep", "think": "Think", "agent": "Agent", "code": "Code",
+        "and": "and", "or": "or", "models": "models", "model": "model", "other": "Other", "all": "All",
+    ]
+    /// Shorthand the CLI uses for a whole group: "3p" is the third-party models (Claude and GPT, at the time of writing).
+    static let shorthand: [String: String] = ["3p": "Other models"]
+
     /// Splits a bucket ID into its model group and its window: "gemini-weekly" → Gemini, Weekly (7 days);
-    /// "claude-and-gpt-5h" → Claude and GPT, 5-hour. An ID that names no window keeps its whole name as the label.
+    /// "claude-and-gpt-5h" → Claude and GPT, 5-hour; "3p-5h" → Other models, 5-hour.
+    /// The group's name follows a rule rather than a list of renames, since new IDs keep arriving: known words are
+    /// written as names, numbers stay ("2.5"), other words of four letters or more stay in lower case, and shorter
+    /// unknown words ("wtu") are left out of the name (the raw ID stays in the tooltip). A name with nothing left is
+    /// "Other models". An ID that names no window is labelled with its group's name.
     static func bucket(_ id: String) -> Bucket {
         var words = id.lowercased().split(whereSeparator: { "-_ .:/".contains($0) }).map(String.init)
         var label: String?, window: TimeInterval?
@@ -335,27 +364,45 @@ enum AntigravityStatusLine {
         }
         if take({ ["weekly", "week", "7d", "7day", "7days", "seven"].contains($0) }) {
             _ = take { $0 == "day" || $0 == "days" }
-            label = "Weekly"; window = 7 * 86400
+            window = 7 * 86400
         } else if take({ ["5h", "5hr", "5hour", "5hours", "five", "fivehour"].contains($0) }) {
             _ = take { $0 == "hour" || $0 == "hours" || $0 == "h" }
-            label = "5-hour"; window = 5 * 3600
+            window = 5 * 3600
         } else if take({ ["daily", "day", "1d", "24h"].contains($0) }) {
-            label = "Daily"; window = 86400
+            window = 86400
         }
+        if let window { label = RateLimit.name(window: window) }
         let group = words.isEmpty ? "all" : words.joined(separator: "-")
-        let name = words.isEmpty ? "All models" : words.map { w -> String in
-            switch w {
-            case "gpt": return "GPT"
-            case "and", "or": return w
-            default: return w.prefix(1).uppercased() + w.dropFirst()
-            }
-        }.joined(separator: " ")
-        return Bucket(group: group, groupName: name, label: label ?? pretty(id), window: window)
+        let name = words.isEmpty ? "All models" : readable(words, keepUnknown: false)
+        let full = words.isEmpty ? name : readable(words, keepUnknown: true)
+        return Bucket(group: group, groupName: name, label: label ?? name, window: window, fullName: full)
     }
 
-    private static func pretty(_ id: String) -> String {
-        let s = id.replacingOccurrences(of: "-", with: " ").replacingOccurrences(of: "_", with: " ")
-        return s.prefix(1).uppercased() + s.dropFirst()
+    /// "gemini argon wtu" → "Gemini Argon"; with `keepUnknown`, "Gemini Argon WTU". "gemini 2 5 pro" → "Gemini 2.5 Pro".
+    static func readable(_ words: [String], keepUnknown: Bool) -> String {
+        if let only = words.first, words.count == 1, let short = shorthand[only] { return short }
+        var out: [String] = []
+        var lastWasNumber = false
+        for w in words {
+            let isNumber = !w.isEmpty && w.allSatisfy(\.isNumber)
+            if isNumber {
+                if lastWasNumber, let prev = out.popLast() { out.append(prev + "." + w) } else { out.append(w) }
+            } else if let known = knownWords[w] {
+                out.append(known)
+            } else if let short = shorthand[w] {
+                out.append(short)
+            } else if w.count >= 4 {
+                out.append(w)
+            } else if keepUnknown {
+                out.append(w.uppercased())
+            }
+            lastWasNumber = isNumber
+        }
+        guard var first = out.first else { return "Other models" }
+        // Sentence case: the name starts with a capital even when its first word isn't a known one.
+        first = first.prefix(1).uppercased() + first.dropFirst()
+        out[0] = first
+        return out.joined(separator: " ")
     }
 
     // MARK: Sessions

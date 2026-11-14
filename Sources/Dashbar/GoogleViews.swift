@@ -40,7 +40,7 @@ struct AntigravityLimitsBlock: View {
                 }
                 .font(.system(size: UI.Size.caption))
             } else if let limits, !limits.isEmpty {
-                ForEach(limits.flattened) { LimitBar(limit: $0, tint: UI.google) }
+                LimitList(limits: limits.flattened, tint: UI.google)
                 if let fetched = limits.fetchedAt {
                     TimelineView(.periodic(from: .now, by: 30)) { ctx in
                         if let line = Self.ageLine(writtenAt: fetched, now: ctx.date) {
@@ -62,10 +62,10 @@ struct AntigravityLimitsBlock: View {
         }
     }
 
-    /// "Updated 25m ago · refreshes when the Antigravity CLI next updates". Nil while recent.
+    /// "Updated 25m ago · refreshes next time you use the Antigravity CLI". Nil while recent.
     static func ageLine(writtenAt: Date, now: Date) -> String? {
         guard now.timeIntervalSince(writtenAt) >= 5 * 60 else { return nil }
-        return "Updated \(Fmt.ago(writtenAt, now: now)) ago · refreshes when the Antigravity CLI next updates"
+        return "Updated \(Fmt.ago(writtenAt, now: now)) ago · refreshes next time you use the Antigravity CLI"
     }
 }
 
