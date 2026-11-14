@@ -183,7 +183,9 @@ struct DashboardView: View {
                 if settings.showWidgets, query.isEmpty, !store.claude.last24.isEmpty, store.claude.warning == nil { WidgetRow() }
             case .agents:
                 PlanLimitsCard()
-                WorkspacesCard(query: query, clearQuery: { query = "" })
+                // Every waiting prompt answerable here too: under its workspace, or on its own if its session isn't listed.
+                PermissionPromptList(requests: store.unmatchedPermissionRequests)
+                WorkspacesCard(query: query, clearQuery: { query = "" }, showsPrompts: true)
                 UsageCard(title: "Claude Code", icon: "asterisk", tint: UI.claude, summary: store.claude, loading: store.usageLoading,
                           accounts: store.claudeAccountUsage)
                 if store.codex.found {
@@ -679,10 +681,7 @@ struct NowSessionLine: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(session.name).font(.system(size: UI.Size.body, weight: .medium)).lineLimit(1)
                     .help("\(session.name)\n\(OpenSession.hint(session))")
-                Text("Claude Code \(HostApp.info(for: session).map { "in " + $0.name } ?? "· " + session.surface)"
-                     + (session.account.map { " · " + $0 } ?? "")
-                     + (store.spawned[session.pid]?.portsText.map { " · " + $0 } ?? "")
-                     + (extra > 0 ? " · \(extra) more" : ""))
+                Text(subtitle)
                     .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary).lineLimit(1)
                     .help(store.spawned[session.pid]?.tooltip ?? "")
             }
@@ -698,6 +697,14 @@ struct NowSessionLine: View {
             }
         }
         .modifier(OpenSession(session: session))
+    }
+
+    /// "Work · Terminal · runs :3000 · 1 more". The account leads, so it survives a narrow panel; the Claude tile
+    /// already says which agent it is, so the line doesn't spend room on "Claude Code".
+    private var subtitle: String {
+        let host = HostApp.info(for: session)?.name ?? session.surface
+        return ([session.account, host, store.spawned[session.pid]?.portsText, extra > 0 ? "\(extra) more" : nil] as [String?])
+            .compactMap { $0 }.joined(separator: " · ")
     }
 }
 
@@ -825,6 +832,8 @@ struct WorkspacesCard: View {
     var clearQuery: () -> Void = {}
     /// The workspace already shown in the Now card.
     var excluding: String?
+    /// Show a waiting permission prompt under its workspace even while the row is collapsed.
+    var showsPrompts = false
 
     var body: some View {
         let list = store.workspaces.filter { $0.id != excluding && $0.matches(query) }
@@ -847,7 +856,7 @@ struct WorkspacesCard: View {
                 VStack(spacing: 0) {
                     ForEach(Array(list.enumerated()), id: \.element.id) { i, w in
                         if i > 0 { Divider().opacity(0.5).padding(.leading, 40) }
-                        WorkspaceRow(workspace: w, autoExpand: !query.isEmpty)
+                        WorkspaceRow(workspace: w, autoExpand: !query.isEmpty, showsPrompts: showsPrompts)
                     }
                 }
             }
@@ -864,6 +873,8 @@ struct WorkspaceRow: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let workspace: Workspace
     var autoExpand = false
+    /// Collapsed, it still shows its sessions' permission prompts (expanded, each sits under its session).
+    var showsPrompts = false
     @State private var expanded: Bool?
     @State private var hover = false
 
@@ -878,6 +889,9 @@ struct WorkspaceRow: View {
                 detail.transition(reduceMotion
                     ? .opacity
                     : .asymmetric(insertion: .opacity.combined(with: .offset(y: -4)), removal: .opacity))
+            } else if showsPrompts {
+                ForEach(workspace.sessions.compactMap(store.permissionRequest(for:))) { PermissionPrompt(request: $0) }
+                    .padding(.leading, 42)
             }
         }
         .padding(.vertical, 4)
