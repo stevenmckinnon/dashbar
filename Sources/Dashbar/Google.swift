@@ -77,3 +77,17 @@ struct AntigravityLimits: Equatable {
     /// (`plan-history-<key>.json`) sits beside the others and copies of Dashbar that predate Antigravity skip it.
     static func historyKey(_ group: String) -> String { AgentAccounts.hash("antigravity:" + group) }
 }
+
+extension LiveSession {
+    /// Whether the session has a title of its own. Google's agents (and an untitled Claude Code session) are named after
+    /// their folder, which every row already shows as the workspace or project.
+    var hasOwnTitle: Bool { name != project }
+    /// What a row calls the session: its own title, or else the agent ("Antigravity CLI"), so the folder isn't repeated.
+    var title: String { hasOwnTitle ? name : agent.name }
+    /// Where and what, for a line under `title`: the project, and a Google agent's name unless `title` already is it.
+    var identityParts: [String] {
+        [project] + (agent.isGoogle && hasOwnTitle ? [agent.name] : [])
+    }
+    /// A Google agent's name for a row under a workspace heading, unless `title` already is it.
+    var agentNote: String? { agent.isGoogle && hasOwnTitle ? agent.name : nil }
+}

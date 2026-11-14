@@ -100,7 +100,7 @@ struct NowSessionLine: View {
                 .background(RoundedRectangle(cornerRadius: UI.innerRadius, style: .continuous).fill(session.agent.tint.opacity(0.12)))
                 .help(session.agent.name)
             VStack(alignment: .leading, spacing: 1) {
-                Text(session.name).font(.system(size: UI.Size.body, weight: .medium)).lineLimit(1)
+                Text(session.title).font(.system(size: UI.Size.body, weight: .medium)).lineLimit(1)
                     .help("\(session.name)\n\(OpenSession.hint(session))")
                 Text(subtitle)
                     .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary).lineLimit(1)
@@ -124,7 +124,7 @@ struct NowSessionLine: View {
     /// already says which agent it is, so the line doesn't spend room on "Claude Code".
     private var subtitle: String {
         let host = HostApp.info(for: session)?.name ?? session.surface
-        let agent = session.agent.isGoogle && host != session.agent.name ? session.agent.name : nil
+        let agent = session.agentNote.flatMap { $0 == host ? nil : $0 }
         return ([session.account, agent, host, store.spawned[session.pid]?.portsText, extra > 0 ? "\(extra) more" : nil] as [String?])
             .compactMap { $0 }.joined(separator: " · ")
     }

@@ -224,7 +224,7 @@ struct IslandContent: View {
                         Text(heading(banner, session: session))
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(isAttention(banner) ? UI.textAttention : UI.textSuccess)
-                        Text(verbatim: session?.name ?? request?.oneLine ?? "Claude Code")
+                        Text(verbatim: session?.title ?? request?.oneLine ?? "Claude Code")
                             .font(.system(size: 12, weight: .medium)).foregroundStyle(.white)
                             .lineLimit(1).truncationMode(.tail)
                         Text(verbatim: subtitle(banner, session: session, request: request))
@@ -322,9 +322,9 @@ private struct IslandRow: View {
             HStack(spacing: 9) {
                 StatusDot(active: session.isBusy, waiting: session.isWaiting, size: 6)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(verbatim: session.name).font(.system(size: 12, weight: .medium)).foregroundStyle(.white)
+                    Text(verbatim: session.title).font(.system(size: 12, weight: .medium)).foregroundStyle(.white)
                         .lineLimit(1).truncationMode(.tail)
-                    Text(verbatim: [session.project, session.agent.isGoogle ? session.agent.name : nil, HostApp.info(for: session)?.name, session.account].compactMap { $0 }.joined(separator: " · "))
+                    Text(verbatim: (session.identityParts + [HostApp.info(for: session)?.name, session.account].compactMap { $0 }).joined(separator: " · "))
                         .font(.system(size: 11)).foregroundStyle(.white.opacity(0.55)).lineLimit(1)
                 }
                 Spacer(minLength: 8)

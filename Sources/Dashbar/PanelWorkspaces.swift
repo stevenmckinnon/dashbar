@@ -185,11 +185,11 @@ struct SessionLine: View {
             HStack(spacing: 8) {
                 StatusDot(active: session.isBusy, waiting: session.isWaiting, size: 7)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(session.name).font(.system(size: UI.Size.body, weight: .medium)).lineLimit(1)
+                    Text(session.title).font(.system(size: UI.Size.body, weight: .medium)).lineLimit(1)
                         .help("\(session.name)\n\(Fmt.tilde(session.cwd))\n\(OpenSession.hint(session))")
                     let host = HostApp.info(for: session)?.name ?? session.surface
                     // Google's agents say which they are; Claude's rows don't spend the room.
-                    Text((session.agent.isGoogle ? session.agent.name + " · " : "")
+                    Text((session.agentNote.map { $0 + " · " } ?? "")
                          + "\(session.isWaiting ? session.waitingLabel : session.isBusy ? "Working" : session.status.capitalized) \(Fmt.ago(session.since, now: ctx.date))"
                          + (host == session.agent.name ? "" : " · " + host)
                          + (session.account.map { " · " + $0 } ?? "")

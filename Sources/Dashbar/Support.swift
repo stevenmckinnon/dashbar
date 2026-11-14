@@ -62,6 +62,21 @@ enum Fmt {
     }
 
     /// "claude-opus-5-5" -> "Opus 5.5", "claude-sonnet-4-5-20250929" -> "Sonnet 4.5", "gpt-5-codex" stays.
+    /// A model's name short enough for a list row: drops a parenthetical ("Gemini 4 Argon (Medium)" → "Gemini 4 Argon")
+    /// and a trailing date ("gpt-5-2025-08-07" → "gpt-5", "gemini-3.8-flash-20260101" → "gemini-3.8-flash").
+    static func shortModel(_ name: String) -> String {
+        var s = name
+        if let paren = s.firstIndex(of: "("), paren > s.startIndex { s = String(s[..<paren]) }
+        s = s.trimmingCharacters(in: .whitespaces)
+        let dated = [#"[-@_ ]\d{4}-\d{2}-\d{2}$"#, #"[-@_ ]\d{8}$"#]
+        for pattern in dated {
+            if let r = s.range(of: pattern, options: .regularExpression), r.lowerBound > s.startIndex {
+                s = String(s[..<r.lowerBound])
+            }
+        }
+        return s.isEmpty ? name : s
+    }
+
     static func model(_ raw: String) -> String {
         guard raw.hasPrefix("claude-") else { return raw }
         var parts = raw.dropFirst("claude-".count).split(separator: "-").map(String.init)

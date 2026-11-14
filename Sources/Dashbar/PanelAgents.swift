@@ -64,7 +64,7 @@ struct UsageCard: View {
                     if !usage.projects.isEmpty {
                         HStack(alignment: .top, spacing: 14) {
                             RankList(title: "Projects", items: usage.projects, tint: tint, showCost: showCost)
-                            RankList(title: "Models", items: usage.models, tint: tint, showCost: showCost)
+                            RankList(title: "Models", items: RankList.shortModels(usage.models), tint: tint, showCost: showCost)
                         }
                     }
                     if accounts.count > 1 {
@@ -193,6 +193,24 @@ struct SubagentShare: View {
 }
 
 struct RankList: View {
+    /// Models under their short names (`Fmt.shortModel`). Names that become the same ("… (Thinking)" and the plain
+    /// one) are added together, largest first, so a row is never listed twice.
+    static func shortModels(_ items: [Ranked]) -> [Ranked] {
+        var order: [String] = []
+        var merged: [String: (value: Int, cost: Double?)] = [:]
+        for item in items {
+            let name = Fmt.shortModel(item.name)
+            if let m = merged[name] {
+                let cost: Double? = (m.cost == nil && item.cost == nil) ? nil : (m.cost ?? 0) + (item.cost ?? 0)
+                merged[name] = (m.value + item.value, cost)
+            } else {
+                order.append(name)
+                merged[name] = (item.value, item.cost)
+            }
+        }
+        return order.map { Ranked(name: $0, value: merged[$0]!.value, cost: merged[$0]!.cost) }.sorted { $0.value > $1.value }
+    }
+
     let title: String
     let items: [Ranked]
     let tint: Color
@@ -205,6 +223,7 @@ struct RankList: View {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack {
                         Text(item.name).font(.system(size: UI.Size.caption)).lineLimit(1)
+                            .minimumScaleFactor(0.85).truncationMode(.middle).help(item.name)
                         Spacer(minLength: 4)
                         Text(Fmt.tokens(item.value) + (showCost ? item.cost.map { " \u{00B7} " + Fmt.usd($0) } ?? "" : ""))
                             .font(.system(size: UI.Size.micro).monospacedDigit()).foregroundStyle(UI.textSecondary)
