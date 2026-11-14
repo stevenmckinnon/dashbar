@@ -503,7 +503,7 @@ final class Store: ObservableObject {
             switch event {
             case .finished(let id, let after):
                 islandEvents.send(IslandEvent(kind: .finished(after: after), sessionID: id))
-                if let s = new.first(where: { $0.id == id }) { notifier.finished(s, after: after) }
+                if after >= SessionTransitions.notifyAfter, let s = new.first(where: { $0.id == id }) { notifier.finished(s, after: after) }
             case .waiting(let id):
                 guard let s = new.first(where: { $0.id == id }) else { continue }
                 if permissionRequests.contains(where: { $0.sessionId == id }) { continue }   // its own notification, with answers
@@ -954,8 +954,11 @@ struct SessionTransitions {
         case waiting(id: String)
     }
 
-    /// Short turns aren't worth interrupting anyone for.
-    static let minimumWork: TimeInterval = 20
+    /// Shorter than this is a quick answer: nothing to show. The island and the menu bar's "Done" are quiet enough for
+    /// anything longer.
+    static let minimumWork: TimeInterval = 5
+    /// A notification interrupts, so it waits for a turn worth coming back for.
+    static let notifyAfter: TimeInterval = 20
 
     private var busySince: [String: Date] = [:]
     private var waiting = Set<String>()

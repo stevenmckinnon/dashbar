@@ -563,7 +563,9 @@ private func session(id: String, root: String = "/dev/app", busy: Bool = false, 
         let start = Date(timeIntervalSince1970: 1_000)
         _ = t.update([], now: start)
         _ = t.update([live("s", "busy")], now: start)
-        #expect(t.update([live("s", "idle")], now: start.addingTimeInterval(5)).isEmpty)
+        #expect(t.update([live("s", "idle")], now: start.addingTimeInterval(3)).isEmpty)
+        _ = t.update([live("s", "busy")], now: start.addingTimeInterval(10))
+        #expect(t.update([live("s", "idle")], now: start.addingTimeInterval(16)) == [.finished(id: "s", after: 6)])
     }
 }
 
