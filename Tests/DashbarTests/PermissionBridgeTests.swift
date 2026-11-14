@@ -290,7 +290,8 @@ private func permissionGroups(_ p: PermissionBridge.Paths) throws -> [[String: A
         let run = try run(p, stdin: sample())
         #expect(run.output.isEmpty)
         #expect(run.status == 0)
-        #expect(run.seconds >= 4.5 && run.seconds < 12)
+        // The script's clock counts whole seconds (`date +%s`), so a 5 s wait can end up to a second early.
+        #expect(run.seconds >= 3.9 && run.seconds < 12)
         #expect(leftovers(p).isEmpty)
     }
 
