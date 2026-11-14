@@ -10,6 +10,16 @@ final class Store: ObservableObject {
     @Published var claude = UsageSummary.empty
     @Published var codex = UsageSummary.empty
     @Published var codexLimits: [RateLimit] = []
+    /// Each account's usage, only while more than one Claude Code (or Codex) account is read; empty otherwise, so a
+    /// single account looks exactly as before.
+    @Published var claudeAccountUsage: [AccountUsage] = []
+    @Published var codexAccountUsage: [AccountUsage] = []
+    /// Plan limits of the Claude accounts beyond the default, from each one's status line bridge.
+    @Published var claudeAccountLimits: [AccountLimits] = []
+    /// Every Codex account's limits, only while there is more than one.
+    @Published var codexAccountLimits: [AccountLimits] = []
+    /// The default Claude account's name, only while there is more than one account.
+    @Published var claudeDefaultLabel: String?
     @Published var listeners: [Listener] = []
     /// What each agent session started, keyed by the session's process ID.
     @Published var spawned: [Int32: SpawnedProcesses] = [:]
@@ -39,6 +49,15 @@ final class Store: ObservableObject {
     @Published var notice: String?
     /// Set when Claude Code's session files exist but can't be read (see `ClaudeSessions.readChecked`).
     @Published var sessionsWarning: String?
+
+    /// Which account the Claude plan limits shown first belong to, only while there is more than one: the default
+    /// account's name, or for the experimental endpoint the account whose Keychain entry was used ("Unlabelled sign-in"
+    /// when the entry matches none).
+    var claudePlanLabel: String? {
+        guard let fallback = claudeDefaultLabel else { return nil }
+        guard claudePlan?.source == .endpoint, let service = claudePlan?.keychainService, !claudeAccounts.isEmpty else { return fallback }
+        return claudeAccounts.first { $0.keychainService() == service }?.label ?? "Unlabelled sign-in"
+    }
 
     /// A log or session format Dashbar can no longer read. Shown instead of quietly reporting nothing.
     var formatWarning: String? { claude.warning ?? codex.warning ?? sessionsWarning }
@@ -80,6 +99,10 @@ final class Store: ObservableObject {
     private static let cleanupInterval: TimeInterval = 600
     private var subscriptions = Set<AnyCancellable>()
     private var watcher: FileWatcher?
+    /// The accounts being read, as of the last change in Settings.
+    private var claudeAccounts: [ResolvedAccount] = []
+    private var codexAccounts: [ResolvedAccount] = []
+    private var watchedPaths: [String] = []
     /// Which windows (the menu bar panel, the popout) are on screen, as reported by their views. Closed until one opens.
     private var surfaces = SurfaceVisibility()
     /// Limit alerts already sent, so each fires once per window even across relaunches.
@@ -107,15 +130,21 @@ final class Store: ObservableObject {
             AppWindow.shared.show(store: self, page: .tab(.agents))   // the plan limits live there
         }
         worker.start(live: { [weak self] in self?.apply($0) }, usage: { [weak self] in self?.apply($0) })
+        setAccounts(claude: settings.claudeAccounts, codex: settings.codexAccounts)
         refresh(usage: true, servers: true, panel: true)
         scanCleanup()
         startTimer()
-        // Agent logs and session files change as agents work: react to that instead of polling.
-        watcher = FileWatcher(paths: [ClaudeUsageScanner.defaultRoot.path, ClaudeSessions.defaultDir.path,
-                                      CodexUsageScanner.defaultRoot.path],
-                              latency: 1.5, queue: .main) { [weak self] in
-            Task { @MainActor in self?.filesChanged() }
-        }
+        settings.$accounts.dropFirst().removeDuplicates()
+            .debounce(for: .seconds(0.3), scheduler: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.setAccounts(claude: self.settings.claudeAccounts, codex: self.settings.codexAccounts)
+                self.refresh(usage: true, servers: false, panel: self.panelVisible)
+            }
+            .store(in: &subscriptions)
+        settings.$accountStatusLines.dropFirst().removeDuplicates()
+            .sink { [weak self] _ in Task { @MainActor in self?.refreshAccountLimits() } }
+            .store(in: &subscriptions)
         NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.worker.saveNow() }
         }
@@ -139,6 +168,49 @@ final class Store: ObservableObject {
             .debounce(for: .seconds(0.5), scheduler: RunLoop.main)
             .sink { [weak self] _ in self?.scanCleanup() }
             .store(in: &subscriptions)
+    }
+
+    /// Points the collectors and the file watcher at these accounts' folders. One watcher covers every folder, so more
+    /// accounts add paths to one FSEvents stream, not more streams or timers.
+    private func setAccounts(claude: [ResolvedAccount], codex: [ResolvedAccount]) {
+        guard claude != claudeAccounts || codex != codexAccounts else { return }
+        claudeAccounts = claude
+        codexAccounts = codex
+        worker.setAccounts(claude: claude, codex: codex)
+        update(\.claudeDefaultLabel, claude.count > 1 ? claude.first?.label : nil)
+        // Agent logs and session files change as agents work: react to that instead of polling.
+        let paths = claude.flatMap { [$0.projectsDir.path, $0.sessionsDir.path] } + codex.map(\.sessionsDir.path)
+        if paths != watchedPaths {   // renaming an account changes nothing on disk
+            watchedPaths = paths
+            watcher = FileWatcher(paths: paths, latency: 1.5, queue: .main) { [weak self] in
+                Task { @MainActor in self?.filesChanged() }
+            }
+        }
+        refreshAccountLimits()
+    }
+
+    /// Reads what each added Claude account's status line bridge saved. A few small files: cheap enough for every refresh.
+    private func refreshAccountLimits() {
+        guard !isDemo else { return }
+        let limits = Self.accountLimits(claudeAccounts, statusLines: settings.accountStatusLines)
+        update(\.claudeAccountLimits, limits)
+    }
+
+    /// The added (not default) Claude accounts' readings from their own status line files.
+    nonisolated static func accountLimits(_ accounts: [ResolvedAccount], statusLines: [String: StatusLineBridge.Status],
+                              readings: URL = ClaudeStatusLine.defaultURL.deletingLastPathComponent(),
+                              now: Date = Date()) -> [AccountLimits] {
+        accounts.filter { !$0.isDefault }.map { account in
+            var out = AccountLimits(label: account.label, path: account.path,
+                                    connected: statusLines[account.path]?.isInstalled ?? false)
+            let file = readings.appendingPathComponent(ClaudeStatusLine.fileName(account: account.key))
+            if let reading = ClaudeStatusLine.read(from: file) {
+                out.limits = reading.current(now: now)
+                out.fetchedAt = reading.writtenAt
+                if reading.unrecognised { out.problem = ClaudeStatusLine.unrecognisedMessage }
+            }
+            return out
+        }
     }
 
     private func startTimer() {
@@ -171,6 +243,7 @@ final class Store: ObservableObject {
         } else if minute {
             plan.statusLineChanged()
         }
+        if minute { refreshAccountLimits() }
         if minute { watcher?.restart() }            // pick up folders created since launch
         if panelVisible, tick % every(Self.cleanupInterval) == 0 { scanCleanup() }   // nothing shows it while closed
     }
@@ -179,14 +252,21 @@ final class Store: ObservableObject {
         guard !paused else { return }
         refresh(usage: true, servers: false, panel: panelVisible)
         plan.statusLineChanged()   // a reply in the logs means the status line has just run
+        if claudeAccounts.count > 1 { refreshAccountLimits() }
     }
 
     /// Notifies when a plan limit is nearly used, on course to run out, or used up (once per window).
     private func checkLimits() {
         guard !isDemo, !paused else { return }
         var alerts = LimitAlerts.check(provider: "Codex", limits: codexLimits, sent: sentLimitAlerts)
+        for other in codexAccountLimits.dropFirst() {   // the first is the default account's, `codexLimits`
+            alerts += LimitAlerts.check(provider: "Codex (\(other.label))", limits: other.limits, sent: sentLimitAlerts)
+        }
         if settings.showsClaudeLimits, let plan = claudePlan, plan.problem == nil {
             alerts += LimitAlerts.check(provider: "Claude", limits: plan.limits, sent: sentLimitAlerts)
+        }
+        for other in claudeAccountLimits where other.problem == nil {
+            alerts += LimitAlerts.check(provider: "Claude (\(other.label))", limits: other.limits, sent: sentLimitAlerts)
         }
         guard !alerts.isEmpty else { return }
         for alert in alerts {
@@ -324,6 +404,9 @@ final class Store: ObservableObject {
         update(\.usageLoading, false)
         update(\.codex, r.codex)
         update(\.codexLimits, r.codexLimits)
+        update(\.claudeAccountUsage, r.claudeAccounts)
+        update(\.codexAccountUsage, r.codexAccounts)
+        update(\.codexAccountLimits, r.codexAccountLimits)
         checkLimits()
     }
 }
@@ -358,6 +441,10 @@ final class Worker: @unchecked Sendable {
         var claude: UsageSummary
         var codex: UsageSummary
         var codexLimits: [RateLimit]
+        /// Per account, only with more than one.
+        var claudeAccounts: [AccountUsage] = []
+        var codexAccounts: [AccountUsage] = []
+        var codexAccountLimits: [AccountLimits] = []
     }
 
     private let liveQueue = DispatchQueue(label: "dashbar.live", qos: .utility)
@@ -369,9 +456,14 @@ final class Worker: @unchecked Sendable {
     private lazy var usage = Coalescer<Void>(queue: usageQueue, merge: { _, _ in () }) { [unowned self] in
         self.scanUsage()
     }
-    // Created on the usage queue at first use, so loading saved progress never blocks the main thread.
-    private lazy var claudeScanner = ClaudeUsageScanner(cache: ScanCache<ClaudeUsageScanner.State>.defaultURL("claude-usage.json"))
-    private lazy var codexScanner = CodexUsageScanner(cache: ScanCache<CodexUsageScanner.State>.defaultURL("codex-usage.json"))
+    /// The accounts to read. Set from the main thread, read on the live and usage queues.
+    private let accountsLock = NSLock()
+    private var claudeAccounts: [ResolvedAccount] = AgentAccounts.resolve(.claude, saved: [])
+    private var codexAccounts: [ResolvedAccount] = AgentAccounts.resolve(.codex, saved: [])
+    /// One scanner per account folder, each with its own saved progress (keyed by folder). Created on the usage queue
+    /// at first use, so loading saved progress never blocks the main thread. Usage queue only.
+    private var claudeScanners: [String: ClaudeUsageScanner] = [:]
+    private var codexScanners: [String: CodexUsageScanner] = [:]
     private let contextReader = ContextReader()
     private let sampler = SystemSampler()
     private let serverActivity = ServerActivity()
@@ -397,10 +489,21 @@ final class Worker: @unchecked Sendable {
 
     private var isStopped: Bool { stopLock.withLock { stopped } }
 
+    func setAccounts(claude: [ResolvedAccount], codex: [ResolvedAccount]) {
+        accountsLock.withLock {
+            claudeAccounts = claude
+            codexAccounts = codex
+        }
+    }
+
+    private var accounts: (claude: [ResolvedAccount], codex: [ResolvedAccount]) {
+        accountsLock.withLock { (claudeAccounts, codexAccounts) }
+    }
+
     private func collectLive(_ req: LiveRequest) {
         guard !isStopped else { return }
         var r = LiveResult()
-        let reading = ClaudeSessions.readChecked()
+        let reading = ClaudeSessions.readChecked(accounts: accounts.claude)
         r.sessions = reading.sessions
         r.sessionsWarning = reading.warning
         r.contexts = contextReader.read(r.sessions)
@@ -430,7 +533,36 @@ final class Worker: @unchecked Sendable {
 
     private func scanUsage() {
         guard !isStopped else { return }
-        let result = UsageResult(claude: claudeScanner.scan(), codex: codexScanner.scan(), codexLimits: codexScanner.limits)
+        let (claude, codex) = accounts
+        // Accounts removed in Settings stop being read; their saved progress stays for if they come back.
+        claudeScanners = claudeScanners.filter { path, _ in claude.contains { $0.path == path } }
+        codexScanners = codexScanners.filter { path, _ in codex.contains { $0.path == path } }
+        let claudeRuns = claude.map { account -> (account: ResolvedAccount, book: UsageBook, summary: UsageSummary) in
+            let scanner = claudeScanners[account.path] ?? ClaudeUsageScanner(
+                root: account.projectsDir, cache: ScanCache<ClaudeUsageScanner.State>.defaultURL(account.fileName("claude-usage")))
+            claudeScanners[account.path] = scanner
+            let summary = scanner.scan()
+            return (account, scanner.currentBook, summary)
+        }
+        let codexRuns = codex.map { account -> (account: ResolvedAccount, scanner: CodexUsageScanner, summary: UsageSummary) in
+            let scanner = codexScanners[account.path] ?? CodexUsageScanner(
+                root: account.sessionsDir, cache: ScanCache<CodexUsageScanner.State>.defaultURL(account.fileName("codex-usage")))
+            codexScanners[account.path] = scanner
+            return (account, scanner, scanner.scan())
+        }
+        var result = UsageResult(claude: Self.combined(claudeRuns.map { ($0.book, $0.summary) }),
+                                 codex: Self.combined(codexRuns.map { ($0.scanner.currentBook, $0.summary) }),
+                                 codexLimits: codexRuns.first?.scanner.limits ?? [])
+        if claudeRuns.count > 1 {
+            result.claudeAccounts = claudeRuns.map { AccountUsage(label: $0.account.label, summary: $0.summary) }
+        }
+        let codexFound = codexRuns.filter(\.summary.found)
+        if codexRuns.count > 1, codexFound.count > 1 {
+            result.codexAccounts = codexFound.map { AccountUsage(label: $0.account.label, summary: $0.summary) }
+            result.codexAccountLimits = codexFound.map {
+                AccountLimits(label: $0.account.label, path: $0.account.path, limits: $0.scanner.limits)
+            }
+        }
         if lastSave.map({ Date().timeIntervalSince($0) > 30 }) ?? true { save() }
         let done = onUsage
         DispatchQueue.main.async { done?(result) }
@@ -450,9 +582,18 @@ final class Worker: @unchecked Sendable {
     }
 
     private func save() {
-        claudeScanner.save()
-        codexScanner.save()
+        for scanner in claudeScanners.values { scanner.save() }
+        for scanner in codexScanners.values { scanner.save() }
         lastSave = Date()
+    }
+
+    /// One account's summary as it is; several added together from their ledgers, with the first format warning.
+    static func combined(_ runs: [(book: UsageBook, summary: UsageSummary)]) -> UsageSummary {
+        let found = runs.filter { $0.summary.found }
+        if found.count <= 1 { return found.first?.summary ?? .empty }
+        var s = UsageBook.merged(found.map(\.book)).summary(found: true)
+        s.warning = found.compactMap(\.summary.warning).first
+        return s
     }
 
     func scanCleanup(roots: [URL], done: @escaping @MainActor ([CleanupItem]) -> Void) {

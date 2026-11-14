@@ -112,8 +112,9 @@ struct UsageBook: Codable {
         var sessions = Set<String>()
     }
 
-    private(set) var days: [String: DayUsage] = [:]
-    private(set) var hours: [Date: HourBucket] = [:]
+    /// Settable so `merge` (Accounts.swift) can add another account's ledger.
+    var days: [String: DayUsage] = [:]
+    var hours: [Date: HourBucket] = [:]
 
     private enum CodingKeys: String, CodingKey { case days, hours }
 
@@ -336,6 +337,10 @@ final class ClaudeUsageScanner {
         }
     }
 
+    /// The ledger as of the last scan, so several accounts' usage can be added together.
+    var currentBook: UsageBook { book }
+    var root: URL { tail.root }
+
     func scan() -> UsageSummary {
         guard tail.exists else { return .empty }
         tail.scan { line in
@@ -524,6 +529,10 @@ final class CodexUsageScanner {
     private var fileCtx: [String: FileContext] = [:]
     private(set) var limits: [RateLimit] = []
     private var limitsStamp = Date.distantPast
+
+    /// The ledger as of the last scan, so several accounts' usage can be added together.
+    var currentBook: UsageBook { book }
+    var root: URL { tail.root }
 
     func scan() -> UsageSummary {
         guard tail.exists else { return .empty }

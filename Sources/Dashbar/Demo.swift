@@ -187,6 +187,35 @@ enum DemoData {
                                                        source: .statusLine)
         }
 
+        // DASHBAR_DEMO_ACCOUNTS=2 reads two Claude Code accounts, "Personal" and "Work": sessions and usage say which,
+        // and the Work account's limits sit under the Personal ones.
+        if ProcessInfo.processInfo.environment["DASHBAR_DEMO_ACCOUNTS"].flatMap(Int.init).map({ $0 >= 2 }) == true {
+            let work: Set<String> = ["s1", "s2"]
+            store.sessions = store.sessions.map { s in
+                var s = s
+                s.account = work.contains(s.id) ? "Work" : "Personal"
+                return s
+            }
+            store.claudeDefaultLabel = "Personal"
+            func share(_ f: Double) -> UsageSummary {
+                var s = claude
+                s.periods = claude.periods.map { p in
+                    var p = p
+                    p.totals = TokenTotals(input: Int(Double(p.totals.input) * f), output: Int(Double(p.totals.output) * f),
+                                           cacheRead: Int(Double(p.totals.cacheRead) * f), cacheWrite: Int(Double(p.totals.cacheWrite) * f),
+                                           messages: Int(Double(p.totals.messages) * f))
+                    p.cost *= f
+                    return p
+                }
+                return s
+            }
+            store.claudeAccountUsage = [AccountUsage(label: "Work", summary: share(0.68)), AccountUsage(label: "Personal", summary: share(0.32))]
+            store.claudeAccountLimits = [AccountLimits(label: "Work", path: "/Users/demo/.claude-work", limits: [
+                RateLimit(label: "5-hour", usedPercent: 72, resetsAt: now.addingTimeInterval(1.4 * 3600), window: 5 * 3600),
+                RateLimit(label: "Weekly", usedPercent: 51, resetsAt: now.addingTimeInterval(2.2 * 86400), window: 7 * 86400),
+            ], fetchedAt: now.addingTimeInterval(-90))]
+        }
+
         // System
         var sys = SystemSnapshot()
         sys.cpu = 0.34; sys.cpuUser = 0.24; sys.cpuSystem = 0.10; sys.load = [3.1, 2.7, 2.4]; sys.cores = 12

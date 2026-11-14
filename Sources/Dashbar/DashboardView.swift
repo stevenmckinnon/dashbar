@@ -179,9 +179,11 @@ struct DashboardView: View {
             case .agents:
                 PlanLimitsCard()
                 WorkspacesCard(query: query, clearQuery: { query = "" })
-                UsageCard(title: "Claude Code", icon: "asterisk", tint: UI.claude, summary: store.claude, loading: store.usageLoading)
+                UsageCard(title: "Claude Code", icon: "asterisk", tint: UI.claude, summary: store.claude, loading: store.usageLoading,
+                          accounts: store.claudeAccountUsage)
                 if store.codex.found {
-                    UsageCard(title: "Codex", icon: "chevron.left.forwardslash.chevron.right", tint: .teal, summary: store.codex, loading: false)
+                    UsageCard(title: "Codex", icon: "chevron.left.forwardslash.chevron.right", tint: .teal, summary: store.codex, loading: false,
+                              accounts: store.codexAccountUsage)
                 }
             case .servers:
                 ServersCard(query: query, includeProjects: true)
@@ -672,6 +674,7 @@ struct NowSessionLine: View {
                 Text(session.name).font(.system(size: UI.Size.body, weight: .medium)).lineLimit(1)
                     .help("\(session.name)\n\(OpenSession.hint(session))")
                 Text("Claude Code \(HostApp.info(for: session).map { "in " + $0.name } ?? "· " + session.surface)"
+                     + (session.account.map { " · " + $0 } ?? "")
                      + (store.spawned[session.pid]?.portsText.map { " · " + $0 } ?? "")
                      + (extra > 0 ? " · \(extra) more" : ""))
                     .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary).lineLimit(1)
@@ -978,6 +981,7 @@ struct SessionLine: View {
                     Text(session.name).font(.system(size: UI.Size.body, weight: .medium)).lineLimit(1)
                         .help("\(session.name)\n\(Fmt.tilde(session.cwd))\n\(OpenSession.hint(session))")
                     Text("\(session.isWaiting ? session.waitingLabel : session.isBusy ? "Working" : session.status.capitalized) \(Fmt.ago(session.since, now: ctx.date)) · \(HostApp.info(for: session)?.name ?? session.surface)"
+                         + (session.account.map { " · " + $0 } ?? "")
                          + (store.spawned[session.pid]?.portsText.map { " · " + $0 } ?? ""))
                         .font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary).lineLimit(1)
                         .help(store.spawned[session.pid]?.tooltip ?? "")
@@ -1611,6 +1615,8 @@ struct UsageCard: View {
     let summary: UsageSummary
     let loading: Bool
     var limits: [RateLimit] = []
+    /// Each account's share, shown only with more than one account.
+    var accounts: [AccountUsage] = []
     @State private var period = UsagePeriod.today
     @AppStorage(CostLine.showKey) private var showCost = true
 
@@ -1652,12 +1658,24 @@ struct UsageCard: View {
                             RankList(title: "Models", items: usage.models, tint: tint, showCost: showCost)
                         }
                     }
+                    if accounts.count > 1 {
+                        RankList(title: "Accounts", items: Self.byAccount(accounts, period), tint: tint, showCost: showCost)
+                    }
                     if !limits.isEmpty {
                         VStack(spacing: 6) { ForEach(limits) { LimitBar(limit: $0, tint: tint) } }
                     }
                 }
             }
         }
+    }
+
+    /// Each account's tokens (and cost) for the period, largest first.
+    static func byAccount(_ accounts: [AccountUsage], _ period: UsagePeriod) -> [Ranked] {
+        accounts.map { a in
+            let usage = a.summary.period(period)
+            return Ranked(name: a.label, value: usage.totals.total, cost: usage.cost > 0 ? usage.cost : nil)
+        }
+        .sorted { ($0.value, $1.name) > ($1.value, $0.name) }
     }
 
     private var hourly: some View {
@@ -1848,7 +1866,12 @@ struct PlanLimitsCard: View {
         Card(title: "Plan limits", icon: "gauge.with.needle", tint: .green, count: nil) {
             VStack(alignment: .leading, spacing: 12) {
                 claude
-                if store.codex.found { codex }
+                ForEach(store.claudeAccountLimits) { ClaudeAccountLimitsView(account: $0) }
+                if !store.codexAccountLimits.isEmpty {
+                    ForEach(store.codexAccountLimits) { a in codexBlock(label: a.label, limits: a.limits) }
+                } else if store.codex.found {
+                    codex
+                }
             }
         }
     }
@@ -1870,7 +1893,7 @@ struct PlanLimitsCard: View {
             HStack(spacing: 6) {
                 Image(systemName: "asterisk").font(.system(size: UI.Size.caption, weight: .bold)).foregroundStyle(UI.claude)
                     .accessibilityHidden(true)
-                Text(["Claude", store.claudePlan?.plan].compactMap { $0 }.joined(separator: " · "))
+                Text(["Claude", store.claudePlanLabel, store.claudePlan?.plan].compactMap { $0 }.joined(separator: " · "))
                     .font(.system(size: UI.Size.body, weight: .medium))
                 if store.claudePlan.map({ $0.source == .endpoint }) ?? (!settings.claudeStatusLine && settings.claudeLimits) {
                     Text("Experimental").font(.system(size: UI.Size.micro, weight: .semibold))
@@ -1955,18 +1978,67 @@ struct PlanLimitsCard: View {
         }
     }
 
-    @ViewBuilder private var codex: some View {
+    private var codex: some View { codexBlock(label: nil, limits: store.codexLimits) }
+
+    private func codexBlock(label: String?, limits: [RateLimit]) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Image(systemName: "chevron.left.forwardslash.chevron.right").font(.system(size: UI.Size.caption, weight: .bold))
                     .foregroundStyle(.teal).accessibilityHidden(true)
-                Text("Codex").font(.system(size: UI.Size.body, weight: .medium))
+                Text(["Codex", label].compactMap { $0 }.joined(separator: " · ")).font(.system(size: UI.Size.body, weight: .medium))
             }
-            if store.codexLimits.isEmpty {
+            if limits.isEmpty {
                 Text("Codex hasn't reported limits yet. They appear after your next Codex session.")
                     .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
             } else {
-                ForEach(store.codexLimits) { LimitBar(limit: $0, tint: .teal) }
+                ForEach(limits) { LimitBar(limit: $0, tint: .teal) }
+            }
+        }
+    }
+}
+
+/// Another Claude Code account's limits, from its own status line bridge (Settings → Accounts adds it).
+struct ClaudeAccountLimitsView: View {
+    let account: AccountLimits
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "asterisk").font(.system(size: UI.Size.caption, weight: .bold)).foregroundStyle(UI.claude)
+                    .accessibilityHidden(true)
+                Text("Claude · \(account.label)").font(.system(size: UI.Size.body, weight: .medium))
+            }
+            if let problem = account.problem {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(UI.textDanger).accessibilityHidden(true)
+                    Text(problem).fixedSize(horizontal: false, vertical: true)
+                }
+                .font(.system(size: UI.Size.caption))
+            } else if !account.limits.isEmpty {
+                ForEach(account.limits) { LimitBar(limit: $0, tint: UI.claude) }
+                if let fetched = account.fetchedAt {
+                    TimelineView(.periodic(from: .now, by: 30)) { ctx in
+                        if let line = ClaudeStatusLine.ageLine(writtenAt: fetched, now: ctx.date) {
+                            HStack(spacing: 5) {
+                                Image(systemName: "clock").accessibilityHidden(true)
+                                Text(line).fixedSize(horizontal: false, vertical: true)
+                            }
+                            .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+                        }
+                    }
+                }
+            } else if account.connected {
+                Text("Limits appear after this account's next Claude Code reply.")
+                    .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Add Dashbar to this account's status line to see its limits.")
+                        .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    SettingsButton(tab: .accounts) { Text("Settings…") }
+                        .buttonStyle(.link).font(.system(size: UI.Size.caption, weight: .medium))
+                }
             }
         }
     }

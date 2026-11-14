@@ -14,6 +14,10 @@ struct LiveSession: Identifiable, Equatable {
     let root: String
     /// Why Claude stopped to ask, while `status` is "waiting": "permission prompt", "input needed" or a dialog's own reason.
     var waitingFor: String? = nil
+    /// The account's name, set only while Dashbar reads more than one Claude Code account.
+    var account: String? = nil
+    /// The account's configuration folder, where its transcripts are. Nil means the default.
+    var configDir: String? = nil
 
     var project: String { URL(fileURLWithPath: root).lastPathComponent }
     var isBusy: Bool { status == "busy" }
@@ -92,6 +96,24 @@ enum ClaudeSessions {
         let unreadable = parsed > 0 && recognised == 0 || !sessions.isEmpty && withStatus == 0
         return Reading(sessions: sessions.sorted { ($0.urgency, $1.since) < ($1.urgency, $0.since) },
                        warning: unreadable ? formatWarning : nil)
+    }
+
+    /// Every account's live sessions together. Each is tagged with its folder, and with its account's name when there
+    /// is more than one account. A format warning from any account is passed on.
+    static func readChecked(accounts: [ResolvedAccount]) -> Reading {
+        var out = Reading()
+        for account in accounts {
+            let r = readChecked(dir: account.sessionsDir)
+            out.warning = out.warning ?? r.warning
+            out.sessions += r.sessions.map { s in
+                var s = s
+                s.configDir = account.isDefault ? nil : account.path
+                s.account = accounts.count > 1 ? account.label : nil
+                return s
+            }
+        }
+        out.sessions.sort { ($0.urgency, $1.since) < ($1.urgency, $0.since) }
+        return out
     }
 
     static func isAlive(_ pid: Int32) -> Bool {
