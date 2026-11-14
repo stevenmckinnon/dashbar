@@ -67,6 +67,14 @@ enum Bench {
         let profile = time("Claude plan (profile)") { ClaudeProfile.plan(for: account) }
         _ = time("Claude plan (cached)", runs: 5) { ClaudeProfile.plan(for: account) }
         print("  \(Fmt.tilde(ClaudeProfile.file(for: account).path)): \(profile)")
+        let gemini = GeminiUsageScanner()   // no saved progress: a full read of ~/.gemini/tmp
+        let g = time("Gemini CLI scan (first)") { gemini.scan() }
+        _ = time("Gemini CLI scan (again)") { gemini.scan() }
+        print("  found \(g.found), today \(Fmt.tokens(g.today.total)) tokens, format \(g.warning == nil ? "reads" : "WARNING")")
+        let google = GoogleCollector()
+        let googleLive = time("Google sessions", runs: 5) { google.read() }
+        print("  Gemini CLI and Antigravity sessions: \(googleLive.sessions.count) (\(googleLive.sessions.filter(\.isBusy).count) working), "
+              + "format \(googleLive.warning == nil ? "reads" : "WARNING")")
         print("Resident memory: \(Fmt.bytes(residentBytes()))")
         exit(0)
     }
