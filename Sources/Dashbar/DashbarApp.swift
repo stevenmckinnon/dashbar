@@ -6,6 +6,7 @@ struct DashbarApp: App {
     @StateObject private var store = Store()
 
     init() {
+        Onboarding.decideAtLaunch()   // before anything this launch saves a preference
         _ = Updater.shared   // starts Sparkle's scheduled checks in a built app
         // Belt-and-braces: hide the Dock icon even when run outside the .app bundle.
         NSApplication.shared.setActivationPolicy(.accessory)
@@ -24,7 +25,9 @@ struct DashbarApp: App {
             MenuBarLabel(store: store)
                 .onAppear {
                     if CommandLine.arguments.contains("--window") { AppWindow.shared.show(store: store) }
+                    Onboarding.showAtLaunchIfNeeded(store: store)
                 }
+                .capturesSettingsOpener()
         }
         .menuBarExtraStyle(.window)
 

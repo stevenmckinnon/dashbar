@@ -70,14 +70,22 @@ final class AppSettings: ObservableObject {
 
 // MARK: - Settings window
 
+/// Settings' tabs. The selected one is saved, so other windows can open Settings at a tab (`SettingsOpener`).
+enum SettingsTab: String {
+    static let key = "settingsTab"
+    case general, menuBar, folders, labs, about
+}
+
 struct SettingsView: View {
+    @AppStorage(SettingsTab.key) private var tab: SettingsTab = .general
+
     var body: some View {
-        TabView {
-            GeneralSettings().tabItem { Label("General", systemImage: "gearshape") }
-            MenuBarSettings().tabItem { Label("Menu Bar", systemImage: "menubar.rectangle") }
-            FolderSettings().tabItem { Label("Folders", systemImage: "folder") }
-            LabsSettings().tabItem { Label("Labs", systemImage: "flask") }
-            AboutSettings().tabItem { Label("About", systemImage: "info.circle") }
+        TabView(selection: $tab) {
+            GeneralSettings().tabItem { Label("General", systemImage: "gearshape") }.tag(SettingsTab.general)
+            MenuBarSettings().tabItem { Label("Menu Bar", systemImage: "menubar.rectangle") }.tag(SettingsTab.menuBar)
+            FolderSettings().tabItem { Label("Folders", systemImage: "folder") }.tag(SettingsTab.folders)
+            LabsSettings().tabItem { Label("Labs", systemImage: "flask") }.tag(SettingsTab.labs)
+            AboutSettings().tabItem { Label("About", systemImage: "info.circle") }.tag(SettingsTab.about)
         }
         .frame(width: 440)
         .onAppear {
@@ -119,6 +127,7 @@ private struct GeneralSettings: View {
                     .help("When Claude stops to ask for permission or an answer.")
                 Toggle("Notify when a plan limit runs low", isOn: $notifyLimits)
                     .help("At 80%, when it's on course to run out before it resets, and when it's used up. Once per window.")
+                NotificationPermissionNote(wanted: notify || notifyWaiting || notifyLimits)
                 Toggle("Open the window with \(GlobalShortcut.display)", isOn: $shortcut)
                     .onChange(of: shortcut) { _, on in
                         GlobalShortcut.shared.setEnabled(on)
@@ -137,6 +146,10 @@ private struct GeneralSettings: View {
         }
         .formStyle(.grouped)
         .fixedSize(horizontal: false, vertical: true)
+        // Turning a notification on is when macOS is asked, never at launch.
+        .onChange(of: [notify, notifyWaiting, notifyLimits]) { old, new in
+            if zip(old, new).contains(where: { !$0 && $1 }) { NotificationPermission.shared.request() }
+        }
     }
 }
 
@@ -271,6 +284,8 @@ private struct AboutSettings: View {
                 .padding(.top, 4)
             Text("Not affiliated with Anthropic or OpenAI.")
                 .font(.footnote).foregroundStyle(.secondary)
+            Button("Welcome…") { OnboardingWindow.shared.show(store: nil) }
+                .padding(.top, 4)
         }
         .padding(24)
         .frame(maxWidth: .infinity)

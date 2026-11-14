@@ -77,6 +77,22 @@ enum Snapshot {
                 }
                 return
             }
+            if CommandLine.arguments.contains("--onboarding") {
+                // The first-run window with its title bar, laid out by AppKit so native controls draw.
+                let window = OnboardingWindow.makeWindow(OnboardingView(snapshot: true) {})
+                window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+                window.setFrameOrigin(NSPoint(x: -3000, y: -3000))   // drawn off screen
+                window.orderFrontRegardless()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    guard let frameView = window.contentView?.superview else { exit(1) }
+                    if let rep = frameView.bitmapImageRepForCachingDisplay(in: frameView.bounds) {
+                        frameView.cacheDisplay(in: frameView.bounds, to: rep)
+                        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+                    }
+                    exit(0)
+                }
+                return
+            }
             if CommandLine.arguments.contains("--onscreen"), !CommandLine.arguments.contains("--app") {
                 // The panel in a real window for 8 seconds, for `screencapture -l` to catch what only the window server
                 // draws (Liquid Glass). Prints the window number.

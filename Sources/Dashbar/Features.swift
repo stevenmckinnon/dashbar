@@ -262,7 +262,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         UserDefaults.standard.register(defaults: [Self.defaultsKey: true, Self.limitsKey: true, Self.waitingKey: true])
         let center = UNUserNotificationCenter.current()
         center.delegate = self
-        center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        // Permission is asked for from the first run or when a notification toggle is turned on, never at launch.
     }
 
     func finished(_ s: LiveSession, after duration: TimeInterval) {
