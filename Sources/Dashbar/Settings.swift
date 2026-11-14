@@ -21,6 +21,7 @@ final class AppSettings: ObservableObject {
         static let menuNetwork = "menuNetwork"
         static let menuLimit = "menuClaudeLimit"
         static let claudeLimits = "claudeLimitsExperimental"
+        static let permissionWait = "permissionWaitSeconds"
     }
 
     private let defaults = UserDefaults.standard
@@ -48,6 +49,13 @@ final class AppSettings: ObservableObject {
     @Published private(set) var claudeStatusLine = false
     @Published private(set) var claudeStatusLineStatus: StatusLineBridge.Status = .notInstalled(current: nil)
 
+    /// Dashbar's hook is in Claude Code's PermissionRequest hooks, so Dashbar can answer permission prompts. Like the
+    /// status line, this mirrors Claude Code's settings file rather than being a preference.
+    @Published private(set) var claudePermissions = false
+    @Published private(set) var claudePermissionsStatus: PermissionBridge.Status = .notInstalled
+    /// How long the hook waits for an answer in Dashbar before Claude Code asks in the terminal.
+    @Published var permissionWait: Int { didSet { defaults.set(permissionWait, forKey: Key.permissionWait) } }
+
     var showsMenuBarStats: Bool { menuCPU || menuMemory || menuNetwork }
     /// Either way of reading Claude plan limits is on.
     var showsClaudeLimits: Bool { claudeLimits || claudeStatusLine }
@@ -70,11 +78,33 @@ final class AppSettings: ObservableObject {
         return problem
     }
 
+    /// Re-reads whether Dashbar's permission hook is in Claude Code's settings, and refreshes its script if it is.
+    func refreshClaudePermissions(paths: PermissionBridge.Paths = .default()) {
+        guard !CommandLine.arguments.contains("--demo") else { return }
+        let status = PermissionBridge.status(paths)
+        if status.isInstalled {
+            try? PermissionBridge.writeScript(paths)
+            try? PermissionBridge.prepareQueue(paths)
+        }
+        if status != claudePermissionsStatus { claudePermissionsStatus = status }
+        if status.isInstalled != claudePermissions { claudePermissions = status.isInstalled }
+    }
+
+    /// Adds or removes Dashbar's permission hook. Returns what went wrong, phrased for the user.
+    func setClaudePermissions(_ on: Bool, paths: PermissionBridge.Paths = .default()) -> String? {
+        var problem: String?
+        do { on ? try PermissionBridge.install(paths) : try PermissionBridge.uninstall(paths) }
+        catch { problem = error.localizedDescription }
+        refreshClaudePermissions(paths: paths)
+        return problem
+    }
+
     private init() {
         defaults.register(defaults: [
             Key.refreshSeconds: 3.0, Key.showNow: true, Key.showWidgets: true, Key.showServers: true,
-            Notifier.defaultsKey: true,
+            Notifier.defaultsKey: true, Key.permissionWait: PermissionBridge.defaultWait,
         ])
+        permissionWait = defaults.integer(forKey: Key.permissionWait)
         scanRoots = defaults.stringArray(forKey: Key.scanRoots) ?? Cleanup.defaultRoots
         editorID = defaults.string(forKey: Key.editorID) ?? ""
         terminalID = defaults.string(forKey: Key.terminalID) ?? ""
@@ -247,6 +277,7 @@ private struct MenuBarSettings: View {
 private struct LabsSettings: View {
     @ObservedObject private var settings = AppSettings.shared
     @State private var problem: String?
+    @State private var permissionProblem: String?
 
     var body: some View {
         Form {
@@ -268,10 +299,68 @@ private struct LabsSettings: View {
                 Text("Experimental, and only needed if you'd rather not change Claude Code's status line. Reads Claude Code's sign-in from your Keychain, the same way Claude Code does, and asks an undocumented endpoint that may change. Never refreshes or saves the sign-in. When both are on, Dashbar shows the newer reading.")
                     .foregroundStyle(.secondary)
             }
+            Section {
+                permissionsRow
+                if settings.claudePermissions {
+                    Picker("Wait for an answer", selection: $settings.permissionWait) {
+                        ForEach(PermissionBridge.waitChoices, id: \.self) { seconds in
+                            Text(seconds < 60 ? "\(seconds) seconds" : seconds == 60 ? "1 minute" : "\(seconds / 60) minutes").tag(seconds)
+                        }
+                    }
+                }
+                if let permissionProblem {
+                    Label(permissionProblem, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption).foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } header: {
+                Text("Claude Code permission prompts")
+            } footer: {
+                Text(permissionsExplanation).foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .fixedSize(horizontal: false, vertical: true)
-        .onAppear { settings.refreshClaudeStatusLine() }
+        .onAppear {
+            settings.refreshClaudeStatusLine()
+            settings.refreshClaudePermissions()
+        }
+    }
+
+    @ViewBuilder private var permissionsRow: some View {
+        switch settings.claudePermissionsStatus {
+        case .installed:
+            LabeledContent {
+                Button("Remove") { permissionProblem = settings.setClaudePermissions(false) }
+            } label: {
+                Text("Answering in Dashbar")
+                Text("Allow once or Deny from the panel, the window or the notification.")
+            }
+        case .notInstalled:
+            LabeledContent {
+                Button("Add to Claude Code") { permissionProblem = settings.setClaudePermissions(true) }
+            } label: {
+                Text("Answer permission prompts in Dashbar")
+                Text("Off until you add it. Never answers by itself.")
+            }
+        case .unreadable(let message):
+            LabeledContent {
+                Button("Check Again") { permissionProblem = nil; settings.refreshClaudePermissions() }
+            } label: {
+                Text("Answer permission prompts in Dashbar")
+                Text(message)
+            }
+        }
+    }
+
+    private var permissionsExplanation: String {
+        let file = Fmt.tilde(PermissionBridge.Paths.default().settings.path)
+        return "Adding this puts one hook, PermissionRequest, in \(file), pointing at a small script. When Claude Code is about "
+            + "to ask you to allow a tool, Dashbar shows what it wants to do, with Allow once and Deny. Dashbar can only answer "
+            + "prompts Claude Code already shows you, never changes your permission rules and never answers by itself. If you "
+            + "don't answer in time, or Dashbar isn't running, Claude Code asks in the terminal as usual. While Dashbar waits, "
+            + "the terminal's prompt may hold back; Open Session hands it straight back. Requests stay in a folder only you can "
+            + "read, and nothing is sent anywhere. A backup of the file is kept, and Remove takes out only Dashbar's hook."
     }
 
     @ViewBuilder private var statusLineRow: some View {

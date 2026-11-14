@@ -49,12 +49,16 @@ enum PermissionBridge {
       [ -n "$id" ] && /bin/rm -f "$dir/requests/$id.json" "$dir/requests/.$id.tmp" "$dir/decisions/$id"
     }
 
-    # Dashbar rewrites this file every few seconds while it is running and can answer.
+    # Each running copy of Dashbar rewrites its own alive.<app> file every few seconds while it can answer.
+    # Sets $beat to the first one that is fresh.
     alive() {
-      [ -f "$dir/alive" ] && [ -O "$dir/alive" ] || return 1
-      seen=$(/usr/bin/stat -f %m "$dir/alive") || return 1
       now=$(/bin/date +%s)
-      [ $((now - seen)) -lt 45 ]
+      for beat in "$dir"/alive.*; do
+        [ -f "$beat" ] && [ -O "$beat" ] || continue
+        seen=$(/usr/bin/stat -f %m "$beat") || continue
+        [ $((now - seen)) -lt 45 ] && return 0
+      done
+      return 1
     }
 
     field() { printf '%s' "$input" | /usr/bin/plutil -extract "$1" raw -o - - 2>/dev/null; }
@@ -68,7 +72,7 @@ enum PermissionBridge {
       # These two need an answer typed into Claude Code itself, which a plain allow can't give.
       case $tool in ''|AskUserQuestion|ExitPlanMode) return 0 ;; esac
 
-      limit=$(/usr/bin/sed -n 's/^wait=\([0-9][0-9]*\)$/\1/p' "$dir/alive" | /usr/bin/head -n 1)
+      limit=$(/usr/bin/sed -n 's/^wait=\([0-9][0-9]*\)$/\1/p' "$beat" | /usr/bin/head -n 1)
       [ -n "$limit" ] || limit=60
       [ "$limit" -le 300 ] || limit=300
       [ "$limit" -ge 5 ] || limit=5
@@ -538,7 +542,8 @@ struct PermissionQueue {
     let root: URL
     var requests: URL { root.appendingPathComponent("requests") }
     var decisions: URL { root.appendingPathComponent("decisions") }
-    var alive: URL { root.appendingPathComponent("alive") }
+    /// This copy's heartbeat: the release and a local build each keep their own, so one quitting never stops the other.
+    var alive: URL { root.appendingPathComponent("alive." + (Bundle.main.bundleIdentifier ?? "dashbar")) }
 
     static let `default` = PermissionQueue(root: PermissionBridge.Paths.default().queue)
 

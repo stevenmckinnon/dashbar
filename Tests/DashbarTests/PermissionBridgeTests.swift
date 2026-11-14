@@ -329,6 +329,20 @@ private func permissionGroups(_ p: PermissionBridge.Paths) throws -> [[String: A
         #expect(run.seconds < 5)
     }
 
+    @Test func anotherCopysHeartbeatKeepsItWaitingWhenOneQuits() throws {
+        let fx = try Fixture(); defer { fx.remove() }
+        let (p, queue) = try setUp(fx, wait: 60)
+        // The other copy (release beside a local build) has its own heartbeat.
+        let other = p.queue.appendingPathComponent("alive.fun.dashbar.app.other")
+        try Data("wait=60\n".utf8).write(to: other)
+        let run = try run(p, stdin: sample()) { request in
+            queue.goodbye()
+            Thread.sleep(forTimeInterval: 2.5)   // past a heartbeat check
+            try queue.answer(request.id, .allow)
+        }
+        #expect(try decision(run.output)["behavior"] as? String == "allow")
+    }
+
     @Test func otherEventsAndInteractiveToolsAreLeftToClaudeCode() throws {
         let fx = try Fixture(); defer { fx.remove() }
         let (p, _) = try setUp(fx)

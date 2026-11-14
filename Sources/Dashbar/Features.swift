@@ -408,7 +408,41 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         // Permission is asked for from the first run or when a notification toggle is turned on, never at launch.
+        // A permission prompt's notification can be answered in place. Allow asks for the Mac to be unlocked.
+        let allow = UNNotificationAction(identifier: Self.allowAction, title: "Allow Once", options: [.authenticationRequired])
+        let deny = UNNotificationAction(identifier: Self.denyAction, title: "Deny", options: [])
+        center.setNotificationCategories([UNNotificationCategory(identifier: Self.permissionCategory, actions: [allow, deny],
+                                                                 intentIdentifiers: [], options: [])])
     }
+
+    static let permissionCategory = "dashbar.permission"
+    static let allowAction = "dashbar.permission.allow"
+    static let denyAction = "dashbar.permission.deny"
+    /// Answers a permission request by id (set by the store). `.terminal` hands it back to Claude Code's own prompt.
+    var answerPermission: ((String, PermissionRequest.Answer) -> Void)?
+
+    /// "Claude needs permission in shop" with what it wants to do, and Allow Once / Deny on the notification itself.
+    func permission(_ r: PermissionRequest, session: LiveSession?) {
+        guard available, UserDefaults.standard.bool(forKey: Self.waitingKey) else { return }
+        let content = UNMutableNotificationContent()
+        content.title = session?.name ?? (r.project.isEmpty ? "Claude Code" : r.project)
+        content.subtitle = "Claude needs permission" + (r.project.isEmpty ? "" : " in \(r.project)")
+        content.body = r.oneLine
+        content.sound = .default
+        content.categoryIdentifier = Self.permissionCategory
+        var info: [String: Any] = session.map(userInfo(for:)) ?? ["root": r.cwd.isEmpty ? homeDir.path : Fmt.root(fromCwd: r.cwd)]
+        info["permission"] = r.id
+        content.userInfo = info
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: Self.permissionID(r.id), content: content, trigger: nil))
+    }
+
+    /// Takes a request's notification away once it's answered, handed back or timed out.
+    func removePermission(_ id: String) {
+        guard available else { return }
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [Self.permissionID(id)])
+    }
+
+    private static func permissionID(_ id: String) -> String { "permission-" + id }
 
     func finished(_ s: LiveSession, after duration: TimeInterval) {
         guard available, UserDefaults.standard.bool(forKey: Self.defaultsKey) else { return }
@@ -454,7 +488,27 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
-        if response.notification.request.content.userInfo["limits"] as? Bool == true {
+        let info = response.notification.request.content.userInfo
+        if let id = info["permission"] as? String {
+            switch response.actionIdentifier {
+            case Self.allowAction:
+                DispatchQueue.main.async { [weak self] in self?.answerPermission?(id, .allow) }
+                completionHandler()
+                return
+            case Self.denyAction:
+                DispatchQueue.main.async { [weak self] in self?.answerPermission?(id, .deny) }
+                completionHandler()
+                return
+            case UNNotificationDefaultActionIdentifier:
+                // Clicked rather than answered: hand the prompt back to Claude Code and open the session, as for any
+                // "needs you" notification.
+                DispatchQueue.main.async { [weak self] in self?.answerPermission?(id, .terminal) }
+            default:
+                completionHandler()   // dismissed: the request keeps waiting in Dashbar
+                return
+            }
+        }
+        if info["limits"] as? Bool == true {
             DispatchQueue.main.async { [weak self] in self?.openLimits?() }
         } else if let root = response.notification.request.content.userInfo["root"] as? String {
             let host = response.notification.request.content.userInfo["hostApp"] as? String

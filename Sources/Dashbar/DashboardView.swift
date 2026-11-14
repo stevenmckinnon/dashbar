@@ -170,7 +170,12 @@ struct DashboardView: View {
             switch forcedTab ?? tab {
             case .overview:
                 TileRow { tab = $0 }
-                if settings.showNow, query.isEmpty, let featured = store.featured { NowCard(workspace: featured) }
+                // Prompts the Now card won't show, so every one waiting is in view without opening a row.
+                let nowCard = settings.showNow && query.isEmpty ? store.featured : nil
+                PermissionPromptList(requests: store.permissionRequests.filter { r in
+                    !(nowCard?.sessions.contains { $0.id == r.sessionId } ?? false)
+                })
+                if let featured = nowCard { NowCard(workspace: featured) }
                 WorkspacesCard(query: query, clearQuery: { query = "" },
                                excluding: settings.showNow && query.isEmpty ? store.featured?.id : nil)
                 if settings.showServers || !query.isEmpty { ServersCard(query: query) }
@@ -600,6 +605,7 @@ struct NowCard: View {
                                    extra: s.id == workspace.sessions.first?.id ? max(0, workspace.sessions.count - 2) : 0)
                 }
             }
+            ForEach(workspace.sessions.compactMap(store.permissionRequest(for:))) { PermissionPrompt(request: $0) }
             QuickActions(workspace: workspace)
         }
         .padding(UI.cardPadding)
@@ -928,7 +934,7 @@ struct WorkspaceRow: View {
 
     private var detail: some View {
         VStack(alignment: .leading, spacing: 3) {
-            ForEach(workspace.sessions) { SessionLine(session: $0, context: store.contexts[$0.id]) }
+            ForEach(workspace.sessions) { SessionBlock(session: $0) }
             ForEach(workspace.servers) { ServerRow(listener: $0, inWorkspace: true) }
             QuickActions(workspace: workspace).padding(.top, 4)
         }
