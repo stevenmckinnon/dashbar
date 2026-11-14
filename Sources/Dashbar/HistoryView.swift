@@ -60,7 +60,7 @@ extension PlanHistory.Provider {
         switch self { case .claude: return "asterisk"; case .codex: return "chevron.left.forwardslash.chevron.right"; case .antigravity: return UI.googleSymbol }
     }
     var tint: Color {
-        switch self { case .claude: return UI.claude; case .codex: return .teal; case .antigravity: return UI.google }
+        switch self { case .claude: return UI.claude; case .codex: return UI.codex; case .antigravity: return UI.google }
     }
     /// Under a window with no reading yet: when one arrives.
     var noReadingYet: String {
@@ -366,7 +366,7 @@ private struct UsageHistorySection: View {
 
     /// The agents shown, with their colours, in order.
     private var agents: [(String, Color)] {
-        [("Claude Code", UI.claude)] + (codex == nil ? [] : [("Codex", Color.teal)]) + (google == nil ? [] : [(googleName, UI.google)])
+        [("Claude Code", UI.claude)] + (codex == nil ? [] : [("Codex", UI.codex)]) + (google == nil ? [] : [(googleName, UI.google)])
     }
 
     var body: some View {
@@ -526,7 +526,7 @@ private struct ProjectRanks: View {
                 RankRow(name: r.name, value: Fmt.tokens(r.total) + (r.cost.map { " · " + Fmt.usd($0) } ?? "")) { width in
                     HStack(spacing: 0) {
                         if r.claude > 0 { Rectangle().fill(UI.claude.opacity(0.7)).frame(width: width * Double(r.claude) / top) }
-                        if r.codex > 0 { Rectangle().fill(Color.teal.opacity(0.7)).frame(width: width * Double(r.codex) / top) }
+                        if r.codex > 0 { Rectangle().fill(UI.codex.opacity(0.7)).frame(width: width * Double(r.codex) / top) }
                         if r.google > 0 { Rectangle().fill(UI.google.opacity(0.7)).frame(width: width * Double(r.google) / top) }
                     }
                     .frame(width: max(3, width * Double(r.total) / max(top, 1)), alignment: .leading)
@@ -543,7 +543,7 @@ private struct ModelRanks: View {
     var google: UsageHistory? = nil
 
     var body: some View {
-        let rows = (claude.models.map { ($0, UI.claude) } + (codex?.models ?? []).map { ($0, Color.teal) }
+        let rows = (claude.models.map { ($0, UI.claude) } + (codex?.models ?? []).map { ($0, UI.codex) }
                     + (google?.models ?? []).map { ($0, UI.google) })
             .sorted { $0.0.value > $1.0.value }.prefix(6)
         let top = Double(rows.first?.0.value ?? 1)

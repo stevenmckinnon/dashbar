@@ -88,6 +88,8 @@ struct Card<Content: View>: View {
     var tint: Color = .secondary
     var count: Int?
     var trailing: String?
+    /// A small view at the right of the title row, after `trailing` (the plan limits card's pace key).
+    var accessory: AnyView? = nil
     @ViewBuilder var content: Content
 
     var body: some View {
@@ -101,6 +103,7 @@ struct Card<Content: View>: View {
                 if let trailing {
                     Text(trailing).font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
                 }
+                if let accessory { accessory }
             }
             content
         }
@@ -313,5 +316,15 @@ extension Sequence where Element: Hashable {
     func uniqued() -> [Element] {
         var seen = Set<Element>()
         return filter { seen.insert($0).inserted }
+    }
+}
+
+/// How long a meter's fill is drawn.
+enum Meter {
+    /// Nothing at all for nothing used, so a 0% meter never shows a stub that reads as "a little"; a small non-zero
+    /// share keeps `minimum` so it stays visible. Clamped to the meter's length.
+    static func width(_ fraction: Double, in length: CGFloat, minimum: CGFloat = 3) -> CGFloat {
+        guard fraction > 0, length > 0 else { return 0 }
+        return min(length, max(minimum, length * CGFloat(min(fraction, 1))))
     }
 }

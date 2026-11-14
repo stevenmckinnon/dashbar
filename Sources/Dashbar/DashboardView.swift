@@ -138,7 +138,7 @@ struct DashboardView: View {
                 UsageCard(title: "Claude Code", icon: "asterisk", tint: UI.claude, summary: store.claude, loading: store.usageLoading,
                           accounts: store.claudeAccountUsage)
                 if store.codex.found {
-                    UsageCard(title: "Codex", icon: "chevron.left.forwardslash.chevron.right", tint: .teal, summary: store.codex, loading: false,
+                    UsageCard(title: "Codex", icon: "chevron.left.forwardslash.chevron.right", tint: UI.codex, summary: store.codex, loading: false,
                               accounts: store.codexAccountUsage)
                 }
                 if store.google.found {

@@ -14,7 +14,7 @@ struct ServersCard: View {
         let loose = (includeProjects ? store.devListeners : store.looseServers).filter { matches($0) }
         let others = store.otherListeners.filter { matches($0) }
         if !loose.isEmpty || !others.isEmpty || includeProjects {
-            Card(title: includeProjects ? "Dev servers" : "Servers", icon: "server.rack", tint: .blue, count: Set(loose.map(\.pid)).count) {
+            Card(title: includeProjects ? "Dev servers" : "Servers", icon: "server.rack", tint: .secondary, count: Set(loose.map(\.pid)).count) {
                 if loose.isEmpty {
                     EmptyRow(text: query.isEmpty ? "No dev servers running" : "No servers match “\(query)”")
                 }
