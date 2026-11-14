@@ -311,6 +311,12 @@ private struct OverviewPage: View {
         let workspaces = store.workspaces.filter { $0.matches(query) }
         if let warning = store.formatWarning { NoticeBanner(text: warning, dismiss: nil) }
         TileRow { select(.tab($0)) }
+        if query.isEmpty, !store.permissionRequests.isEmpty {
+            SectionTitle(text: "Needs you", count: store.permissionRequests.count).padding(.top, 10)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 290), spacing: UI.gap, alignment: .top)], spacing: UI.gap) {
+                ForEach(store.permissionRequests) { PermissionPrompt(request: $0, showsProject: true) }
+            }
+        }
         SectionTitle(text: "Workspaces", count: workspaces.count).padding(.top, 10)
         if workspaces.isEmpty {
             EmptyRow(text: store.workspaces.isEmpty
@@ -498,7 +504,7 @@ private struct WorkspacePage: View {
             if !workspace.sessions.isEmpty {
                 Card(title: "Agents", icon: "sparkles", count: workspace.sessions.count) {
                     VStack(spacing: 0) {
-                        ForEach(workspace.sessions) { SessionLine(session: $0, context: store.contexts[$0.id]) }
+                        ForEach(workspace.sessions) { SessionBlock(session: $0) }
                     }
                 }
                 .frame(maxHeight: .infinity, alignment: .top)

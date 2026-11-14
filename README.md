@@ -43,7 +43,7 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
 - **Codex usage**: the same, plus 5h/weekly rate-limit gauges, from `~/.codex/sessions`. Shown once Codex has session logs.
 - **More than one account**: if you run Claude Code with [`CLAUDE_CONFIG_DIR`](https://code.claude.com/docs/en/authentication#log-in-with-multiple-accounts) (say `~/.claude-work` beside `~/.claude`) or Codex with `CODEX_HOME`, add each folder in Settings → Accounts (Dashbar suggests `~/.claude-*` and `~/.codex-*` folders with logs, looking only at the top of your home folder). It reads every account's sessions and usage, names them by account (only once there's more than one), and shows each Claude account's plan limits from its own status line, saved to `~/Library/Caches/Dashbar/claude-statusline-<id>.json`.
 - **Estimated cost**: what the period's tokens would cost at public API list prices, per model and project, worked out on your Mac from the token counts (a guide for subscribers, not a bill; models without a known price are named, never counted as $0). Settings → General can hide it.
-- **History**: a page in the Dashbar window (or **History** in a usage card) with each 5-hour and weekly plan window's peak over the last 30 days (how often you hit the limit), the current window against an even pace, and 30 days of tokens and estimated cost per day by agent, project and model. Plan readings are kept for 90 days in `~/Library/Application Support/Dashbar/plan-history.json` (usually tens of KB); usage comes from the scan Dashbar already does.
+- **History**: a page in the Dashbar window (or **History** in a usage card) with each 5-hour and weekly plan window's peak over the last 30 days (with more than one account, the default account's) (how often you hit the limit), the current window against an even pace, and 30 days of tokens and estimated cost per day by agent, project and model. Plan readings are kept for 90 days in `~/Library/Application Support/Dashbar/plan-history.json` (usually tens of KB); usage comes from the scan Dashbar already does.
 - **Local servers**: listening TCP ports with their project name, command and uptime. Hover a row to open it in the browser or stop the process.
   Servers up over an hour that use almost no CPU are marked "barely used", and servers started from a Claude Code
   session say so (the session shows what it runs).
@@ -73,6 +73,19 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
   copies of Dashbar on the same Mac share their last reading (`~/Library/Caches/Dashbar/claude-plan.json`,
   percentages and reset times only) so only one of them asks. With both on, Dashbar shows the newer reading
   and doesn't ask while the status line's is current.
+- **Answer permission prompts** (off by default, in Labs): when Claude Code is about to ask you to allow a tool,
+  Dashbar shows what it wants to do (the command, file or address) under that session, in the window and on the
+  "needs permission" notification, with Allow once and Deny. Open session hands the prompt back to the terminal
+  and takes you there. Choosing Add to Claude Code puts one
+  [`PermissionRequest` hook](https://code.claude.com/docs/en/hooks#permissionrequest) in `~/.claude/settings.json`
+  (after a backup, keeping any hooks you have) pointing at
+  `~/Library/Application Support/Dashbar/claude-permission-bridge.sh`. The script leaves the request in
+  `~/Library/Application Support/Dashbar/Permissions` (readable only by you, file contents and edits left out)
+  and waits up to a minute (adjustable) for your answer. It never answers by itself: if you don't answer, Dashbar
+  isn't running, or anything goes wrong, it prints nothing and Claude Code asks in the terminal as usual. Allow
+  once adds nothing to your permission rules, and Deny tells Claude you said no. Dashbar can only answer prompts
+  Claude Code would show you anyway. Remove takes out only Dashbar's hook. With more than one account it covers
+  the default account for now; other accounts' prompts stay in the terminal.
 
 The menu bar shows the number of working Claude sessions beside the icon, and the icon's bar fills while any are working.
 
@@ -80,6 +93,7 @@ The menu bar shows the number of working Claude sessions beside the icon, and th
 
 - **Local only.** It reads the session logs Claude Code and Codex already write on your Mac (`~/.claude`, `~/.codex` and any account folders you add), lists listening ports with libproc and measures folders. No browser cookies, no Full Disk Access, no account, no analytics.
 - **Nothing is sent**, except Sparkle's update checks to GitHub and, if you turn it on, the experimental Claude plan-limits request to `api.anthropic.com` (the same read-only call Claude Code's `/usage` makes). The recommended way to see Claude plan limits sends nothing: only when you press Add does Dashbar change the `statusLine` setting in Claude Code's `settings.json` (after a backup), so a local script saves your usage percentages to a file on your Mac.
+- **Reads, and acts only when you click.** Dashbar changes Claude Code's `settings.json` only when you press Add (the status line, or the permission hook), after a backup, and Remove puts it back. If you turn on answering permission prompts, it answers one only when you click Allow once or Deny, never by itself and never by changing your permission rules; anything else falls back to Claude Code's own prompt.
 - **One app for the whole picture.** Agents (working, idle, waiting for you), plan limits with a pace mark and a projected run-out time, dev servers grouped by project, what each workspace's processes use, system stats and a clean-up of rebuildable caches, in the panel or in a window.
 
 ## Settings
@@ -109,6 +123,11 @@ folders. Claude plan limits come from Claude Code's status line: with your conse
 setting so a local script saves your usage percentages to a file, and it sends nothing. The only network
 requests are update checks and the optional experimental plan-limits setting, which sends Claude Code's own
 sign-in to Anthropic's usage endpoint, the same call Claude Code makes.
+
+Answering permission prompts is the one feature that acts on an agent, and only when you click Allow or Deny.
+Requests and answers pass through files only your user can read, named with 128 random bits. Another program
+running as you could write an answer file, but such a program could equally type into your terminal or edit
+Claude Code's settings, so this opens nothing new to it. Nothing about the request leaves your Mac.
 
 ## Licence
 

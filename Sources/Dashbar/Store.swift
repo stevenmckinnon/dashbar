@@ -53,6 +53,18 @@ final class Store: ObservableObject {
     @Published var notice: String?
     /// Set when Claude Code's session files exist but can't be read (see `ClaudeSessions.readChecked`).
     @Published var sessionsWarning: String?
+    /// Claude Code permission prompts waiting for an answer in Dashbar (only while the permission hook is added).
+    @Published var permissionRequests: [PermissionRequest] = []
+
+    func permissionRequest(for session: LiveSession) -> PermissionRequest? {
+        permissionRequests.first { $0.sessionId == session.id }
+    }
+
+    /// Requests whose session Dashbar can't see (no session file), shown on their own so none goes unanswered.
+    var unmatchedPermissionRequests: [PermissionRequest] {
+        let ids = Set(sessions.map(\.id))
+        return permissionRequests.filter { !ids.contains($0.sessionId) }
+    }
 
     /// Which account the Claude plan limits shown first belong to, only while there is more than one: the default
     /// account's name, or for the experimental endpoint the account whose Keychain entry was used ("Unlabelled sign-in"
@@ -115,6 +127,13 @@ final class Store: ObservableObject {
     /// Demo stores hold invented data and never collect anything.
     private var isDemo = false
     private let planRecorder = PlanHistoryRecorder()
+    /// Sessions as Claude Code's files describe them, before pending permission requests mark theirs as waiting.
+    private var rawSessions: [LiveSession] = []
+    private let permissionQueue = PermissionQueue.default
+    private var permissionWatcher: FileWatcher?
+    private var heartbeat: Timer?
+    /// Requests already notified about, so each gets one notification.
+    private var notifiedRequests = Set<String>()
 
     /// `demo` fills the store with invented data and starts nothing: no scanning, timers, watchers or
     /// Keychain access. Used for README and website screenshots (`Dashbar --snapshot out.png --demo`).
@@ -154,8 +173,18 @@ final class Store: ObservableObject {
             MainActor.assumeIsolated {
                 self?.worker.saveNow()
                 self?.planRecorder.save()
+                // Waiting hooks stop at once (unless another copy is running), so the terminal prompts straight away.
+                if self?.heartbeat != nil { self?.permissionQueue.goodbye() }
             }
         }
+        notifier.answerPermission = { [weak self] id, answer in self?.answer(id, answer, fromNotification: true) }
+        settings.refreshClaudePermissions()
+        settings.$claudePermissions.removeDuplicates()
+            .sink { [weak self] on in Task { @MainActor in self?.setPermissionsEnabled(on) } }
+            .store(in: &subscriptions)
+        settings.$permissionWait.dropFirst().removeDuplicates()
+            .sink { [weak self] _ in Task { @MainActor in self?.beat() } }
+            .store(in: &subscriptions)
         settings.$refreshSeconds.dropFirst().removeDuplicates()
             .sink { [weak self] _ in Task { @MainActor in self?.startTimer() } }
             .store(in: &subscriptions)
@@ -233,6 +262,7 @@ final class Store: ObservableObject {
     /// While it's closed only the menu bar badge matters, and the file watcher keeps that current,
     /// so the timer just runs a light safety refresh each minute. Usage also comes from the watcher.
     private func onTick() {
+        if !permissionRequests.isEmpty { refreshPermissions() }   // drop requests that timed out, even while paused
         guard !paused else { return }
         tick += 1
         let base = settings.refreshSeconds
@@ -247,6 +277,7 @@ final class Store: ObservableObject {
         }
         if tick % every(300) == 0 {   // every 5 minutes
             settings.refreshClaudeStatusLine()   // notices the status line being changed outside Dashbar
+            settings.refreshClaudePermissions()  // …and the permission hook
             refreshClaudePlan()
         } else if minute {
             plan.statusLineChanged()
@@ -379,9 +410,93 @@ final class Store: ObservableObject {
             case .finished(let id, let after):
                 if let s = new.first(where: { $0.id == id }) { notifier.finished(s, after: after) }
             case .waiting(let id):
-                if let s = new.first(where: { $0.id == id }) { notifier.waiting(s) }
+                guard let s = new.first(where: { $0.id == id }) else { continue }
+                if permissionRequests.contains(where: { $0.sessionId == id }) { continue }   // its own notification, with answers
+                if heartbeat != nil, s.waitingFor == "permission prompt" {
+                    // The hook's request may be a moment behind Claude Code's session file: give it a second to arrive.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                        guard let self, !self.permissionRequests.contains(where: { $0.sessionId == id }),
+                              let still = self.sessions.first(where: { $0.id == id }), still.isWaiting else { return }
+                        self.notifier.waiting(still)
+                    }
+                    continue
+                }
+                notifier.waiting(s)
             }
         }
+    }
+
+    // MARK: Permission prompts
+
+    /// Starts or stops answering permission prompts, following whether the hook is in Claude Code's settings.
+    private func setPermissionsEnabled(_ on: Bool) {
+        guard !isDemo else { return }
+        heartbeat?.invalidate()
+        heartbeat = nil
+        permissionWatcher = nil
+        guard on else {
+            permissionQueue.goodbye()
+            applyPermissions([])
+            return
+        }
+        beat()
+        heartbeat = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.beat() }
+        }
+        permissionWatcher = FileWatcher(paths: [permissionQueue.requests.path], latency: 0.2, queue: .main) { [weak self] in
+            Task { @MainActor in self?.refreshPermissions() }
+        }
+        refreshPermissions()
+    }
+
+    /// Tells waiting hooks this copy of Dashbar is here, and how long to wait.
+    private func beat() {
+        guard !isDemo, settings.claudePermissions else { return }
+        permissionQueue.heartbeat(wait: settings.permissionWait)
+        permissionWatcher?.restart()   // the folder may have been recreated
+    }
+
+    private func refreshPermissions() {
+        guard !isDemo, settings.claudePermissions else { return }
+        applyPermissions(permissionQueue.read())
+    }
+
+    private func applyPermissions(_ requests: [PermissionRequest]) {
+        let live = Set(requests.map(\.id))
+        for id in notifiedRequests.subtracting(live) { notifier.removePermission(id) }
+        notifiedRequests.formIntersection(live)
+        update(\.permissionRequests, requests)
+        let marked = PermissionRequest.marking(rawSessions, with: requests)
+        for r in requests where notifiedRequests.insert(r.id).inserted {
+            notifier.permission(r, session: marked.first { $0.id == r.sessionId })
+        }
+        trackTransitions(marked)
+        update(\.sessions, marked)
+    }
+
+    /// Allow once, Deny, or hand the prompt back to Claude Code's terminal. A request that has gone (answered in the
+    /// terminal, timed out) is explained, except when it was only being handed back.
+    func answer(_ request: PermissionRequest, _ answer: PermissionRequest.Answer) {
+        self.answer(request.id, answer, fromNotification: false)
+    }
+
+    private func answer(_ id: String, _ answer: PermissionRequest.Answer, fromNotification: Bool) {
+        guard !isDemo else { return }
+        do {
+            try permissionQueue.answer(id, answer)
+        } catch {
+            if answer != .terminal { notice = error.localizedDescription }
+        }
+        notifier.removePermission(id)
+        applyPermissions(permissionRequests.filter { $0.id != id })   // at once; the watcher confirms
+    }
+
+    /// Hands the prompt back to the terminal and goes to the session, so it can be answered there with every option.
+    func openSession(for request: PermissionRequest) {
+        let session = sessions.first { $0.id == request.sessionId }
+        answer(request, .terminal)
+        let root = session?.root ?? (request.cwd.isEmpty ? homeDir.path : Fmt.root(fromCwd: request.cwd))
+        HostApp.open(session.flatMap { HostApp.info(for: $0)?.bundle }, root: root)
     }
 
     /// `panel` adds what only the open panel shows (other agent processes, busiest apps) and implies `system`.
@@ -399,8 +514,10 @@ final class Store: ObservableObject {
     }
 
     private func apply(_ r: Worker.LiveResult) {
-        trackTransitions(r.sessions)
-        update(\.sessions, r.sessions)
+        rawSessions = r.sessions
+        let sessions = PermissionRequest.marking(r.sessions, with: permissionRequests)
+        trackTransitions(sessions)
+        update(\.sessions, sessions)
         update(\.sessionsWarning, r.sessionsWarning)
         update(\.contexts, r.contexts)
         if let a = r.agents { update(\.otherAgents, a) }
