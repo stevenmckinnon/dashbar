@@ -46,12 +46,36 @@ import Testing
 
     @Test func idleIsHiddenAndABannerShowsOverIt() {
         var p = IslandPresenter()
-        #expect(p.mode(status: .idle) == .hidden)
-        #expect(p.mode(status: .working(1)) == .collapsed(.working(1)))
+        #expect(p.mode(status: .idle, showsPill: true) == .hidden)
+        #expect(p.mode(status: .working(1), showsPill: true) == .collapsed(.working(1)))
         let b = IslandBanner(kind: .finished(after: 60), sessionID: "a", shownAt: t0)
         let posted1 = p.post(b, settings: on, now: t0)
         #expect(posted1)
-        #expect(p.mode(status: .idle) == .banner(b))
+        #expect(p.mode(status: .idle, showsPill: true) == .banner(b))
+    }
+
+    @Test func byDefaultOnlyMomentsShow() {
+        // Events only: idle and working both draw nothing; a moment shows its banner, then the island is gone again.
+        var p = IslandPresenter()
+        #expect(p.mode(status: .idle, showsPill: false) == .hidden)
+        #expect(p.mode(status: .working(2), showsPill: false) == .hidden)
+        #expect(p.mode(status: .needsYou(1), showsPill: false) == .hidden)
+        let b = IslandBanner(kind: .waiting, sessionID: "a", shownAt: t0)
+        p.post(b, settings: on, now: t0)
+        #expect(p.mode(status: .needsYou(1), showsPill: false) == .banner(b))
+        p.expire(now: t0 + b.kind.duration)
+        #expect(p.mode(status: .needsYou(1), showsPill: false) == .hidden)
+        // Without the pill there's nothing to hover, so the list never opens.
+        p.openList()
+        #expect(p.mode(status: .working(1), showsPill: false) == .hidden)
+    }
+
+    @Test func thePillIsOptInAndOffByDefault() throws {
+        let defaults = try #require(UserDefaults(suiteName: "IslandTests-pill-\(UUID().uuidString)"))
+        #expect(!IslandSettings.Values.read(defaults).showsPill)
+        defaults.set(true, forKey: IslandSettings.showsPillKey)
+        #expect(IslandSettings.Values.read(defaults).showsPill)
+        #expect(IslandPresenter().mode(status: .working(1), showsPill: true) == .collapsed(.working(1)))
     }
 
     @Test func turnedOffKindsNeverExpand() {
@@ -142,12 +166,12 @@ import Testing
     @Test func theListOpensOnlyWithoutABannerAndCloses() {
         var p = IslandPresenter()
         p.openList()
-        #expect(p.mode(status: .idle) == .list)
+        #expect(p.mode(status: .idle, showsPill: true) == .list)
         p.closeList()
-        #expect(p.mode(status: .idle) == .hidden)
+        #expect(p.mode(status: .idle, showsPill: true) == .hidden)
         p.post(IslandBanner(kind: .waiting, sessionID: "a", shownAt: t0), settings: on, now: t0)
         p.openList()
-        if case .banner = p.mode(status: .needsYou(1)) {} else { Issue.record("banner should win over the list") }
+        if case .banner = p.mode(status: .needsYou(1), showsPill: true) {} else { Issue.record("banner should win over the list") }
     }
 
     // MARK: Notifications

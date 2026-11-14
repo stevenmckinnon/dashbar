@@ -331,6 +331,7 @@ private struct GeneralSettings: View {
     @AppStorage(IslandSettings.expandOnFinishKey) private var islandFinish = true
     @AppStorage(IslandSettings.expandOnNeedsYouKey) private var islandNeedsYou = true
     @AppStorage(IslandSettings.replacesNotificationsKey) private var islandInstead = false
+    @AppStorage(IslandSettings.showsPillKey) private var islandPill = false
     @State private var shortcutUnavailable = GlobalShortcut.shared.unavailable
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
@@ -356,7 +357,7 @@ private struct GeneralSettings: View {
                 }
             }
             Section {
-                Toggle("Show the island at the top of the screen", isOn: $island)
+                Toggle("Show the island when something happens", isOn: $island)
                     .help("A small black pill on the notch (or below the menu bar) with your agents' status. It opens briefly when something happens, and on hover lists your sessions.")
                 if island {
                     Picker("Position", selection: $islandPosition) {
@@ -371,6 +372,12 @@ private struct GeneralSettings: View {
                         .help("With answering permission prompts on (Labs), you can Allow once or Deny right in the island.")
                     Toggle("Use the island instead of notifications", isOn: $islandInstead)
                         .help("Leaves out the notification for anything the island opens for. The others still notify.")
+                    Toggle("Keep a small status beside the notch", isOn: $islandPill)
+                        .help("While agents work or wait, the mark and a count stay either side of the notch, and hovering lists your sessions.")
+                    if islandPill {
+                        Text("In apps with many menus it can cover the last few, since macOS carries menus on past the notch.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 }
             } header: {
                 Text("Island")

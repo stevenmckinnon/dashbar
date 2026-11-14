@@ -11,6 +11,7 @@ enum IslandSettings {
     static let expandOnFinishKey = "islandExpandOnFinish"
     static let expandOnNeedsYouKey = "islandExpandOnNeedsYou"
     static let replacesNotificationsKey = "islandReplacesNotifications"
+    static let showsPillKey = "islandShowsPill"
 
     struct Values: Equatable {
         var enabled = true
@@ -18,6 +19,9 @@ enum IslandSettings {
         var expandOnFinish = true
         var expandOnNeedsYou = true
         var replacesNotifications = false
+        /// Keep a small status beside the notch while agents work. Off by default: the island shows only for
+        /// moments, since a lasting pill can cover an app's menus (macOS carries them on past the notch).
+        var showsPill = false
 
         /// Unset keys take the defaults above, except `enabled`, which is off unless a new install turned it on.
         static func read(_ defaults: UserDefaults = .standard) -> Values {
@@ -26,7 +30,8 @@ enum IslandSettings {
                           position: IslandPosition(rawValue: defaults.string(forKey: positionKey) ?? "") ?? .automatic,
                           expandOnFinish: flag(expandOnFinishKey, true),
                           expandOnNeedsYou: flag(expandOnNeedsYouKey, true),
-                          replacesNotifications: flag(replacesNotificationsKey, false))
+                          replacesNotifications: flag(replacesNotificationsKey, false),
+                          showsPill: flag(showsPillKey, false))
         }
 
         /// Whether this kind of moment opens the island.
@@ -192,12 +197,16 @@ struct IslandPresenter: Equatable {
         hoverEndedAt = inside ? nil : now
     }
 
-    /// The pointer rested on the pill long enough (`hoverIntent`), or it was clicked.
+    /// The pointer rested on the pill long enough (`hoverIntent`), or it was clicked. Only the lasting pill opens
+    /// the list; without it there is nothing to hover between moments.
     mutating func openList() { if banner == nil { listOpen = true } }
     mutating func closeList() { listOpen = false }
 
-    func mode(status: IslandStatus) -> IslandMode {
+    /// A moment shows as its banner. Otherwise the island is gone (nothing drawn, nothing to click) unless the user
+    /// keeps the small status pill, which shows while any agent works or waits.
+    func mode(status: IslandStatus, showsPill: Bool) -> IslandMode {
         if let banner { return .banner(banner) }
+        guard showsPill else { return .hidden }
         if listOpen { return .list }
         return status == .idle ? .hidden : .collapsed(status)
     }

@@ -95,7 +95,10 @@ final class IslandController {
             AppWindow.shared.show(store: store)
             self.update()
         }
-        model.expand = { [weak self] in self?.hoverWork?.cancel(); self?.presenter.openList(); self?.update() }
+        model.expand = { [weak self] in
+            guard let self, self.settings.showsPill else { return }
+            self.hoverWork?.cancel(); self.presenter.openList(); self.update()
+        }
 
         store.$sessions.combineLatest(store.$permissionRequests)
             .receive(on: RunLoop.main)
@@ -144,7 +147,7 @@ final class IslandController {
     /// settings say, with an agent finishing a second in, so the open, the auto-collapse and the resizing can be watched.
     func startDemo(store: Store) {
         demo = true
-        settings = IslandSettings.Values(enabled: true, position: settings.position)
+        settings = IslandSettings.Values(enabled: true, position: settings.position, showsPill: settings.showsPill)
         start(store: store)
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             store.islandEvents.send(IslandEvent(kind: .finished(after: 12 * 60), sessionID: "s3"))
@@ -185,7 +188,7 @@ final class IslandController {
         presenter.expire(now: Date())
         presenter.reconcile(sessions: store.sessions, permissionRequests: store.permissionRequests)
         let status = IslandStatus.of(sessions: store.sessions, permissionRequests: store.permissionRequests)
-        let mode = presenter.mode(status: status)
+        let mode = presenter.mode(status: status, showsPill: settings.showsPill)
         scheduleDeadline()
         // The collapsed ears follow the menu bar: Dashbar's own item changes width with its stats.
         let ears = earsFor(mode, placement: model.placement)
@@ -208,7 +211,7 @@ final class IslandController {
         hoverWork?.cancel()
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
-            if inside { self.presenter.openList() } else { self.presenter.closeList() }
+            if inside, self.settings.showsPill { self.presenter.openList() } else if !inside { self.presenter.closeList() }
             self.update()
         }
         hoverWork = work
