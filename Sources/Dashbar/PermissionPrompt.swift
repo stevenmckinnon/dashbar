@@ -68,7 +68,7 @@ struct PermissionPrompt: View {
     /// "0:42": time left to answer here (the terminal asks too, and keeps asking after).
     static func remaining(_ expires: Date, now: Date) -> String {
         let s = max(0, Int(expires.timeIntervalSince(now).rounded(.up)))
-        return String(format: "%d:%02d", s / 60, s % 60)
+        return String(format: "%d:%02d left", s / 60, s % 60)
     }
 }
 

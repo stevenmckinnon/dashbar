@@ -14,7 +14,7 @@ struct WorkspacesCard: View {
 
     var body: some View {
         let list = store.workspaces.filter { $0.id != excluding && $0.matches(query) }
-        if !(list.isEmpty && excluding != nil && store.otherAgents.isEmpty) {
+        if !(list.isEmpty && excluding != nil && AgentChips.items(store.otherAgents, sessions: store.sessions).isEmpty) {
             card(list)
         }
     }
@@ -37,9 +37,9 @@ struct WorkspacesCard: View {
                     }
                 }
             }
-            if !store.otherAgents.isEmpty && query.isEmpty {
-                AgentChips(items: store.otherAgents.map { $0.count > 1 ? "\($0.name) ×\($0.count)" : $0.name })
-                    .padding(.top, 4)
+            let others = AgentChips.items(store.otherAgents, sessions: store.sessions)
+            if !others.isEmpty && query.isEmpty {
+                AgentChips(items: others).padding(.top, 4)
             }
         }
     }
@@ -156,20 +156,20 @@ struct WorkspaceStatus: View {
 
     private func text(now: Date) -> String {
         let s = workspace.sessions
-        let more = s.count > 1 ? " · \(s.count - 1) more" : ""
+        let more = s.count > 1 ? " · " + NowSessionLine.moreAgents(s.count - 1) : ""
         if let waiting = s.first(where: \.isWaiting) {
             return "\(waiting.waitingSentence) · \(Fmt.ago(waiting.since, now: now))" + more
         }
         let subagents = s.reduce(0) { $0 + store.subagents(for: $1).running.count }
         let helpers = subagents == 0 ? "" : subagents == 1 ? " · 1 subagent" : " · \(subagents) subagents"
         if let busy = s.first(where: \.isBusy) {
-            return "\(busy.agent.name) is working · \(Fmt.ago(busy.since, now: now))" + helpers + more
+            return "\(busy.agent.name) working · \(Fmt.ago(busy.since, now: now))" + helpers + more
         }
         if subagents > 0 {   // the session waits while its background subagents work
             return (subagents == 1 ? "1 subagent working" : "\(subagents) subagents working") + more
         }
         if let idle = s.first {
-            return "\(idle.agent.name) idle for \(Fmt.ago(idle.since, now: now))" + more
+            return "\(idle.agent.name) idle · \(Fmt.ago(idle.since, now: now))" + more
         }
         return workspace.servers.map(\.hint).uniqued().prefix(2).joined(separator: " · ")
     }
@@ -253,7 +253,7 @@ struct OpenSession: ViewModifier {
     }
 }
 
-/// "22%" over "context", so the number explains itself.
+/// "22%" over "context used", so the number explains itself.
 struct ContextLabel: View {
     let context: ContextInfo
     var body: some View {
@@ -261,7 +261,7 @@ struct ContextLabel: View {
             Text("\(Int((context.fraction * 100).rounded()))%")
                 .font(.system(size: UI.Size.caption, weight: .semibold).monospacedDigit())
                 .foregroundStyle(ContextRing.color(context.fraction))
-            Text("context")
+            Text("context used")
                 .font(.system(size: UI.Size.micro))
                 .foregroundStyle(UI.textSecondary)
         }

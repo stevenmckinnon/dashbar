@@ -30,7 +30,7 @@ struct CleanupCard: View {
                 let items = showAll || !query.isEmpty ? matching : Array(matching.prefix(8))
                 VStack(spacing: 1) { ForEach(items) { CleanupRow(item: $0) } }
                 HStack {
-                    Text("Moves to the Trash. Reinstall deps to get them back.")
+                    Text(CleanupNote.text)
                         .font(.system(size: UI.Size.micro)).foregroundStyle(UI.textSecondary)
                     Spacer()
                     if query.isEmpty && store.cleanup.count > 8 {
@@ -97,4 +97,10 @@ struct CleanupRow: View {
         default: return "archivebox"
         }
     }
+}
+
+/// Under the clean-up list, in the panel and the window alike: packages come back by installing them again, build output
+/// and DerivedData by building again.
+enum CleanupNote {
+    static let text = "Moves to the Trash. Reinstall packages or rebuild to get them back."
 }

@@ -261,20 +261,32 @@ struct EmptyRow: View {
     }
 }
 
+/// Other AI tools running on this Mac whose sessions Dashbar doesn't list by workspace (Codex, Cursor, Ollama…). No
+/// status dot: they aren't known to be working, and green means a working agent.
 struct AgentChips: View {
     let items: [String]
     var body: some View {
         HStack(spacing: 5) {
-            Text("Also running").font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+            Text("Other AI tools running").font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
             ForEach(items, id: \.self) { item in
-                HStack(spacing: 4) {
-                    Circle().fill(Color.green).frame(width: 5, height: 5)
-                    Text(item).font(.system(size: UI.Size.caption))
-                }
-                .padding(.horizontal, 7).padding(.vertical, 3)
-                .background(Capsule().fill(Color.primary.opacity(0.07)))
+                Text(item).font(.system(size: UI.Size.caption))
+                    .padding(.horizontal, 7).padding(.vertical, 3)
+                    .background(Capsule().fill(Color.primary.opacity(0.07)))
             }
         }
+        .help("Running on this Mac. Dashbar doesn't list their sessions by workspace.")
+    }
+
+    /// The chips: each running tool ("Codex ×2" for several copies), leaving out an app that already hosts a listed
+    /// session (T3 Code, when a Claude Code session above runs in it), since that row already names it.
+    static func items(_ agents: [AgentProcess], hosts: Set<String>) -> [String] {
+        agents.filter { a in !hosts.contains(a.name) && !hosts.contains { a.name == $0 + " app" } }
+            .map { $0.count > 1 ? "\($0.name) ×\($0.count)" : $0.name }
+    }
+
+    @MainActor static func items(_ agents: [AgentProcess], sessions: [LiveSession]) -> [String] {
+        guard !agents.isEmpty else { return [] }
+        return items(agents, hosts: Set(sessions.compactMap { HostApp.info(for: $0)?.name }))
     }
 }
 

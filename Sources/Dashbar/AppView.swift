@@ -330,8 +330,9 @@ private struct OverviewPage: View {
                 }
             }
         }
-        if !store.otherAgents.isEmpty, query.isEmpty {
-            AgentChips(items: store.otherAgents.map { $0.count > 1 ? "\($0.name) ×\($0.count)" : $0.name }).padding(.horizontal, 4)
+        let others = AgentChips.items(store.otherAgents, sessions: store.sessions)
+        if !others.isEmpty, query.isEmpty {
+            AgentChips(items: others).padding(.horizontal, 4)
         }
         if !store.looseServers.isEmpty { ServersCard(query: query).padding(.top, 10) }
         if settings.showWidgets, query.isEmpty, !store.claude.last24.isEmpty, store.claude.warning == nil { WidgetRow().padding(.top, 10) }
@@ -587,7 +588,7 @@ private struct WorkspaceCleanup: View {
             Card(title: "Clean-up", icon: "shippingbox", tint: .orange, count: nil, trailing: Fmt.diskBytes(total)) {
                 VStack(spacing: 1) { ForEach(items) { CleanupRow(item: $0) } }
                 HStack(spacing: 8) {
-                    Text("Moves to the Trash. Reinstall deps or rebuild to get them back.")
+                    Text(CleanupNote.text)
                         .font(.system(size: UI.Size.micro)).foregroundStyle(UI.textSecondary)
                     Spacer()
                     if confirmAll {

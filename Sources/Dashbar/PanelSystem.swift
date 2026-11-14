@@ -50,8 +50,8 @@ struct SystemPage: View {
             HStack(spacing: UI.gap) {
                 if s.diskTotal > 0 {
                     MiniMetric(title: "Disk", icon: "internaldrive", tint: .orange,
-                               value: Fmt.bytesSplit(s.diskFree).0, unit: Fmt.bytesSplit(s.diskFree).1 + " free",
-                               fraction: 1 - Double(s.diskFree) / Double(s.diskTotal), detail: "of \(Fmt.bytes(s.diskTotal))")
+                               value: Self.split(Fmt.driveBytes(s.diskFree)).0, unit: Self.split(Fmt.driveBytes(s.diskFree)).1 + " free",
+                               fraction: 1 - Double(s.diskFree) / Double(s.diskTotal), detail: "of \(Fmt.driveBytes(s.diskTotal))")
                 }
                 if let b = s.battery {
                     MiniMetric(title: s.charging ? "Battery · charging" : "Battery", icon: s.charging ? "battery.100.bolt" : "battery.75",
@@ -63,6 +63,14 @@ struct SystemPage: View {
             }
             BusiestApps(apps: store.topApps, query: query)
         }
+    }
+}
+
+extension SystemPage {
+    /// "421 GB" → ("421", "GB").
+    static func split(_ s: String) -> (String, String) {
+        let parts = s.split(separator: " ", maxSplits: 1)
+        return (String(parts.first ?? ""), parts.count > 1 ? String(parts[1]) : "")
     }
 }
 

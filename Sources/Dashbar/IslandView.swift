@@ -385,7 +385,7 @@ private struct IslandRow: View {
                         .font(.system(size: 11)).foregroundStyle(.white.opacity(0.55)).lineLimit(1)
                 }
                 Spacer(minLength: 8)
-                Text(session.isWaiting ? session.waitingLabel : session.isBusy ? "Working" : Fmt.ago(session.since))
+                Text(session.isWaiting ? session.waitingLabel : session.isBusy ? "Working" : "Idle " + Fmt.ago(session.since))
                     .font(.system(size: 11, weight: session.isWaiting || session.isBusy ? .semibold : .regular).monospacedDigit())
                     .foregroundStyle(session.isWaiting ? UI.textAttention : session.isBusy ? UI.textSuccess : .white.opacity(0.55))
             }

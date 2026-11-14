@@ -100,7 +100,8 @@ struct NowSessionLine: View {
                 .background(RoundedRectangle(cornerRadius: UI.innerRadius, style: .continuous).fill(session.agent.tint.opacity(0.12)))
                 .help(session.agent.name)
             VStack(alignment: .leading, spacing: 1) {
-                Text(session.title).font(.system(size: UI.Size.body, weight: .medium)).lineLimit(1)
+                Text(session.title).font(.system(size: UI.Size.body, weight: .medium)).lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                     .help("\(session.name)\n\(OpenSession.hint(session))")
                 Text(subtitle)
                     .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary).lineLimit(1)
@@ -120,12 +121,15 @@ struct NowSessionLine: View {
         .modifier(OpenSession(session: session))
     }
 
-    /// "Work · Terminal · runs :3000 · 1 more". The account leads, so it survives a narrow panel; the Claude tile
+    /// "1 more agent", "2 more agents".
+    static func moreAgents(_ n: Int) -> String { n == 1 ? "1 more agent" : "\(n) more agents" }
+
+    /// "Work · Terminal · runs :3000 · 1 more agent". The account leads, so it survives a narrow panel; the Claude tile
     /// already says which agent it is, so the line doesn't spend room on "Claude Code".
     private var subtitle: String {
         let host = HostApp.info(for: session)?.name ?? session.surface
         let agent = session.agentNote.flatMap { $0 == host ? nil : $0 }
-        return ([session.account, agent, host, store.spawned[session.pid]?.portsText, extra > 0 ? "\(extra) more" : nil] as [String?])
+        return ([session.account, agent, host, store.spawned[session.pid]?.portsText, extra > 0 ? Self.moreAgents(extra) : nil] as [String?])
             .compactMap { $0 }.joined(separator: " · ")
     }
 }
@@ -137,32 +141,42 @@ struct WidgetRow: View {
 
     var body: some View {
         let days = store.claude.last14
-        let thisWeek = days.suffix(7).reduce(0) { $0 + $1.tokens }
-        let lastWeek = days.prefix(7).reduce(0) { $0 + $1.tokens }
+        let recent = days.suffix(7).reduce(0) { $0 + $1.tokens }
+        let before = days.prefix(7).reduce(0) { $0 + $1.tokens }
         HStack(spacing: UI.gap) {
-            Widget(title: "Today") {
-                BigNumber(Fmt.tokens(store.claude.today.total))
+            // Claude Code's usage only: the title says so, as the plan limits card's "Claude · Max 5x" does.
+            Widget(title: "Claude · today") {
+                BigNumber(Fmt.tokens(store.claude.today.total), unit: "tokens")
                 Spacer(minLength: 4)
                 DayBars(points: Array(days.suffix(7)), tint: UI.textInfo)
                 Spacer(minLength: 4)
-                Footnote("\(store.claude.today.messages) msgs · \(store.claude.sessions24) sessions in 24h")
+                Footnote(Self.sessionsText(store.claude.sessionsToday))
+                    .help(Self.messagesHelp(store.claude.today.messages))
             }
-            Widget(title: "This week") {
-                BigNumber(Fmt.tokens(thisWeek))
+            Widget(title: "Claude · last 7 days") {
+                BigNumber(Fmt.tokens(recent), unit: "tokens")
                 Spacer(minLength: 4)
-                WeekCompare(this: thisWeek, last: lastWeek)
+                WeekCompare(this: recent, last: before)
                 Spacer(minLength: 4)
-                Footnote(changeText(this: thisWeek, last: lastWeek))
+                Footnote(Self.changeText(this: recent, last: before))
             }
         }
     }
 
-    /// Direction in words, so the change never rests on colour.
-    private func changeText(this: Int, last: Int) -> String {
-        guard last > 0 else { return "No usage the week before" }
+    static func sessionsText(_ n: Int) -> String { n == 1 ? "1 session today" : "\(n) sessions today" }
+
+    /// The message count counts each of Claude's replies and tool steps, not what you typed, so it lives in the tooltip.
+    static func messagesHelp(_ n: Int) -> String {
+        "Claude Code tokens since midnight. Claude sent \(n.formatted()) \(n == 1 ? "message" : "messages") today, "
+            + "counting each step of its tool use."
+    }
+
+    /// Direction in words, so the change never rests on colour. The span is a rolling 7 days, not a calendar week.
+    static func changeText(this: Int, last: Int) -> String {
+        guard last > 0 else { return "No usage the 7 days before" }
         let pct = Int((Double(this - last) / Double(last) * 100).rounded())
-        if pct == 0 { return "Same as the week before" }
-        return "\(pct > 0 ? "Up" : "Down") \(abs(pct))% on the week before"
+        if pct == 0 { return "Same as the 7 days before" }
+        return "\(pct > 0 ? "Up" : "Down") \(abs(pct))% on the 7 days before"
     }
 }
 
@@ -173,22 +187,24 @@ struct WeekCompare: View {
     var body: some View {
         let maxV = Double(max(this, last, 1))
         VStack(alignment: .leading, spacing: 5) {
-            bar("This", value: this, maxV: maxV, fill: UI.textInfo)
-            bar("Prev", value: last, maxV: maxV, fill: Color.secondary.opacity(0.45))
+            bar("Last 7", value: this, maxV: maxV, fill: UI.textInfo)
+            bar("Prior 7", value: last, maxV: maxV, fill: Color.secondary.opacity(0.45))
         }
         .accessibilityElement()
-        .accessibilityLabel("This week \(Fmt.tokens(this)) tokens, the week before \(Fmt.tokens(last))")
+        .accessibilityLabel("Last 7 days \(Fmt.tokens(this)) tokens, the 7 days before \(Fmt.tokens(last))")
     }
 
     private func bar(_ label: String, value: Int, maxV: Double, fill: Color) -> some View {
         HStack(spacing: 6) {
-            Text(label).font(.system(size: UI.Size.micro)).foregroundStyle(UI.textSecondary).frame(width: 28, alignment: .leading)
+            Text(label).font(.system(size: UI.Size.micro)).foregroundStyle(UI.textSecondary).fixedSize()
+                .frame(minWidth: 34, alignment: .leading)
             GeometryReader { g in
                 Capsule().fill(fill).frame(width: max(3, g.size.width * Double(value) / maxV))
             }
             .frame(height: 5)
+            // Sized to its text, so "12.4B" or "1.20T" never truncates; the bar takes what is left.
             Text(Fmt.tokens(value)).font(.system(size: UI.Size.micro).monospacedDigit()).foregroundStyle(UI.textSecondary)
-                .frame(width: 34, alignment: .trailing)
+                .fixedSize().frame(minWidth: 34, alignment: .trailing)
         }
     }
 }
@@ -230,11 +246,18 @@ struct DayBars: View {
     }
 }
 
+/// A widget's figure, with its unit small and secondary beside it, as the Clean-up tile sets "GB".
 struct BigNumber: View {
     let text: String
-    init(_ text: String) { self.text = text }
+    var unit: String? = nil
+    init(_ text: String, unit: String? = nil) { self.text = text; self.unit = unit }
     var body: some View {
-        Text(text).font(.system(size: UI.Size.numeral, weight: .semibold, design: .rounded).monospacedDigit()).lineLimit(1)
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Text(text).font(.system(size: UI.Size.numeral, weight: .semibold, design: .rounded).monospacedDigit()).lineLimit(1)
+            if let unit {
+                Text(unit).font(.system(size: UI.Size.caption, weight: .semibold)).foregroundStyle(UI.textSecondary).fixedSize()
+            }
+        }
     }
 }
 
