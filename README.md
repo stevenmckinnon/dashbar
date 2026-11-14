@@ -1,8 +1,8 @@
 # Dashbar
 
-A native macOS menu bar dashboard for agent usage, local dev servers, and system stats.
+A free, open-source Mac menu bar app that shows which Claude Code and Codex agents are working, how much of your plan is left and when it runs out, and which dev servers are idling.
 
-**[Website](https://stevenmckinnon.github.io/dashbar/)** · [Download](https://github.com/stevenmckinnon/dashbar/releases/latest) · [Homebrew](#install)
+**[Website](https://stevenmckinnon.github.io/dashbar/)** · [Download](https://github.com/stevenmckinnon/dashbar/releases/latest) · [Homebrew](#install) · [What's new](https://github.com/stevenmckinnon/dashbar/releases)
 
 <p align="center">
   <picture>
@@ -26,7 +26,7 @@ A native macOS menu bar dashboard for agent usage, local dev servers, and system
 ## Install
 
 **Download:** get the latest `Dashbar-x.y.z.dmg` from [Releases](https://github.com/stevenmckinnon/dashbar/releases/latest),
-open it and drag Dashbar to Applications. It's signed with a Developer ID and notarised by Apple. Needs macOS 14 or later.
+open it and drag Dashbar to Applications. It's signed with a Developer ID and notarised by Apple. Universal (Apple silicon and Intel); needs macOS 14 or later.
 
 **Homebrew:**
 
@@ -36,9 +36,7 @@ brew install --cask stevenmckinnon/tap/dashbar
 
 Dashbar checks for updates itself (Settings → About → Check for Updates…).
 
-The project site is a small React app in `site/` (`npm run dev` inside it), deployed to GitHub Pages by
-`.github/workflows/pages.yml`. Its pictures come from `docs/images`, rendered with `Dashbar --snapshot … --demo`.
-
+## Features
 
 - **Agents**: live Claude Code sessions (`~/.claude/sessions`), working/idle status, and "needs you" when Claude has stopped to ask for permission or an answer (it sorts first, in amber, with a count beside the menu bar icon), plus other agent apps and CLIs it spots running (T3 Code, Codex, Cursor, Gemini, Aider, Ollama…). Click a session to open its folder.
 - **Claude Code usage**: today's tokens (in / out / cache read / cache write), a 14-day chart, and top projects and models, read incrementally from `~/.claude/projects/**/*.jsonl`.
@@ -65,6 +63,14 @@ The project site is a small React app in `site/` (`npm run dev` inside it), depl
 
 The menu bar shows the number of working Claude sessions beside the icon, and the icon's bar fills while any are working.
 
+The menu bar shows the number of working Claude sessions beside the icon, and the icon's bar fills while any are working.
+
+## How it differs
+
+- **Local only.** It reads the session logs Claude Code and Codex already write on your Mac, lists listening ports with libproc and measures folders. No browser cookies, no Full Disk Access, no account, no analytics.
+- **Nothing is sent**, except Sparkle's update checks to GitHub and, if you turn it on, the opt-in Claude plan-limits request to `api.anthropic.com` (the same read-only call Claude Code's `/usage` makes).
+- **One app for the whole picture.** Agents (working, idle, waiting for you), plan limits with a pace mark and a projected run-out time, dev servers grouped by project, what each workspace's processes use, system stats and a clean-up of rebuildable caches, in the panel or in a window.
+
 ## Settings
 
 Open from the gear menu or ⌘, : which panel sections show, refresh interval, which editor and
@@ -74,50 +80,16 @@ terminal the quick actions open, notifications, launch at login, and the folders
 If Claude Code or Codex change their log format, Dashbar shows a warning rather than silently
 reporting zero.
 
-## Performance
-
-- Scan progress is saved to `~/Library/Application Support/Dashbar/`, so a relaunch reads only new
-  transcript lines (about 30 ms instead of about 5 s for ~1 GB of logs).
-- Agent log folders are watched with FSEvents rather than polled. With the panel closed, Dashbar only
-  reacts to those changes plus a once-a-minute safety refresh.
-- Ports, working folders, memory and command lines come from libproc, so nothing spawns `lsof` or `ps`.
-- `Dashbar --bench` prints timings for each collector.
-
-## Icon
-
-`Resources/AppIcon.svg` is the source. `build.sh` renders it with WebKit (`scripts/render-svg.swift`,
-which keeps the SVG's glow and shadow filters that macOS's own SVG renderer drops) and packages
-`Resources/AppIcon.icns` whenever the SVG changes. The menu bar glyph is drawn in code from the same
-proportions (`Sources/Dashbar/Brand.swift`) as a template image; its bar fills up while agents are working.
-`Dashbar --snapshot glyphs.png --glyphs` previews it on light and dark menu bars.
-
-## Build
-
-```bash
-./build.sh --run        # build build/"Dashbar Local.app" and launch it
-./build.sh --install    # copy to /Applications as "Dashbar Local" (needed for "Launch at login"), beside any installed release
-.build/release/Dashbar --snapshot out.png --dark   # render the panel to a PNG
-```
-
-```bash
-swift test              # parser, grouping and clean-up tests against throwaway log folders
-.build/release/Dashbar --snapshot settings.png --settings   # render the Settings window
-```
+## Building from source
 
 Needs macOS 14+ and Xcode / Swift 6.
 
-## Releasing
+```bash
+swift test              # tests
+./build.sh --run        # build "Dashbar Local.app" and launch it
+```
 
-`scripts/release.sh <version>` builds a universal (Apple silicon and Intel) app signed with a Developer ID
-certificate and the hardened runtime, wraps it in a DMG, notarises it with Apple and staples the ticket.
-`scripts/release.sh <version> --dry-run` does everything except notarise, with any signing identity.
-After notarising it signs the DMG for Sparkle and adds an entry to `appcast.xml`, the update feed the app reads;
-commit that file once the GitHub release exists. The signing key lives in the login Keychain
-(`Resources/sparkle-public-key.txt` is its public half), so back it up with Sparkle's `generate_keys -x`.
-
-One-time setup needs a paid Apple Developer membership: create a "Developer ID Application" certificate in
-Xcode, then store notary credentials with `xcrun notarytool store-credentials dashbar-notary` (the script's
-header has the full command). The result is `build/Dashbar-<version>.dmg`, ready to attach to a GitHub release.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for local builds, releasing and the rules for changes. Bugs and ideas go in [issues](https://github.com/stevenmckinnon/dashbar/issues); security reports are described in [SECURITY.md](SECURITY.md).
 
 ## Privacy
 

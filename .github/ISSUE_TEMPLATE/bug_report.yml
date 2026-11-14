@@ -1,0 +1,39 @@
+name: Bug report
+description: Something in Dashbar is wrong or broken
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead. A screenshot helps, but check it shows no private project names.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "e.g. 15.4, Apple silicon"
+    validations:
+      required: true
+  - type: input
+    id: dashbar
+    attributes:
+      label: Dashbar version
+      description: Settings → About. Say if you installed with Homebrew or the DMG.
+    validations:
+      required: true
+  - type: input
+    id: claude
+    attributes:
+      label: Claude Code version
+      description: Run `claude --version`. Leave blank if not relevant.
+  - type: input
+    id: codex
+    attributes:
+      label: Codex version
+      description: Run `codex --version`. Leave blank if not relevant.
