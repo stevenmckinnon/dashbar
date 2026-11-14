@@ -69,6 +69,14 @@ enum IslandStatus: Equatable {
         return busy > 0 ? .working(busy) : .idle
     }
 
+    /// "2": the number alone, for a narrow ear.
+    var countText: String {
+        switch self {
+        case .idle: return ""
+        case .working(let n), .needsYou(let n): return "\(n)"
+        }
+    }
+
     /// "1 needs you", "2 working".
     var label: String {
         switch self {
@@ -233,17 +241,24 @@ struct IslandPlacement: Equatable {
     /// The y its top edge sits at.
     var topY: CGFloat
 
-    /// The window's frame for content of this size.
-    func frame(for size: CGSize) -> CGRect {
-        let x: CGFloat
+    /// How far the island's centre sits from `anchorX`. Beside the notch it extends away from it; on the notch,
+    /// ears of different widths (`left`, `right`) put the centre off the notch's.
+    func centreOffset(for size: CGSize, ears: (left: CGFloat, right: CGFloat)? = nil) -> CGFloat {
         switch style {
-        case .beside(let leading, _): x = leading ? anchorX - size.width : anchorX
-        case .notch, .floating: x = anchorX - size.width / 2
+        case .beside(let leading, _): return leading ? -size.width / 2 : size.width / 2
+        case .notch: return ears.map { ($0.right - $0.left) / 2 } ?? 0
+        case .floating: return 0
         }
-        // Half points, so it lands on Retina pixels and stays flush with a notch at x.5 (the 14-inch's is).
-        func px(_ v: CGFloat) -> CGFloat { (v * 2).rounded() / 2 }
-        return CGRect(x: px(x), y: px(topY - size.height), width: px(size.width), height: px(size.height))
     }
+
+    /// The window's frame for content of this size (on the notch, with these ear widths when collapsed).
+    func frame(for size: CGSize, ears: (left: CGFloat, right: CGFloat)? = nil) -> CGRect {
+        let x = anchorX + centreOffset(for: size, ears: ears) - size.width / 2
+        return CGRect(x: Self.px(x), y: Self.px(topY - size.height), width: Self.px(size.width), height: Self.px(size.height))
+    }
+
+    /// Half points, so it lands on Retina pixels and stays flush with a notch at x.5 (the 14-inch's is).
+    static func px(_ v: CGFloat) -> CGFloat { (v * 2).rounded() / 2 }
 
     /// The gap kept between a floating island and the menu bar (or another island above it).
     static let floatingGap: CGFloat = 6
@@ -283,6 +298,96 @@ struct IslandPlacement: Equatable {
         let height = screen.menuBarHeight + 40
         let midX = screen.notch?.midX ?? screen.frame.midX
         return CGRect(x: midX - width / 2, y: screen.frame.maxY - height, width: width, height: height)
+    }
+}
+
+// MARK: - Ears that fit between the notch and the menu bar items
+
+/// The collapsed island on a notch: the notch plus two small ears, the Dashbar mark on the left and a short status
+/// on the right, each only as wide as the free menu bar beside the notch allows. macOS won't move menu bar items
+/// out of the way, so the island has to fit around them.
+struct IslandEars: Equatable {
+    /// The right ear's status, widest first: "2 working", "2", a dot, nothing.
+    enum Right: Int, Comparable, CaseIterable {
+        case none, dot, count, full
+        static func < (a: Right, b: Right) -> Bool { a.rawValue < b.rawValue }
+    }
+
+    var showsMark = true
+    var right = Right.count
+    /// Each ear's width, flare included (0 for a hidden ear).
+    var leftWidth: CGFloat = 0
+    var rightWidth: CGFloat = 0
+
+    /// What each form of each ear needs, measured from the text it would show.
+    struct Widths: Equatable {
+        var mark: CGFloat
+        var full: CGFloat
+        var count: CGFloat
+        var dot: CGFloat
+
+        func width(_ form: Right) -> CGFloat {
+            switch form {
+            case .none: return 0
+            case .dot: return dot
+            case .count: return count
+            case .full: return full
+            }
+        }
+    }
+
+    /// Kept clear between an ear and the nearest menu bar item.
+    static let margin: CGFloat = 6
+    /// Free space assumed beside the notch when nothing there can be measured: room for the mark on the left and a
+    /// count on the right, not the full words. The app's menus (left) and other apps' menu bar items (right) aren't
+    /// exposed to other apps without Accessibility access, so the ears stay small rather than guess.
+    static let assumedLeft: CGFloat = 48
+    static let assumedRight: CGFloat = 54
+
+    /// The widest of each ear that fits its gap less the margin, or a hidden ear when even the smallest doesn't.
+    /// `allowFull` is false unless the right gap was actually measured.
+    static func fit(leftGap: CGFloat, rightGap: CGFloat, widths: Widths, allowFull: Bool) -> IslandEars {
+        let leftRoom = leftGap - margin, rightRoom = rightGap - margin
+        let showsMark = widths.mark <= leftRoom
+        let forms: [Right] = allowFull ? [.full, .count, .dot] : [.count, .dot]
+        let right = forms.first { widths.width($0) <= rightRoom } ?? .none
+        return IslandEars(showsMark: showsMark, right: right,
+                          leftWidth: showsMark ? widths.mark : 0, rightWidth: widths.width(right))
+    }
+
+    /// The free menu bar either side of the notch, from the menu bar items that could be found (AppKit coordinates).
+    /// A side with nothing found gets the assumed room, capped by the screen edge; `measuredRight` says whether
+    /// the right side's came from real items rather than the assumption.
+    static func gaps(notch: CGRect, screen: CGRect, items: [CGRect], itemsAreComplete: Bool)
+        -> (left: CGFloat, right: CGFloat, measuredRight: Bool) {
+        let band = CGRect(x: screen.minX, y: notch.minY, width: screen.width, height: notch.height)
+        let inBar = items.filter { $0.intersects(band) && !$0.intersects(notch.insetBy(dx: 1, dy: 1)) }
+        let rightItems = inBar.filter { $0.midX > notch.midX }.map(\.minX)
+        let leftItems = inBar.filter { $0.midX < notch.midX }.map(\.maxX)
+        let rightEdge = rightItems.min()
+        let leftEdge = leftItems.max()
+        var right = (rightEdge ?? screen.maxX) - notch.maxX
+        var left = notch.minX - (leftEdge ?? screen.minX)
+        // Unless every item could be seen, an unseen one may sit nearer the notch than any found.
+        if !itemsAreComplete || rightEdge == nil { right = min(right, assumedRight) }
+        if !itemsAreComplete || leftEdge == nil { left = min(left, assumedLeft) }
+        return (max(0, left), max(0, right), itemsAreComplete && rightEdge != nil)
+    }
+
+    /// Menu bar items in `CGWindowListCopyWindowInfo` (layer 25, the status window level, inside the menu bar),
+    /// in AppKit coordinates. Recent macOS draws other apps' items inside the menu bar's own window and lists none
+    /// of them here, so this is often empty; Dashbar's own item comes from its own windows instead.
+    static func statusItems(in windows: [[String: Any]], ownPID: Int32, primaryHeight: CGFloat, menuBarHeight: CGFloat) -> [CGRect] {
+        windows.compactMap { w in
+            guard (w[kCGWindowOwnerPID as String] as? Int).map(Int32.init) != ownPID,
+                  w[kCGWindowLayer as String] as? Int == 25,
+                  let b = w[kCGWindowBounds as String] as? [String: Any],
+                  let x = (b["X"] as? NSNumber)?.doubleValue, let y = (b["Y"] as? NSNumber)?.doubleValue,
+                  let width = (b["Width"] as? NSNumber)?.doubleValue, let height = (b["Height"] as? NSNumber)?.doubleValue,
+                  y < 1, height <= menuBarHeight + 1, width < 400
+            else { return nil }
+            return CGRect(x: x, y: primaryHeight - y - height, width: width, height: height)
+        }
     }
 }
 

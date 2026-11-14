@@ -50,10 +50,23 @@ enum IslandMetrics {
     static let floatingHeight: CGFloat = 30
     static let statusFont = NSFont.systemFont(ofSize: 12, weight: .semibold)
 
-    /// Each wing beside the notch, wide enough for the status (both wings match, so the island stays centred on it).
-    static func wing(for status: IslandStatus) -> CGFloat {
-        let text = (status.label as NSString).size(withAttributes: [.font: statusFont]).width
-        return max(44, ceil(text) + 10 + 6 + 14) + flare
+    static let markSize: CGFloat = 15
+    /// Padding inside an ear: next to the notch, and at its outer end.
+    static let earInner: CGFloat = 7
+    static let earOuter: CGFloat = 10
+    static let glyph: CGFloat = 9
+
+    static func textWidth(_ text: String) -> CGFloat {
+        ceil((text as NSString).size(withAttributes: [.font: statusFont]).width)
+    }
+
+    /// What each form of the ears needs for this status, flare included.
+    static func earWidths(for status: IslandStatus) -> IslandEars.Widths {
+        let base = flare + earInner + glyph + earOuter
+        return IslandEars.Widths(mark: flare + earOuter + markSize + earInner,
+                                 full: base + 5 + textWidth(status.label),
+                                 count: base + 4 + textWidth(status.countText),
+                                 dot: base)
     }
 }
 
@@ -67,29 +80,48 @@ struct IslandContent: View {
     var onOpenDashbar: () -> Void = {}
     /// A click on the collapsed pill opens the session list.
     var onExpand: () -> Void = {}
+    /// On the notch, which ears the collapsed island shows and how wide each is.
+    var ears: IslandEars? = nil
+    /// The shape's size while animating (set by the window); nil sizes it to its content.
+    var size: CGSize? = nil
 
     /// One black shape whose size springs between modes, with the content cross-fading inside it.
     var body: some View {
         let s = shape(expanded: isExpanded)
-        ZStack(alignment: .top) {
+        ZStack(alignment: contentAlignment) {
             switch mode {
             case .hidden:
                 Color.clear.frame(width: 1, height: 1)
             case .collapsed(let status):
-                collapsed(status).transition(.opacity)
+                collapsed(status).transition(fade)
                     .contentShape(Rectangle())
                     .onTapGesture(perform: onExpand)
             case .banner(let banner):
-                expanded { bannerBody(banner) }.transition(.opacity)
+                expanded { bannerBody(banner) }.transition(fade)
             case .list:
-                expanded { listBody }.transition(.opacity)
+                expanded { listBody }.transition(fade)
             }
         }
+        .fixedSize()
+        .frame(width: size?.width, height: size?.height, alignment: contentAlignment)
         .background(s.fill(.black))
         .overlay { if case .floating = style { s.stroke(Color.white.opacity(0.14), lineWidth: 0.5) } }
         .clipShape(s)
         .contentShape(s)
         .environment(\.colorScheme, .dark)
+    }
+
+    /// Content arrives once the shape has started growing, sliding down a touch; it leaves quickly.
+    private var fade: AnyTransition {
+        if reduceMotion { return .opacity }
+        return .asymmetric(insertion: .opacity.combined(with: .offset(y: -6)).animation(.easeOut(duration: 0.22).delay(0.1)),
+                           removal: .opacity.animation(.easeOut(duration: 0.1)))
+    }
+
+    /// Content stays pinned to the top, and beside the notch to the notch's edge, while the shape grows around it.
+    private var contentAlignment: Alignment {
+        if case .beside(let leading, _) = style { return leading ? .topTrailing : .topLeading }
+        return .top
     }
 
     private var isExpanded: Bool {
@@ -133,15 +165,27 @@ struct IslandContent: View {
     @ViewBuilder private func collapsed(_ status: IslandStatus) -> some View {
         switch style {
         case .notch(let width, let height):
-            let wing = IslandMetrics.wing(for: status)
+            // The notch plus two small ears, each only as wide as the menu bar beside it allows.
+            let ears = ears ?? IslandEars.fit(leftGap: .infinity, rightGap: .infinity,
+                                              widths: IslandMetrics.earWidths(for: status), allowFull: false)
             HStack(spacing: 0) {
-                BrandMarkView(size: 17)
-                    .padding(.leading, 12 + IslandMetrics.flare)
-                    .frame(width: wing, alignment: .leading)
+                Group {
+                    if ears.showsMark {
+                        BrandMarkView(size: IslandMetrics.markSize)
+                            .padding(.leading, IslandMetrics.flare + IslandMetrics.earOuter)
+                            .padding(.trailing, IslandMetrics.earInner)
+                    }
+                }
+                .frame(width: ears.leftWidth, alignment: .leading)
                 Color.clear.frame(width: width)
-                statusLabel(status)
-                    .padding(.trailing, 12 + IslandMetrics.flare)
-                    .frame(width: wing, alignment: .trailing)
+                Group {
+                    if ears.right != .none {
+                        statusLabel(status, form: ears.right)
+                            .padding(.leading, IslandMetrics.earInner)
+                            .padding(.trailing, IslandMetrics.flare + IslandMetrics.earOuter)
+                    }
+                }
+                .frame(width: ears.rightWidth, alignment: .leading)
             }
             .frame(height: height)
         case .beside(_, let height):
@@ -161,20 +205,23 @@ struct IslandContent: View {
         }
     }
 
-    private func statusLabel(_ status: IslandStatus) -> some View {
-        HStack(spacing: 6) {
+    private func statusLabel(_ status: IslandStatus, form: IslandEars.Right = .full) -> some View {
+        HStack(spacing: form == .full ? 5 : 4) {
             switch status {
             case .needsYou:
-                Image(systemName: "hand.raised.fill").font(.system(size: 10, weight: .semibold)).foregroundStyle(UI.attention)
+                Image(systemName: "hand.raised.fill").font(.system(size: 9, weight: .semibold)).foregroundStyle(UI.attention)
+                    .frame(width: IslandMetrics.glyph)
             case .working:
-                StatusDot(active: true, size: 6).frame(width: 10, height: 10)
+                Circle().fill(Color.green).frame(width: 6, height: 6).frame(width: IslandMetrics.glyph)
             case .idle:
                 EmptyView()
             }
-            Text(status.label)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(statusColor(status))
-                .fixedSize()
+            if form == .full || form == .count {
+                Text(form == .full ? status.label : status.countText)
+                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(statusColor(status))
+                    .fixedSize()
+            }
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Dashbar: \(status.label)")
@@ -191,9 +238,7 @@ struct IslandContent: View {
     // MARK: Expanded
 
     private func expanded<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        // On the notch it opens at least as wide as the collapsed pill, so it only ever grows out of it.
-        let status = IslandStatus.of(sessions: store.sessions, permissionRequests: store.permissionRequests)
-        let width = max(IslandMetrics.bannerWidth, styleNotchWidth.map { $0 + 2 * IslandMetrics.wing(for: status) + 16 } ?? 0)
+        let width = max(IslandMetrics.bannerWidth, styleNotchWidth.map { $0 + 150 } ?? 0)
         return VStack(spacing: 0) {
             if topInset > 0 { Color.clear.frame(height: topInset) }
             content()
@@ -343,24 +388,18 @@ private struct IslandRow: View {
     }
 }
 
-/// The island in its window: content pinned to the edge it grows from, animating between modes.
+/// The island in its window. The panel is a fixed canvas while the island animates: the shape's top stays pinned to
+/// the canvas top (the screen edge), and its size and centre spring, so it grows down and out of the notch and folds
+/// back into it. The panel only changes size before growing and after shrinking, never during.
 struct IslandRoot: View {
     @ObservedObject var model: IslandModel
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         IslandContent(mode: model.mode, style: model.placement.style,
                       onOpenSession: model.openSession, onOpenDashbar: model.openDashbar,
-                      onExpand: model.expand)
-            .id(model.placement.style == .floating ? "floating" : "attached")
-            .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.9, anchor: .top)))
-            .opacity(model.mode == .hidden ? 0 : 1)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
-            .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.42, dampingFraction: 0.82), value: model.mode)
-    }
-
-    private var alignment: Alignment {
-        if case .beside(let leading, _) = model.placement.style { return leading ? .topTrailing : .topLeading }
-        return .top
+                      onExpand: model.expand, ears: model.ears, size: model.size)
+            .opacity(model.visible ? 1 : 0)
+            .offset(x: model.anchorInPanel + model.offsetX - model.size.width / 2)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
