@@ -61,6 +61,24 @@ struct PressStyle: ButtonStyle {
             .scaleEffect(pressed && !reduceMotion ? 0.96 : 1)
             .opacity(pressed && reduceMotion ? 0.7 : 1)
             .animation(.easeOut(duration: 0.15), value: pressed)
+            .modifier(KeyboardFocusRing())
+    }
+}
+
+/// A ring in the system's focus colour while a hand-styled button holds keyboard focus (Keyboard navigation on in
+/// System Settings), so someone moving with Tab can see where they are. Buttons only take focus that way, so a mouse
+/// user never sees it.
+private struct KeyboardFocusRing: ViewModifier {
+    @Environment(\.isFocused) private var isFocused
+    func body(content: Content) -> some View {
+        content.overlay {
+            if isFocused {
+                RoundedRectangle(cornerRadius: UI.innerRadius, style: .continuous)
+                    .strokeBorder(Color(nsColor: .keyboardFocusIndicatorColor), lineWidth: 2)
+                    .padding(-2)
+                    .allowsHitTesting(false)
+            }
+        }
     }
 }
 
@@ -77,6 +95,7 @@ struct Card<Content: View>: View {
             HStack(spacing: 7) {
                 if let icon { IconChip(symbol: icon, tint: tint) }
                 Text(title).font(.system(size: UI.Size.body, weight: .semibold))
+                    .accessibilityAddTraits(.isHeader)   // VoiceOver's headings rotor jumps between cards
                 if let count, count > 0 { Text("\(count)").font(.system(size: UI.Size.body).monospacedDigit()).foregroundStyle(UI.textSecondary) }
                 Spacer()
                 if let trailing {
