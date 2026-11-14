@@ -14,6 +14,8 @@ enum Snapshot {
         let island = CommandLine.arguments.firstIndex(of: "--island").flatMap { CommandLine.arguments.dropFirst($0 + 1).first }
         if island == "permission" { setenv("DASHBAR_DEMO_PERMISSION", "1", 1) }
         if island == "needsyou" { setenv("DASHBAR_DEMO_WAITING", "1", 1) }
+        let menubar = CommandLine.arguments.firstIndex(of: "--menubar").flatMap { CommandLine.arguments.dropFirst($0 + 1).first }
+        if menubar == "needsyou" { setenv("DASHBAR_DEMO_WAITING", "1", 1) }
         let demo = CommandLine.arguments.contains("--demo")
         let store = Store(demo: demo)
         self.store = store
@@ -63,6 +65,10 @@ enum Snapshot {
             }
             if let island {
                 IslandSnapshot.render(island, store: store, dark: dark, to: path)
+                return
+            }
+            if let menubar {
+                MenuBarSnapshot.render(menubar, store: store, dark: dark, to: path)
                 return
             }
             if let flag = CommandLine.arguments.firstIndex(of: "--settings") {
@@ -314,5 +320,111 @@ private struct IslandScene: View {
             }
             .fixedSize(horizontal: false, vertical: true)
         }
+    }
+}
+
+/// `--menubar idle|working|needsyou|done|time|all`: the menu bar item on a made-up menu bar strip (`--dark` for a dark
+/// one), at 3x. `working` shows the mark at three points of its sweep; `all` is every state, light and dark, in one sheet.
+/// With `--onscreen`, the state in a real status item for 8 seconds (animating while working), for `screencapture -R`.
+@MainActor
+enum MenuBarSnapshot {
+    static func status(_ name: String, store: Store, now: Date = Date()) -> MenuBarStatus {
+        let settings = AppSettings.shared
+        let busy = name == "idle" ? [] : store.sessions.filter(\.isBusy).map(\.since) + [now.addingTimeInterval(-160)]
+        return MenuBarStatus.make(busySince: busy, waiting: name == "needsyou" ? max(store.waitingCount, 1) : 0,
+                                  finished: name == "done" ? "storefront-web" : nil,
+                                  mode: name == "time" ? .countTime : settings.menuText, animate: true, now: now)
+    }
+
+    static func render(_ name: String, store: Store, dark: Bool, to path: String) {
+        if CommandLine.arguments.contains("--onscreen") { live(name, store: store); return }
+        let rows: [(String, Bool)]
+        if name == "all" {
+            rows = ["idle", "working", "needsyou", "done", "time"].flatMap { [($0, false), ($0, true)] }
+        } else {
+            rows = [(name, dark)]
+        }
+        let scale: CGFloat = 3, w: CGFloat = 300, h: CGFloat = 24
+        let out = NSImage(size: NSSize(width: w * scale, height: h * CGFloat(rows.count) * scale))
+        out.lockFocus()
+        for (i, row) in rows.enumerated() {
+            let y = out.size.height - CGFloat(i + 1) * h * scale
+            // Roughly macOS's menu bar over a neutral wallpaper.
+            (row.1 ? NSColor(white: 0.16, alpha: 1) : NSColor(white: 0.90, alpha: 1)).setFill()
+            NSRect(x: 0, y: y, width: w * scale, height: h * scale).fill()
+            let status = status(row.0, store: store)
+            let fills: [CGFloat?] = row.0 == "working" ? [0.3, 0.65, 1] : [nil]
+            var x: CGFloat = 12
+            for fill in fills {
+                let image = draw(MenuBarStatusImage.image(status, fill: fill), dark: row.1)
+                image.draw(in: NSRect(x: x * scale, y: y + (h - image.size.height) / 2 * scale,
+                                      width: image.size.width * scale, height: image.size.height * scale))
+                x += image.size.width + 24
+            }
+        }
+        out.unlockFocus()
+        if let tiff = out.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
+            try? png.write(to: URL(fileURLWithPath: path))
+        }
+        exit(0)
+    }
+
+    /// The item as the menu bar would draw it: template images tinted with the menu bar's text colour, coloured ones
+    /// drawn as they are, both resolved for a light or dark menu bar. At 3x, so it stays sharp when scaled up.
+    private static func draw(_ image: NSImage, dark: Bool) -> NSImage {
+        let appearance = NSAppearance(named: dark ? .vibrantDark : .vibrantLight) ?? NSAppearance.currentDrawing()
+        let size = image.size
+        let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width * 3), pixelsHigh: Int(size.height * 3),
+                                   bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                   colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+        rep.size = size
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        appearance.performAsCurrentDrawingAppearance {
+            if image.isTemplate {
+                // The system draws a template's alpha in the menu bar's text colour.
+                let tinted = NSImage(size: size, flipped: false) { r in
+                    image.draw(in: r)
+                    (dark ? NSColor.white : NSColor.black).set()
+                    r.fill(using: .sourceIn)
+                    return true
+                }
+                tinted.draw(in: NSRect(origin: .zero, size: size))
+            } else {
+                image.draw(in: NSRect(origin: .zero, size: size))
+            }
+        }
+        NSGraphicsContext.restoreGraphicsState()
+        let out = NSImage(size: size)
+        out.addRepresentation(rep)
+        return out
+    }
+
+    /// A real status item showing the state for 8 seconds, animating while working. Prints its frame in screen
+    /// coordinates (top-left origin, for `screencapture -R`).
+    private static func live(_ name: String, store: Store) {
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        var frame = 0
+        func tick() {
+            let status = status(name, store: store)
+            let fill = status.animates ? MenuBarStatus.sweep(tick: frame) : nil
+            let image = MenuBarStatusImage.cachedImage(status, fill: fill)
+            if item.button?.image !== image { item.button?.image = image }
+            frame += 1
+        }
+        tick()
+        if status(name, store: store).animates {
+            let timer = Timer(timeInterval: 1 / MenuBarStatus.fps, repeats: true) { _ in MainActor.assumeIsolated { tick() } }
+            RunLoop.main.add(timer, forMode: .common)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            if let window = item.button?.window, let screen = window.screen ?? NSScreen.main {
+                let f = window.frame
+                print("item", Int(f.minX), Int(screen.frame.maxY - f.maxY), Int(f.width), Int(f.height))
+                fflush(stdout)
+            }
+        }
+        let seconds = Double(ProcessInfo.processInfo.environment["DASHBAR_ONSCREEN_SECONDS"] ?? "") ?? 8
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { exit(0) }
     }
 }

@@ -51,30 +51,46 @@ enum BrandMark {
         }
     }
 
+    /// The menu bar glyph's size in points.
+    static let menuBarSize: CGFloat = 18
+
+    /// Draws the menu bar glyph with its top-left corner at `origin` of a flipped or unflipped context. `fill` is the bar's
+    /// fill (0…1). In a template image `colour` is black and the system tints it; the track keeps its faint alpha.
+    static func drawMenuBarMark(at origin: NSPoint, fill: CGFloat, colour: NSColor) {
+        let pt = menuBarSize
+        let g = Geometry(size: pt)
+        // The geometry is laid out top-down; flip it into whatever context we're drawing in.
+        let flipped = NSGraphicsContext.current?.isFlipped ?? false
+        func r(_ rect: CGRect) -> NSRect {
+            NSRect(x: origin.x + rect.minX, y: flipped ? origin.y + rect.minY : origin.y + pt - rect.maxY,
+                   width: rect.width, height: rect.height)
+        }
+        colour.setStroke()
+        let arc = NSBezierPath()
+        let c = r(CGRect(origin: g.arcCenter, size: .zero)).origin
+        arc.appendArc(withCenter: c, radius: g.arcRadius, startAngle: 180, endAngle: 0, clockwise: !flipped)
+        arc.lineWidth = g.arcWidth
+        arc.lineCapStyle = .round
+        arc.stroke()
+
+        // Template images keep alpha, so the track can be faint like the icon's.
+        colour.withAlphaComponent(colour.alphaComponent * 0.3).setFill()
+        let track = r(g.track)
+        NSBezierPath(roundedRect: track, xRadius: track.height / 2, yRadius: track.height / 2).fill()
+
+        colour.setFill()
+        let bar = r(g.fill(min(max(fill, 0), 1)))
+        NSBezierPath(roundedRect: bar, xRadius: bar.height / 2, yRadius: bar.height / 2).fill()
+        // A local build carries a dot in the top corner, so it reads differently from the release's icon.
+        if BuildInfo.isLocal { NSBezierPath(ovalIn: r(CGRect(x: pt - 5.5, y: 0.5, width: 5, height: 5))).fill() }
+    }
+
     /// Menu bar glyph as a template image, so the system tints it for light, dark and highlighted menu bars.
     /// While an agent is working the bar fills further, a static cue that doesn't rely on colour.
     static func menuBarImage(working: Bool) -> NSImage {
-        let pt: CGFloat = 18
-        let g = Geometry(size: pt)
-        let image = NSImage(size: NSSize(width: pt, height: pt), flipped: true) { _ in
-            NSColor.black.setStroke()
-            NSColor.black.setFill()
-
-            let arc = NSBezierPath()
-            arc.appendArc(withCenter: g.arcCenter, radius: g.arcRadius, startAngle: 180, endAngle: 0, clockwise: false)
-            arc.lineWidth = g.arcWidth
-            arc.lineCapStyle = .round
-            arc.stroke()
-
-            // Template images keep alpha, so the track can be faint like the icon's.
-            NSColor.black.withAlphaComponent(0.3).setFill()
-            NSBezierPath(roundedRect: g.track, xRadius: g.track.height / 2, yRadius: g.track.height / 2).fill()
-
-            NSColor.black.setFill()
-            let fillRect = g.fill(working ? 1 : 0.45)
-            NSBezierPath(roundedRect: fillRect, xRadius: fillRect.height / 2, yRadius: fillRect.height / 2).fill()
-            // A local build carries a dot in the top corner, so it reads differently from the release's icon.
-            if BuildInfo.isLocal { NSBezierPath(ovalIn: NSRect(x: pt - 5.5, y: 0.5, width: 5, height: 5)).fill() }
+        let pt = menuBarSize
+        let image = NSImage(size: NSSize(width: pt, height: pt), flipped: false) { _ in
+            drawMenuBarMark(at: .zero, fill: working ? 1 : 0.45, colour: .black)
             return true
         }
         image.isTemplate = true

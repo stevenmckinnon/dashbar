@@ -20,6 +20,9 @@ final class AppSettings: ObservableObject {
         static let menuMemory = "menuMemory"
         static let menuNetwork = "menuNetwork"
         static let menuLimit = "menuClaudeLimit"
+        static let menuAnimate = "menuAnimate"
+        static let menuDone = "menuDone"
+        static let menuText = "menuText"
         static let claudeLimits = "claudeLimitsExperimental"
         static let accounts = "agentAccounts"
         static let permissionWait = "permissionWaitSeconds"
@@ -43,6 +46,12 @@ final class AppSettings: ObservableObject {
     @Published var menuNetwork: Bool { didSet { defaults.set(menuNetwork, forKey: Key.menuNetwork) } }
     /// What's left of the Claude plan limit, beside the icon. Needs the Labs plan-limits setting.
     @Published var menuLimit: Bool { didSet { defaults.set(menuLimit, forKey: Key.menuLimit) } }
+    /// The menu bar mark's bar sweeps while agents work (never with Reduce Motion on).
+    @Published var menuAnimate: Bool { didSet { defaults.set(menuAnimate, forKey: Key.menuAnimate) } }
+    /// A green "Done · project" beside the icon for a few seconds after an agent finishes.
+    @Published var menuDone: Bool { didSet { defaults.set(menuDone, forKey: Key.menuDone) } }
+    /// What the text beside the icon says about working agents.
+    @Published var menuText: MenuBarStatus.TextMode { didSet { defaults.set(menuText.rawValue, forKey: Key.menuText) } }
     /// Experimental: read Claude Code's sign-in to show plan limits. Off by default.
     @Published var claudeLimits: Bool { didSet { defaults.set(claudeLimits, forKey: Key.claudeLimits) } }
     /// Dashbar's bridge is in Claude Code's status line. Not a preference: it mirrors Claude Code's settings file,
@@ -200,6 +209,7 @@ final class AppSettings: ObservableObject {
         defaults.register(defaults: [
             Key.refreshSeconds: 3.0, Key.showNow: true, Key.showWidgets: true, Key.showServers: true,
             Notifier.defaultsKey: true, Key.permissionWait: PermissionBridge.defaultWait,
+            Key.menuAnimate: true, Key.menuDone: true,
         ])
         permissionWait = defaults.integer(forKey: Key.permissionWait)
         scanRoots = defaults.stringArray(forKey: Key.scanRoots) ?? Cleanup.defaultRoots
@@ -214,6 +224,9 @@ final class AppSettings: ObservableObject {
         menuMemory = defaults.bool(forKey: Key.menuMemory)
         menuNetwork = defaults.bool(forKey: Key.menuNetwork)
         menuLimit = defaults.bool(forKey: Key.menuLimit)
+        menuAnimate = defaults.bool(forKey: Key.menuAnimate)
+        menuDone = defaults.bool(forKey: Key.menuDone)
+        menuText = defaults.string(forKey: Key.menuText).flatMap(MenuBarStatus.TextMode.init(rawValue:)) ?? .count
         // Demo renders show the plan limits without reading the Keychain; assigning here skips `didSet`, so nothing is saved.
         claudeLimits = defaults.bool(forKey: Key.claudeLimits) || CommandLine.arguments.contains("--demo")
         if CommandLine.arguments.contains("--demo") {
@@ -420,15 +433,27 @@ private struct MenuBarSettings: View {
     var body: some View {
         Form {
             Section {
+                Picker("Text beside the icon", selection: $settings.menuText) {
+                    ForEach(MenuBarStatus.TextMode.allCases) { Text($0.title).tag($0) }
+                }
+                Toggle("Animate while agents work", isOn: $settings.menuAnimate)
+                Toggle("Show “Done” when an agent finishes", isOn: $settings.menuDone)
+            } header: {
+                Text("Agents")
+            } footer: {
+                Text("An agent that needs you always shows, in amber. Count and time adds how long the longest-running agent has been working. The icon holds still when Reduce Motion is on.")
+                    .settingsFooter()
+            }
+            Section {
                 Toggle("CPU", isOn: $settings.menuCPU)
                 Toggle("Memory", isOn: $settings.menuMemory)
                 Toggle("Download speed", isOn: $settings.menuNetwork)
                 Toggle("Claude plan left", isOn: $settings.menuLimit)
                     .disabled(!settings.showsClaudeLimits)
             } header: {
-                Text("Show beside the icon")
+                Text("Also beside the icon")
             } footer: {
-                Text("The count of working agents always shows."
+                Text("These follow the agents' status."
                      + (settings.showsClaudeLimits ? " Claude plan left shows a warning symbol when you're nearly out or on course to run out."
                                                    : " Claude plan left needs Claude plan limits, in Labs."))
                     .settingsFooter()

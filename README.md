@@ -101,7 +101,10 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
   Claude Code would show you anyway. Remove takes out only Dashbar's hook. With more than one account, Labs lists
   each one: Add puts the hook in that account's own `settings.json`, and a prompt says which account it came from.
 
-The menu bar shows the number of working Claude sessions beside the icon, and the icon's bar fills while any are working.
+- **Live menu bar status**: the icon's bar sweeps while agents work (a one-second sweep every five seconds; still with
+  Reduce Motion or the setting off) beside the working count, an amber hand and count when an agent needs you, and a
+  green "Done · project" for five seconds when one finishes. Settings → Menu Bar picks the text beside the icon
+  (nothing, the count, or the count and how long the longest-running agent has been at it).
 
 ## How it differs
 

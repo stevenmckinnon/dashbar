@@ -1,5 +1,6 @@
 import Foundation
 import Darwin
+import AppKit
 
 /// `Dashbar --bench`: times the expensive collectors and prints resident memory, then exits.
 /// Used to compare performance work before and after.
@@ -75,6 +76,21 @@ enum Bench {
         let googleLive = time("Google sessions", runs: 5) { google.read() }
         print("  Gemini CLI and Antigravity sessions: \(googleLive.sessions.count) (\(googleLive.sessions.filter(\.isBusy).count) working), "
               + "format \(googleLive.warning == nil ? "reads" : "WARNING")")
+        // One frame of the menu bar's working animation: the status, its image, and drawing it at 2x as the menu bar does.
+        let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 120, pixelsHigh: 36, bitsPerSample: 8, samplesPerPixel: 4,
+                                   hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+        var frame = 0
+        time("Menu bar frame", runs: 500) {
+            let status = MenuBarStatus.make(busySince: [Date().addingTimeInterval(-300)], waiting: 0, finished: nil,
+                                            mode: .count, animate: true)
+            let image = MenuBarStatusImage.image(status, fill: MenuBarStatus.sweep(tick: frame % MenuBarStatus.sweepFrames))
+            frame += 1
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+            image.draw(in: NSRect(origin: .zero, size: image.size))
+            NSGraphicsContext.restoreGraphicsState()
+        }
+        print("  \(MenuBarStatus.sweepFrames) frames every \((MenuBarStatus.sweepFrames + MenuBarStatus.holdFrames) / Int(MenuBarStatus.fps)) s, only while agents work")
         print("Resident memory: \(Fmt.bytes(residentBytes()))")
         exit(0)
     }
