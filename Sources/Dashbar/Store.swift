@@ -254,6 +254,7 @@ final class Store: ObservableObject {
         guard claude != claudeAccounts || codex != codexAccounts else { return }
         claudeAccounts = claude
         codexAccounts = codex
+        plan.accounts = claude
         worker.setAccounts(claude: claude, codex: codex)
         update(\.claudeDefaultLabel, claude.count > 1 ? claude.first?.label : nil)
         // Agent logs and session files change as agents work: react to that instead of polling.
@@ -281,6 +282,7 @@ final class Store: ObservableObject {
         accounts.filter { !$0.isDefault }.map { account in
             var out = AccountLimits(label: account.label, path: account.path,
                                     connected: statusLines[account.path]?.isInstalled ?? false)
+            out.plan = ClaudeProfile.plan(for: account).name
             let file = readings.appendingPathComponent(ClaudeStatusLine.fileName(account: account.key))
             if let reading = ClaudeStatusLine.read(from: file) {
                 out.limits = reading.current(now: now)

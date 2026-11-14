@@ -51,6 +51,10 @@ enum Bench {
                          u.watts.map { String(format: "%.2f W", $0) } ?? "no energy",
                          u.processes.prefix(4).map { "\($0.name)×\($0.count)" }.joined(separator: " ")))
         }
+        let account = AgentAccounts.resolve(.claude, saved: []).first!
+        let profile = time("Claude plan (profile)") { ClaudeProfile.plan(for: account) }
+        _ = time("Claude plan (cached)", runs: 5) { ClaudeProfile.plan(for: account) }
+        print("  \(Fmt.tilde(ClaudeProfile.file(for: account).path)): \(profile)")
         print("Resident memory: \(Fmt.bytes(residentBytes()))")
         exit(0)
     }

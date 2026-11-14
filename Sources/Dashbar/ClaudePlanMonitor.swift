@@ -30,6 +30,9 @@ final class ClaudePlanMonitor: ObservableObject {
         var readStatusLine: () -> ClaudeStatusLine.Reading?
         /// Calls back after the given number of seconds, on the main actor.
         var after: (TimeInterval, @escaping @MainActor () -> Void) -> Void
+        /// The plan an account's Claude Code profile names (`ClaudeProfile`). It wins over the Keychain's plan field,
+        /// which Claude Code only writes at sign-in.
+        var profilePlan: (ResolvedAccount) -> ClaudeProfile.Plan = { _ in .unknown }
 
         static var live: Dependencies {
             Dependencies(
@@ -41,7 +44,8 @@ final class ClaudePlanMonitor: ObservableObject {
                 readStatusLine: { ClaudeStatusLine.read() },
                 after: { delay, work in
                     DispatchQueue.main.asyncAfter(deadline: .now() + max(0, delay)) { MainActor.assumeIsolated { work() } }
-                })
+                },
+                profilePlan: { ClaudeProfile.plan(for: $0) })
         }
     }
 
@@ -52,6 +56,8 @@ final class ClaudePlanMonitor: ObservableObject {
     var anyEnabled: Bool { statusLineEnabled || endpointEnabled }
     /// Called after the shown reading changes (the store checks limit alerts).
     var onUpdate: (() -> Void)?
+    /// The Claude accounts being read (the store sets them), to find whose profile names the plan.
+    var accounts: [ResolvedAccount] = AgentAccounts.resolve(.claude, saved: [])
     /// A reading this young from the status line is current: the endpoint isn't asked.
     static let freshStatusLine: TimeInterval = 240
 
@@ -157,7 +163,7 @@ final class ClaudePlanMonitor: ObservableObject {
             failures = 0
             retryAt = nil
             if result.problem == nil {
-                deps.saveShared(ClaudePlanLimits.Shared(fetchedAt: result.fetchedAt, plan: result.plan, limits: result.limits,
+                deps.saveShared(ClaudePlanLimits.Shared(fetchedAt: result.fetchedAt, plan: planName(for: result), limits: result.limits,
                                                         service: result.keychainService))
             }
         }
@@ -209,9 +215,23 @@ final class ClaudePlanMonitor: ObservableObject {
     }
 
     private func publish() {
-        let shown = Self.preferred(statusLine: statusLineResult, endpoint: endpointEnabled ? endpointResult : nil)
+        var shown = Self.preferred(statusLine: statusLineResult, endpoint: endpointEnabled ? endpointResult : nil)
+        if let r = shown { shown?.plan = planName(for: r) }
         result = shown
         onUpdate?()
+    }
+
+    /// The plan to show beside a reading: its account's profile, else the Keychain's field the reading carries (which
+    /// may be stale, from this copy's sign-in or another copy's shared file). An endpoint reading belongs to the account
+    /// whose Keychain entry it used; a status line reading to the default account.
+    private func planName(for r: ClaudePlanLimits.Result) -> String? {
+        let account: ResolvedAccount?
+        if r.source == .endpoint, let service = r.keychainService {
+            account = accounts.first { $0.keychainService() == service }
+        } else {
+            account = accounts.first(where: \.isDefault)
+        }
+        return (account.map(deps.profilePlan) ?? .unknown).resolved(keychain: r.plan)
     }
 
     /// The fresher of two good readings; a good reading over a problem; otherwise the endpoint's problem (it has an

@@ -151,6 +151,8 @@ struct AccountLimits: Equatable, Identifiable {
     var problem: String?
     /// Claude: Dashbar's bridge is in this account's status line, so limits will come.
     var connected = true
+    /// Claude: the plan this account's profile names ("Max 5x"), nil when it names none.
+    var plan: String?
 }
 
 extension UsageBook {

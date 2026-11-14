@@ -412,7 +412,7 @@ struct ClaudeAccountLimitsView: View {
             HStack(spacing: 6) {
                 Image(systemName: "asterisk").font(.system(size: UI.Size.caption, weight: .bold)).foregroundStyle(UI.claude)
                     .accessibilityHidden(true)
-                Text("Claude · \(account.label)").font(.system(size: UI.Size.body, weight: .medium))
+                Text(["Claude", account.label, account.plan].compactMap { $0 }.joined(separator: " · ")).font(.system(size: UI.Size.body, weight: .medium))
             }
             if let problem = account.problem {
                 HStack(alignment: .top, spacing: 6) {
