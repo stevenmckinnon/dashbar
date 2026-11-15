@@ -204,7 +204,7 @@ section[id], [id="top"] { scroll-margin-top: 88px; }
 .reads, .sends { grid-column: span 4; }
 .reads { grid-column: 1 / span 6; }
 .sends { grid-column: 7 / -1; padding-left: clamp(0px, 3vw, 48px); }
-.privacy .check, .privacy .site-note { margin-top: 20px; }
+.privacy .check, .privacy .site-note, .privacy .policy-link { margin-top: 20px; }
 .privacy h3 { margin-bottom: 14px; }
 .privacy ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 14px; color: var(--muted); }
 .privacy .sends p { color: var(--muted); }
@@ -311,3 +311,17 @@ section[id], [id="top"] { scroll-margin-top: 88px; }
   .window-head p { margin-top: 20px; }
   .window-demo { margin-top: 32px; }
 }
+
+/* ---------- Privacy policy (/privacy): one readable column ---------- */
+.policy { padding-block: 56px var(--section); }
+.policy article { max-width: 68ch; }
+.policy h1 { font-size: var(--step-head); letter-spacing: -0.045em; }
+.policy .updated { margin-top: 20px; color: var(--muted); font-size: var(--step-ui); }
+.policy .policy-lede { margin-top: 28px; font-size: var(--step-lead); line-height: 1.42; color: var(--muted); }
+.policy section { margin-top: 56px; scroll-margin-top: 88px; }
+.policy h2 { font-size: var(--step-title); letter-spacing: -0.03em; line-height: 1.15; }
+.policy p, .policy ul { margin-top: 16px; }
+.policy ul { padding-left: 1.25em; display: grid; gap: 10px; }
+.policy li::marker { color: var(--muted); }
+.policy strong { font-weight: 600; }
+@media (max-width: 760px) { .policy { padding-block: 32px 88px; } .policy section { margin-top: 44px; } }

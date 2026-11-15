@@ -63,6 +63,7 @@ export const PRIVACY = {
     "Update checks, from version 0.3.0: a small feed fetched from GitHub to see whether a newer version exists.",
   ],
   siteNote: "This website, not the app, counts visits with Cloudflare Web Analytics, which uses no cookies.",
+  policyLink: "Read the full privacy policy",
 };
 
 export const INSTALL = {

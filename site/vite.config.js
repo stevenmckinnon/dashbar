@@ -1,15 +1,24 @@
 import { defineConfig } from "vite";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { FAQ } from "./src/faq.js";
 import { SITE, REPO, HERO, FEATURES, plain } from "./src/content.js";
+import { POLICY, policyHtml } from "./src/policy.js";
 import * as agent from "./agent-files.js";
 
 const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const isHome = (ctx) => ctx.path === "/index.html" || ctx.path === "/";
+// Shown until React mounts, then replaced; visually hidden meanwhile, so readers without JavaScript and crawlers get it.
+const hideFallback =
+  `  <script>document.documentElement.className="js"</script>\n` +
+  `  <style>.js .seo-fallback{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}</style>\n</head>`;
 
 // Writes the FAQ into index.html as structured data, from the same list the page renders.
 const faqSchema = {
   name: "faq-schema",
-  transformIndexHtml(html) {
+  transformIndexHtml(html, ctx) {
+    if (!isHome(ctx)) return html;
     const data = {
       "@context": "https://schema.org",
       "@type": "FAQPage",
@@ -24,7 +33,8 @@ const faqSchema = {
 // before. While scripts are enabled the text is visually hidden (not display:none) until then.
 const seo = {
   name: "seo",
-  transformIndexHtml(html) {
+  transformIndexHtml(html, ctx) {
+    if (!isHome(ctx)) return html;
     const version = agent.releases()[0]?.version ?? null;
     const app = {
       "@context": "https://schema.org",
@@ -64,6 +74,25 @@ const seo = {
   },
 };
 
+// The privacy policy, a second page (privacy.html, from src/policy.js). Its text goes into the HTML as well, like the
+// homepage's. GitHub Pages serves privacy.html at /privacy; a copy at privacy/index.html makes /privacy/ work too.
+const privacyPage = {
+  name: "privacy-page",
+  transformIndexHtml(html, ctx) {
+    if (ctx.path !== "/privacy.html") return html;
+    return html
+      .replaceAll("{{policy-description}}", esc(POLICY.description).replace(/"/g, "&quot;"))
+      .replace("</head>", hideFallback)
+      .replace('<div id="root"></div>', () => `<div id="root">\n<div class="seo-fallback">\n${policyHtml()}\n</div>\n</div>`);
+  },
+  writeBundle(options, bundle) {
+    const page = bundle["privacy.html"];
+    if (!page) throw new Error("privacy-page: privacy.html missing from the build");
+    mkdirSync(`${options.dir}/privacy`, { recursive: true });
+    writeFileSync(`${options.dir}/privacy/index.html`, page.source);
+  },
+};
+
 // The files for agents and crawlers (see agent-files.js), written next to index.html. robots.txt is static, in
 // docs/images. GitHub Pages can't negotiate content or add headers, so index.md is linked from index.html instead.
 const agentFiles = {
@@ -97,8 +126,16 @@ const noAnalyticsInDev = {
 // Pictures live in docs/images (the README uses them too); Vite copies them to the site root.
 export default defineConfig({
   base: "/",
-  plugins: [react(), faqSchema, seo, agentFiles, noAnalyticsInDev],
+  plugins: [react(), faqSchema, seo, privacyPage, agentFiles, noAnalyticsInDev],
   publicDir: "../docs/images",
   // "What's new" reads release-notes/ and appcast.xml from the repository root.
   server: { fs: { allow: [".."] } },
+  build: {
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL("index.html", import.meta.url)),
+        privacy: fileURLToPath(new URL("privacy.html", import.meta.url)),
+      },
+    },
+  },
 });

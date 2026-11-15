@@ -5,7 +5,8 @@ import { RELEASE_NOTES, LATEST_VERSION, inline } from "./releases";
 import { DashbarDemo } from "./demos/DashbarDemo";
 import { AgentsDemo, LimitsDemo, UsageDemo, ServersDemo, SystemDemo, CleanupDemo } from "./demos/FeatureDemos";
 import { WindowDemo } from "./demos/WindowDemo";
-import { REPO, BREW, HERO, FEATURES_INTRO, FEATURES, WINDOW, PACE, PRIVACY, INSTALL, FOOTER } from "./content";
+import { REPO, BREW, HERO, FEATURES_INTRO, FEATURES, WINDOW, PACE, PRIVACY, INSTALL } from "./content";
+import { Mark, Footer } from "./Chrome";
 
 // The DMG itself, so the button downloads straight away. The version comes from the update feed at build time;
 // if the feed can't be read it falls back to the releases page.
@@ -20,16 +21,6 @@ function Shot({ name, alt, width, height, className, lazy = true }) {
       <source media="(prefers-color-scheme: dark)" srcSet={`./${name}-dark.png`} />
       <img className={className} src={`./${name}-light.png`} width={width} height={height} alt={alt} loading={lazy ? "lazy" : undefined} />
     </picture>
-  );
-}
-
-function Mark({ size = 28 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
-      <path d="M8 26a16 16 0 0 1 32 0" fill="none" stroke="var(--arc)" strokeWidth="6" strokeLinecap="round" />
-      <rect x="4" y="33" width="40" height="10" rx="5" fill="var(--track)" />
-      <rect x="6" y="35" width="26" height="6" rx="3" fill="var(--signal)" />
-    </svg>
   );
 }
 
@@ -332,6 +323,7 @@ function Privacy() {
           </ul>
           <p className="check">The code is <a href={REPO}>on GitHub</a> if you want to check.</p>
           <p className="site-note">{PRIVACY.siteNote}</p>
+          <p className="policy-link"><a href="/privacy">{PRIVACY.policyLink}</a></p>
         </div>
       </div>
     </section>
@@ -361,41 +353,6 @@ function Install() {
         </div>
       </div>
     </section>
-  );
-}
-
-/* ---------- Footer ---------- */
-
-function Footer() {
-  return (
-    <footer className="footer">
-      <div className="footer-inner wrap">
-        <div className="who">
-          <a className="brand" href="#top"><Mark /> Dashbar</a>
-          <p>{`${FOOTER.about} Made by `}<a href="https://steve.mn">Steve McKinnon</a>.</p>
-        </div>
-        <ul className="links" aria-label="On this page">
-          <li><a href="#features">Features</a></li>
-          <li><a href="#window">Window</a></li>
-          <li><a href="#pace">Pace</a></li>
-          <li><a href="#privacy">Privacy</a></li>
-          <li><a href="#whats-new">What’s new</a></li>
-          <li><a href="#faq">FAQ</a></li>
-          <li><a href="#install">Install</a></li>
-        </ul>
-        <ul className="links" aria-label="Project">
-          <li><a href={REPO}>GitHub</a></li>
-          <li><a href={`${REPO}/releases`}>Releases</a></li>
-          <li><a href={`${REPO}/issues`}>Issues</a></li>
-          <li><a href={`${REPO}/blob/main/LICENSE`}>Licence</a></li>
-          <li><a href="mailto:hello@usedashbar.com">hello@usedashbar.com</a></li>
-        </ul>
-        <div className="last">
-          <p>© 2026 Steve McKinnon. Free and open source under the MIT licence.</p>
-          <p>{FOOTER.trademarks}</p>
-        </div>
-      </div>
-    </footer>
   );
 }
 

@@ -74,6 +74,7 @@ export function indexMd(all) {
     PRIVACY.sends.map((r) => `- ${r}`).join("\n"),
     `The code is [on GitHub](${REPO}) if you want to check.`,
     PRIVACY.siteNote,
+    `[${PRIVACY.policyLink}](${SITE}privacy).`,
     ...(all.length ? [`## What’s new`, releaseSection(all.slice(0, 3)), `[All releases on GitHub](${REPO}/releases)`] : []),
     `## Questions`,
     ...FAQ.map(({ q, a }) => `### ${q}\n\n${a}`),
@@ -175,6 +176,7 @@ export function llmsTxt(all) {
       `- [README](${REPO}/blob/main/README.md): features, settings, privacy and building from source`,
       `- [FAQ](${SITE}#faq): supported agents, Claude plan limits, privacy, updating and uninstalling`,
       `- [Privacy](${SITE}#privacy): every file it reads and the only two requests it can make`,
+      `- [Privacy policy](${SITE}privacy): what the app and this website do with data, and who to contact`,
     ].join("\n"),
     `## Install`,
     [
@@ -197,7 +199,7 @@ export function llmsTxt(all) {
 /** sitemap.xml. index.md is left out so search engines don't index it as a copy of the page; llms.txt and
  * the <link rel="alternate"> in index.html point agents to it. */
 export function sitemap(lastmod) {
-  const urls = ["", "llms.txt", "llms-full.txt"];
+  const urls = ["", "privacy", "llms.txt", "llms-full.txt"];
   const mod = lastmod ? `<lastmod>${lastmod}</lastmod>` : "";
   return [
     `<?xml version="1.0" encoding="UTF-8"?>`,
