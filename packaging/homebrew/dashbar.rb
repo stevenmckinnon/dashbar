@@ -15,6 +15,7 @@ cask "dashbar" do
   depends_on macos: ">= :sonoma"
 
   app "Dashbar.app"
+  binary "#{appdir}/Dashbar.app/Contents/Helpers/dashbar"
 
   zap trash: [
     "~/Library/Application Support/Dashbar",

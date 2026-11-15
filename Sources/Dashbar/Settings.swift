@@ -667,6 +667,7 @@ private struct IntegrationSettings: View {
                 Text(permissionsExplanation).settingsFooter()
             }
             AntigravityLabsSection()
+            CommandLineToolSection()
             // Last, and labelled: the one setting here that leans on something undocumented.
             Section {
                 Toggle("Also ask Anthropic with Claude Code's sign-in", isOn: $settings.claudeLimits)

@@ -52,6 +52,12 @@ codesign --verify --deep --strict "$APP"
 DETAILS=$(codesign -dv "$APP" 2>&1)
 [[ "$DETAILS" == *"(runtime)"* ]] || { echo "Hardened runtime is missing" >&2; exit 1; }
 lipo -archs "$APP/Contents/MacOS/Dashbar"
+# The bundled `dashbar` tool (Contents/Helpers) is notarised with the app, so it needs the same: both architectures,
+# signed with the hardened runtime.
+CLI="$APP/Contents/Helpers/dashbar"
+[[ "$(lipo -archs "$CLI")" == *arm64* && "$(lipo -archs "$CLI")" == *x86_64* ]] || { echo "dashbar isn't universal" >&2; exit 1; }
+[[ "$(codesign -dv "$CLI" 2>&1)" == *"(runtime)"* ]] || { echo "Hardened runtime is missing from dashbar" >&2; exit 1; }
+"$CLI" --version
 
 DMG="build/Dashbar-$VERSION.dmg"
 scripts/make-dmg.sh "$APP" "$DMG"   # the styled installer window (needs dmgbuild)

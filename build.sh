@@ -51,6 +51,10 @@ APP="build/$APP_NAME.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BINARY" "$APP/Contents/MacOS/$APP_NAME"
+# The `dashbar` command-line tool (the dashbar-cli product), in Helpers: Contents/MacOS already holds "Dashbar", which a
+# case-insensitive disk can't tell from "dashbar". The cask links it onto the PATH.
+mkdir -p "$APP/Contents/Helpers"
+cp "$(dirname "$BINARY")/dashbar-cli" "$APP/Contents/Helpers/dashbar"
 
 # Sparkle (in-app updates) ships as a framework next to the binary: embed it and let the binary find it.
 mkdir -p "$APP/Contents/Frameworks"
@@ -114,6 +118,7 @@ for item in "$SPARKLE"/XPCServices/*.xpc; do sign --preserve-metadata=entitlemen
 sign "$SPARKLE/Autoupdate"
 sign "$SPARKLE/Updater.app"
 sign "$APP/Contents/Frameworks/Sparkle.framework"
+sign --identifier "$BUNDLE_ID.cli" "$APP/Contents/Helpers/dashbar"
 sign "$APP"
 if [[ -n "$IDENTITY" ]]; then echo "Signed with: $IDENTITY"; else echo "Signed ad-hoc (no signing identity found)"; fi
 echo "Built $APP"
