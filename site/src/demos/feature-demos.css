@@ -75,13 +75,14 @@
     color: var(--ss-text);
     letter-spacing: 0;
   }
+  /* Neutral, as the app draws its system charts: teal would say Codex */
   .fd-tile-chart {
     margin-top: 8px;
-    color: var(--dd-codex);
+    color: var(--ss-icon);
   }
   .fd-app {
     display: grid;
-    grid-template-columns: 64px 1fr 36px;
+    grid-template-columns: minmax(0, 1fr) 96px 40px;
     align-items: center;
     gap: 10px;
     height: 34px;
@@ -102,7 +103,7 @@
     display: block;
     height: 100%;
     border-radius: 3px;
-    background: var(--dd-codex);
+    background: var(--ss-icon);
     transition: width 0.9s cubic-bezier(0.25, 0.8, 0.25, 1);
   }
 
@@ -111,43 +112,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    height: 46px;
-  }
-  .fd-action {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 6px;
-    padding-top: 12px;
-    border-top: 1px solid var(--ss-line);
-  }
-  .fd-total {
-    font-size: 15px;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    color: var(--ss-text-strong);
-  }
-  .fd-total small {
-    font-size: 12px;
-    font-weight: 400;
-    color: var(--ss-text);
-  }
-  .fd-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 32px;
-    padding: 0 12px;
-    border-radius: 9px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--ss-text);
-    background: var(--ss-ink-2);
-    transition: background 0.3s ease, color 0.3s ease;
-  }
-  .fd-btn[data-on] {
-    color: #fff;
-    background: var(--dd-signal);
+    height: 40px;
   }
 }
 
@@ -230,21 +195,6 @@
 
   /* ---------- Usage and the cost estimate ---------- */
   .fd-usage-head .dd-faint { margin-left: auto; }
-  .fd-tokens {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 6px;
-    margin-top: 6px;
-  }
-  .fd-tokens div {
-    display: grid;
-    gap: 1px;
-    padding: 6px 9px;
-    border-radius: 9px;
-    background: var(--ss-ink-2);
-  }
-  .fd-tokens small { font-size: 11px; color: var(--ss-text); white-space: nowrap; }
-  .fd-tokens b { font-size: 13px; font-weight: 600; color: var(--ss-text-strong); font-variant-numeric: tabular-nums; }
   .fd-cost {
     display: flex;
     align-items: baseline;
@@ -297,9 +247,8 @@
     margin-top: 12px;
   }
   .fd-box[data-layout="compact"] .fd-ranks { grid-template-columns: 1fr; }
-  .fd-box[data-layout="compact"] .fd-tokens { grid-template-columns: 1fr 1fr; }
   .fd-rank { display: grid; gap: 6px; align-content: start; }
-  .fd-rank-title { font-size: 11px; font-weight: 600; color: var(--ss-text); }
+  .fd-rank-title { font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ss-text); }
   .fd-rank-line {
     display: flex;
     justify-content: space-between;
@@ -327,3 +276,39 @@
 .fd .fd-box > *,
 .fd .fd-clip > * { min-width: 0; }
 .fd .fd-box[data-layout="compact"] .dd-now-top small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.fd {
+  .fd-head-end { margin-left: auto; font-size: 12px; color: var(--ss-text); font-variant-numeric: tabular-nums; }
+  .fd-app b { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* Usage: the range the card shows, and the subagents' share */
+  .fd-sub { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; color: var(--ss-text); }
+
+  /* Clean-up: a row's Trash button shows on hover, then asks once */
+  .fd-folder { padding: 0 4px; border-radius: 8px; transition: background 0.2s ease; }
+  .fd-folder[data-hover] { background: var(--ss-ink-2); }
+  .fd-folder-icon { flex: none; width: 16px; color: var(--ss-icon); }
+  .fd-trash { display: grid; place-items: center; width: 22px; color: var(--ss-icon); opacity: 0; transition: opacity 0.2s ease; }
+  .fd-trash[data-show] { opacity: 1; }
+  .fd-confirm {
+    padding: 4px 9px;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--ss-danger-text);
+    background: var(--ss-danger-soft);
+  }
+  .fd-note { display: block; margin-top: 6px; font-size: 11px; color: var(--ss-text); }
+}
+
+/* The system charts in the app's greys: past samples quiet, the latest one dark */
+.fd .fd-tile-chart .ss-chart .ss-chart__bar { fill: var(--ss-ink-5); }
+.fd .fd-tile-chart .ss-chart .ss-chart__bar:last-of-type { fill: var(--ss-text-strong); }
+
+/* Compact, as the panel's compact design: the context readout, the fourth action and the servers' memory go,
+   so names and statuses keep one line */
+.fd .fd-box[data-layout="compact"] .dd-context,
+.fd .fd-box[data-layout="compact"] .dd-wide-only,
+.fd .fd-box[data-layout="compact"] .dd-ws-end small[data-port-note] { display: none; }
+.fd .fd-box[data-layout="compact"] .dd-ws .dd-grow small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

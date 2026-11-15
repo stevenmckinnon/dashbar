@@ -1,13 +1,15 @@
-import { Asterisk, ChartColumn, ChevronDown, ChevronRight, Code, Compass, Folder, Gauge, Layers, Moon, Pause, RotateCw, Server, SquareArrowOutUpRight, Terminal } from 'lucide-react'
+import { ArrowUpRight, Asterisk, Braces, ChevronDown, ChevronRight, CodeXml, Compass, Folder, Gauge, Layers, Moon, Package, Pause, RotateCw, Server, Split, SquareArrowOutUpRight, SquareTerminal } from 'lucide-react'
 import { Badge, Bar, Count, Segmented, Stage, type Act } from '../stageshow/kit'
 import './dashbar-demo.css'
 
-// Dashbar's panel, hung from the menu bar. It opens on Overview, looks at the
-// servers (two are barely used), then at the plan limits, where the pace
-// mark lands and the story ends. That last frame is also the poster.
+// Dashbar's panel, hung from the menu bar. It opens on Overview (the working
+// workspace, the others, the tightest plan limits and the caches), looks at
+// the servers (two are barely used), then at the Usage tab, where the limits
+// fill, the pace marks land and the story ends. That last frame is also the
+// poster.
 
 type S = {
-  /** 0 Overview, 1 Agents, 2 Servers */
+  /** 0 Overview, 1 Usage, 2 Servers */
   tab: number
   /** How many server rows have arrived */
   rows: number
@@ -20,10 +22,11 @@ type S = {
 const initial: S = { tab: 0, rows: 0, flags: false, limits: false, marks: false }
 const POSTER: S = { tab: 1, rows: 4, flags: true, limits: true, marks: true }
 
-const REST = { wide: { x: 396, y: 612 }, compact: { x: 300, y: 500 } }
+const REST = { wide: { x: 458, y: 610 }, compact: { x: 345, y: 470 } }
 
 async function script(a: Act<S>) {
-  await a.wait(1000)
+  // Time to read the Overview first
+  await a.wait(1800)
 
   // Servers: four arrive, two are marked barely used
   await a.move('tab-2')
@@ -34,9 +37,9 @@ async function script(a: Act<S>) {
   await a.stagger([1, 2, 3, 4], (n) => a.set({ rows: n }), 110)
   await a.wait(700)
   await a.set({ flags: true })
-  await a.wait(2400)
+  await a.wait(2200)
 
-  // Agents: the limits fill and the pace mark says where an even pace would be
+  // Usage: the limits fill and the pace mark says where an even pace would be
   await a.move('tab-1')
   await a.wait(200)
   await a.click()
@@ -48,15 +51,15 @@ async function script(a: Act<S>) {
   await a.move('rest')
 }
 
-const TABS = ['Overview', 'Agents', 'Servers', 'System', 'Clean-up']
+const TABS = ['Overview', 'Usage', 'Servers', 'System', 'Clean-up']
 const TARGETS = TABS.map((_, i) => `tab-${i}`)
 
 export function DashbarDemo({ dark = false }: { dark?: boolean }) {
   return (
     <Stage
       width={480}
-      height={660}
-      compact={{ below: 420, width: 358, height: 560 }}
+      height={716}
+      compact={{ below: 420, width: 358, height: 680 }}
       initial={initial}
       poster={POSTER}
       script={script}
@@ -74,7 +77,7 @@ export function DashbarDemo({ dark = false }: { dark?: boolean }) {
             <Segmented className="dd-rail" items={TABS} value={s.tab} targets={TARGETS} />
             <div className="dd-body">
               <div className="dd-pane" data-on={s.tab === 0}><Overview /></div>
-              <div className="dd-pane" data-on={s.tab === 1}><Agents s={s} /></div>
+              <div className="dd-pane" data-on={s.tab === 1}><Usage s={s} /></div>
               <div className="dd-pane" data-on={s.tab === 2}><Servers s={s} /></div>
             </div>
           </div>
@@ -130,50 +133,91 @@ function Header() {
 
 /* ---------- Overview ---------- */
 
+/** The Now card's title: the workspace, then the arrow that opens it in the Dashbar window */
+export function NowTitle({ letter, name, sub, attention, children }: { letter: string; name: string; sub: string; attention?: boolean; children: React.ReactNode }) {
+  return (
+    <div className="dd-now-top">
+      <span className="dd-mono">{letter}<i className="dd-dot" data-attention={attention || undefined} /></span>
+      <div className="dd-grow dd-now-name"><b>{name}</b><small>{sub}</small></div>
+      <ArrowUpRight size={13} strokeWidth={2} className="dd-now-open" />
+      {children}
+    </div>
+  )
+}
+
+/** The agent's session in the Now card, with how full its context is */
+export function NowSession({ title, sub, context }: { title: string; sub: string; context: number }) {
+  return (
+    <div className="dd-session">
+      <span className="dd-claude"><Asterisk size={14} strokeWidth={2} /></span>
+      <div className="dd-grow"><b>{title}</b><small>{sub}</small></div>
+      <div className="dd-context"><span className="dd-meter"><i style={{ width: `${context}%` }} /></span><b>{context}%</b><small>context used</small></div>
+    </div>
+  )
+}
+
+/** The Now card's four labelled actions */
+export function QuickActions({ port }: { port: string }) {
+  return (
+    <div className="dd-actions">
+      <span><Braces size={15} strokeWidth={1.75} />VS Code</span>
+      <span><SquareTerminal size={15} strokeWidth={1.75} />Ghostty</span>
+      <span><Folder size={15} strokeWidth={1.75} />Finder</span>
+      <span className="dd-wide-only"><Compass size={15} strokeWidth={1.75} />localhost{port}</span>
+    </div>
+  )
+}
+
 function Overview() {
   return (
     <>
-      <div className="dd-stats">
-        <div className="dd-stat">
-          <div className="dd-stat-top"><span>Agents</span><b className="dd-ok">1 working</b></div>
-          <div className="dd-stat-bottom"><strong>4</strong><span className="dd-spark">{[5, 9, 6, 12, 8, 14].map((h, i) => <i key={i} style={{ height: h }} />)}</span></div>
-        </div>
-        <div className="dd-stat">
-          <div className="dd-stat-top"><span>Servers</span><b className="dd-ok">Live</b></div>
-          <div className="dd-stat-bottom"><strong>4</strong><span className="dd-faint">980 MB</span></div>
-        </div>
-        <div className="dd-stat">
-          <div className="dd-stat-top"><span>Clean-up</span></div>
-          <div className="dd-stat-bottom"><strong>7<small>GB</small></strong><span className="dd-kinds"><i /><i /><i /></span></div>
-        </div>
-      </div>
-
       <div className="dd-card dd-now">
-        <div className="dd-now-top">
-          <span className="dd-mono dd-mono--blue dd-mono--lg">S<i className="dd-dot" /></span>
-          <div className="dd-grow"><b>storefront-web</b><small>node :3000 · 412 MB</small></div>
-          <ChevronRight size={14} strokeWidth={1.75} className="dd-chevron dd-now-chevron" />
+        <NowTitle letter="S" name="storefront-web" sub="node :3000 · 412 MB">
           <Badge tone="success" dot>Working 4m</Badge>
-        </div>
-        <div className="dd-session">
-          <span className="dd-claude"><Asterisk size={14} strokeWidth={2} /></span>
-          <div className="dd-grow"><b>Add Stripe checkout and webhooks</b><small>Terminal · runs :3000</small></div>
-          <div className="dd-context"><span className="dd-meter"><i style={{ width: '34%' }} /></span><b>34%</b><small>context</small></div>
-        </div>
-        <div className="dd-actions">
-          {[ChartColumn, Code, Terminal, Folder, Compass].map((Glyph, i) => <span key={i}><Glyph size={15} strokeWidth={1.75} /></span>)}
-        </div>
+        </NowTitle>
+        <NowSession title="Add Stripe checkout and webhooks" sub="Terminal · runs :3000" context={34} />
+        <div className="dd-subagents dd-wide-only"><Split size={13} strokeWidth={2} />3 subagents running · 1 done<ChevronRight size={13} strokeWidth={2} /></div>
+        <QuickActions port=":3000" />
       </div>
 
       <div className="dd-card">
-        <CardHead icon={<Layers size={14} strokeWidth={1.75} />} tone="violet" title="Other workspaces" count="4" />
-        <WorkspaceRow tone="green" letter="B" name="billing-api" sub="Claude idle for 38m" port=":4000" note="server 186 MB" />
-        <WorkspaceRow tone="red" letter="D" name="docs-site" sub="Claude idle for 1h 35m" port=":5173" note="server 144 MB" />
-        <WorkspaceRow tone="magenta" letter="N" name="notes-ios" sub="Claude idle for 2h 50m" note="1 agent" wideOnly />
-        <FillerRow />
-        <FillerRow />
+        <CardHead icon={<Layers size={14} strokeWidth={1.75} />} tone="violet" title="Other workspaces" count="3" />
+        <WorkspaceRow tone="green" letter="B" name="billing-api" sub="Claude idle · 38m" port=":4000" note="server 186 MB" />
+        <WorkspaceRow tone="red" letter="D" name="docs-site" sub="Claude idle · 1h 35m" port=":5173" note="server 144 MB" />
+        <WorkspaceRow tone="magenta" letter="N" name="notes-ios" sub="Claude idle · 2h 50m" note="1 agent" />
+      </div>
+
+      <PlanStrip />
+
+      <div className="dd-cleanup">
+        <Package size={14} strokeWidth={1.75} />
+        <span>7 GB of rebuildable caches</span>
+        <ChevronRight size={14} strokeWidth={1.75} />
       </div>
     </>
+  )
+}
+
+/** Overview's plan limits: the tightest windowed limit of each agent, one line each, and a link to Usage */
+function PlanStrip() {
+  return (
+    <div className="dd-card dd-strip">
+      <div className="dd-head">
+        <span className="dd-chip"><Gauge size={14} strokeWidth={1.75} /></span>
+        <b>Plan limits</b>
+        <span className="dd-link">Usage<ChevronRight size={13} strokeWidth={2} /></span>
+      </div>
+      <div className="dd-strip-row" data-tone="claude">
+        <Asterisk size={14} strokeWidth={2} className="dd-claude-ink" /><b>Claude</b><span>5-hour</span>
+        <span className="dd-strip-bar"><i style={{ width: '55%' }} /></span>
+        <strong>55% used</strong><span className="dd-strip-reset">resets in 2h 11m</span>
+      </div>
+      <div className="dd-strip-row" data-tone="codex">
+        <CodeXml size={14} strokeWidth={2} className="dd-codex-ink" /><b>Codex</b><span>Weekly</span>
+        <span className="dd-strip-bar"><i style={{ width: '34%' }} /></span>
+        <strong>34% used</strong><span className="dd-strip-reset">resets Thu 11:46</span>
+      </div>
+    </div>
   )
 }
 
@@ -187,12 +231,13 @@ export function FillerRow() {
   )
 }
 
-export function CardHead({ icon, tone, title, count }: { icon: React.ReactNode; tone: string; title: string; count?: string }) {
+export function CardHead({ icon, tone, title, count, children }: { icon: React.ReactNode; tone: string; title: string; count?: string; children?: React.ReactNode }) {
   return (
     <div className="dd-head">
       <span className="dd-chip" data-tone={tone}>{icon}</span>
       <b>{title}</b>
       {count && <span className="dd-faint">{count}</span>}
+      {children}
     </div>
   )
 }
@@ -205,7 +250,7 @@ export function WorkspaceRow({ tone, letter, name, sub, port, note, working, att
       {(port || note) && (
         <span className="dd-ws-end">
           {port && <span className="dd-port-text">{port}</span>}
-          {note && <small>{note}</small>}
+          {note && <small data-port-note={port ? true : undefined}>{note}</small>}
         </span>
       )}
       <ChevronRight size={14} strokeWidth={1.75} className="dd-chevron" />
@@ -213,11 +258,19 @@ export function WorkspaceRow({ tone, letter, name, sub, port, note, working, att
   )
 }
 
-/* ---------- Agents: the plan limits ---------- */
+/* ---------- Usage: the plan limits ---------- */
 
+/** The key to the tick on the limit bars, once per card */
+export function PaceKey() {
+  return <span className="dd-pace-key"><i />even pace</span>
+}
+
+/** One limit as the Usage tab draws it. The fill is the agent's colour, amber while it is on course to run out,
+ *  red from 90% used; the track is neutral. */
 export function Limit({ label, resets, used, mark, verdict, tone, attention, s }: { label: string; resets: string; used: number; mark: number; verdict: string; tone: 'claude' | 'codex'; attention?: boolean; s: { limits: boolean; marks: boolean } }) {
+  const state = used >= 90 ? 'problem' : attention ? 'attention' : undefined
   return (
-    <div className="dd-limit" data-tone={tone}>
+    <div className="dd-limit" data-tone={tone} data-state={state}>
       <div className="dd-limit-top">
         <b>{label}</b><span className="dd-faint">{resets}</span>
         <span className="dd-used" data-show={s.limits || undefined}>
@@ -225,33 +278,66 @@ export function Limit({ label, resets, used, mark, verdict, tone, attention, s }
           <span>used</span>
         </span>
       </div>
-      <small className="dd-verdict" data-show={s.marks || undefined} data-attention={attention || undefined}>{verdict}</small>
       <div className="dd-bar">
         <i style={{ width: s.limits ? `${used}%` : 0 }} />
         <u data-show={s.marks || undefined} style={{ left: `${mark}%` }} />
       </div>
+      <small className="dd-verdict" data-show={s.marks || undefined} data-attention={attention || undefined}>{verdict}</small>
     </div>
   )
 }
 
-function Agents({ s }: { s: S }) {
+/** Both agents' limits, as the Usage tab's first card shows them */
+export function LimitsCard({ s, weekly = { used: 38, mark: 50, verdict: 'At this rate, plenty left when it resets' } }: { s: { limits: boolean; marks: boolean }; weekly?: { used: number; mark: number; verdict: string; attention?: boolean } }) {
+  return (
+    <div className="dd-card" data-target="limits">
+      <CardHead icon={<Gauge size={14} strokeWidth={1.75} />} tone="green" title="Plan limits"><PaceKey /></CardHead>
+      <div className="dd-who"><Asterisk size={14} strokeWidth={2} className="dd-claude-ink" /><b>Claude</b></div>
+      <Limit s={s} tone="claude" label="5-hour" resets="resets in 2h 11m" used={55} mark={56} verdict="At this rate, lasts until it resets" />
+      <Limit s={s} tone="claude" label="Weekly" resets="resets Wed 21:22" used={weekly.used} mark={weekly.mark} verdict={weekly.verdict} attention={weekly.attention} />
+      <div className="dd-who"><CodeXml size={14} strokeWidth={2} className="dd-codex-ink" /><b>Codex</b></div>
+      <Limit s={s} tone="codex" label="5-hour" resets="resets in 3h 23m" used={21} mark={32} verdict="At this rate, plenty left when it resets" />
+      <Limit s={s} tone="codex" label="Weekly" resets="resets Thu 11:46" used={34} mark={41} verdict="At this rate, lasts until it resets" />
+    </div>
+  )
+}
+
+const DAYS = [{ d: 'M', v: 62 }, { d: 'T', v: 88 }, { d: 'W', v: 54 }, { d: 'T', v: 100 }, { d: 'F', v: 70 }, { d: 'S', v: 84 }, { d: 'S', v: 92 }]
+
+function Usage({ s }: { s: S }) {
   return (
     <>
-      <div className="dd-card" data-target="limits">
-        <CardHead icon={<Gauge size={14} strokeWidth={1.75} />} tone="green" title="Plan limits" />
-        <div className="dd-who"><Asterisk size={14} strokeWidth={2} className="dd-claude-ink" /><b>Claude</b></div>
-        <Limit s={s} tone="claude" label="5-hour" resets="resets in 2 hours" used={55} mark={56} verdict="On pace to last until it resets" />
-        <Limit s={s} tone="claude" label="Weekly" resets="resets in 4 days" used={38} mark={50} verdict="Well under pace" />
-        <div className="dd-who"><Code size={14} strokeWidth={2} className="dd-codex-ink" /><b>Codex</b></div>
-        <Limit s={s} tone="codex" label="5h window" resets="resets in 3 hours" used={21} mark={40} verdict="Well under pace" />
-        <Limit s={s} tone="codex" label="7d window" resets="resets in 4 days" used={34} mark={42} verdict="On pace to last until it resets" />
+      <LimitsCard s={s} />
+      <div className="dd-widgets">
+        <div className="dd-card dd-widget">
+          <span className="dd-widget-title"><Asterisk size={12} strokeWidth={2.5} className="dd-claude-ink" />Claude · today</span>
+          <strong>153M<small>tokens</small></strong>
+          <span className="dd-days">{DAYS.map((x, i) => <span key={i} data-today={i === 6 || undefined}><i style={{ height: `${x.v * 0.2}px` }} />{x.d}</span>)}</span>
+          <small className="dd-widget-foot">6 sessions today</small>
+        </div>
+        <div className="dd-card dd-widget">
+          <span className="dd-widget-title"><Asterisk size={12} strokeWidth={2.5} className="dd-claude-ink" />Claude · last 7 days</span>
+          <strong>891M<small>tokens</small></strong>
+          <span className="dd-compare">
+            <span><small>Last 7</small><i style={{ width: '100%' }} /><small>891M</small></span>
+            <span data-past><small>Prior 7</small><i style={{ width: '47%' }} /><small>421M</small></span>
+          </span>
+          <small className="dd-widget-foot">Up 112% on the 7 days before</small>
+        </div>
       </div>
+      {/* The usage card runs off the bottom of the panel */}
       <div className="dd-card">
-        <CardHead icon={<Layers size={14} strokeWidth={1.75} />} tone="violet" title="Workspaces" count="5" />
-        <WorkspaceRow tone="blue" letter="S" name="storefront-web" sub="Claude is working · 4m" port=":3000" note="server 412 MB" working />
-        <WorkspaceRow tone="green" letter="B" name="billing-api" sub="Claude idle for 38m" port=":4000" note="server 186 MB" />
-        <WorkspaceRow tone="magenta" letter="N" name="notes-ios" sub="Claude idle for 2h 50m" note="1 agent" />
-        <FillerRow />
+        <div className="dd-head dd-usage-head">
+          <span className="dd-chip dd-claude-ink"><Asterisk size={15} strokeWidth={2} /></span>
+          <b>Claude Code</b>
+          <span className="dd-faint">153M tokens today</span>
+        </div>
+        <div className="fd-range"><span data-on>Today</span><span>7d</span><span>14d</span></div>
+        <div className="fd-tokens">
+          {[['In', '1.2M'], ['Out', '640K'], ['Cache read', '148M'], ['Cache write', '2.9M']].map(([k, v]) => (
+            <div key={k}><small>{k}</small><b>{v}</b></div>
+          ))}
+        </div>
       </div>
     </>
   )
@@ -261,12 +347,12 @@ function Agents({ s }: { s: S }) {
 
 const SERVERS = [
   { port: ':3000', name: 'storefront-web', by: 'Started by Claude', up: 'up 52m', cmd: 'node next dev', mem: '412 MB', idle: false },
-  { port: ':4000', name: 'billing-api', by: '', up: 'up 20h 0m', cmd: 'node server.js', mem: '186 MB', idle: true },
-  { port: ':5173', name: 'docs-site', by: 'Started by Claude', up: 'up 3h 0m', cmd: 'node vite', mem: '144 MB', idle: false },
-  { port: ':8888', name: 'ml-notebooks', by: '', up: 'up 1d', cmd: 'python jupyter-lab', mem: '238 MB', idle: true },
+  { port: ':4000', name: 'billing-api', by: '', up: 'up 20h', cmd: 'node server.js', mem: '186 MB', idle: true },
+  { port: ':5173', name: 'docs-site', by: 'Started by Claude', up: 'up 3h', cmd: 'node vite', mem: '144 MB', idle: false },
+  { port: ':8888', name: 'ml-notebooks', by: '', up: 'up 1d 3h', cmd: 'python jupyter-lab', mem: '238 MB', idle: true },
 ]
 
-const LISTENERS = [96, 70, 120, 84, 110, 76, 100, 88]
+const LISTENERS = [96, 70, 120, 84, 110, 76, 100, 88, 116, 80, 104]
 
 export function Servers({ s }: { s: { rows: number; flags: boolean } }) {
   return (

@@ -293,39 +293,60 @@
     background: var(--ss-ink-3);
     overflow: hidden;
   }
+  /* Neutral, as in the app: blue is kept for links */
   .dd-meter i {
     display: block;
     height: 100%;
-    background: var(--ss-accent);
+    background: var(--ss-icon);
     border-radius: 3px;
   }
   .dd-context b {
     font-size: 12px;
+    font-weight: 600;
     line-height: 1.3;
-    color: var(--ss-accent-text);
+    color: var(--ss-text-strong);
   }
   .dd-context small {
     font-size: 10px;
     line-height: 1.3;
     color: var(--ss-text);
   }
+  /* Four labelled actions: an icon over its name */
   .dd-actions {
     margin-top: 12px;
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 8px;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 6px;
   }
-  /* The name opens the workspace in the Dashbar window, so a chevron follows it, then room before the status */
-  .dd-now-chevron { margin-right: auto; }
-  .dd-now-top .dd-grow:has(+ .dd-now-chevron) { flex: 0 1 auto; }
   .dd-actions span {
-    height: 34px;
-    display: grid;
-    place-items: center;
+    height: 44px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
     border-radius: 9px;
     background: var(--ss-ink-2);
     color: var(--ss-icon);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ss-text);
+    white-space: nowrap;
   }
+  /* The name opens the workspace in the Dashbar window: an arrow follows it, then room before the status */
+  .dd-now-top .dd-now-name { flex: 0 1 auto; }
+  .dd-now-open { flex: none; margin-right: auto; color: var(--ss-icon); }
+  .dd-subagents {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 0 0 34px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ss-success-text);
+  }
+  .dd-subagents svg:last-child { color: var(--ss-icon); }
 
   .dd-panel[data-layout="compact"] .dd-rail,
   .dd-panel[data-layout="compact"] .dd-body {
@@ -336,7 +357,10 @@
   .dd-panel[data-layout="compact"] .dd-srv > .dd-faint {
     display: none;
   }
-  .dd-panel[data-layout="compact"] .dd-ws[data-wide-only] {
+  .dd-panel[data-layout="compact"] .dd-ws[data-wide-only],
+  .dd-panel[data-layout="compact"] .dd-wide-only,
+  .dd-panel[data-layout="compact"] .dd-ws-end small[data-port-note],
+  .dd-panel[data-layout="compact"] .dd-strip-reset {
     display: none;
   }
   .dd-panel[data-layout="compact"] .dd-stats {
@@ -407,11 +431,21 @@
   }
 
   .dd-ws {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 10px;
     height: 52px;
     padding: 0;
+  }
+  /* A hairline between rows, from the text's edge, as the app draws it */
+  .dd-ws + .dd-ws::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 42px;
+    right: 0;
+    border-top: 1px solid var(--ss-line);
   }
   .dd-port-text {
     font-size: 12px;
@@ -440,7 +474,7 @@
 
   .dd-limit {
     --c: var(--dd-claude);
-    padding: 8px 0 8px;
+    padding: 6px 0;
   }
   .dd-limit[data-tone="codex"] {
     --c: var(--dd-codex);
@@ -473,12 +507,14 @@
   .dd-used[data-show] {
     opacity: 1;
   }
+  .dd-limit[data-state="attention"] { --c: var(--ss-warning); }
+  .dd-limit[data-state="problem"] { --c: var(--ss-danger); }
   .dd-bar {
     position: relative;
     height: 6px;
-    margin: 8px 0 0;
+    margin: 6px 0 4px;
     border-radius: 3px;
-    background: color-mix(in srgb, var(--c) 18%, transparent);
+    background: var(--ss-ink-3);
   }
   .dd-bar i {
     position: absolute;
@@ -504,7 +540,7 @@
   }
   .dd-verdict {
     display: block;
-    margin-top: 1px;
+    margin-top: 0;
     font-size: 12px;
     line-height: 1.3;
     color: var(--ss-text);
@@ -632,3 +668,123 @@
 }
 
 .dd .dd-pane > * { min-width: 0; }
+
+/* ---------- The Overview's plan strip, clean-up line and Usage widgets ---------- */
+.dd {
+  .dd-link {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ss-accent-text);
+  }
+  .dd-strip-row {
+    --c: var(--dd-claude);
+    display: grid;
+    grid-template-columns: 14px 46px 46px 1fr auto auto;
+    align-items: center;
+    column-gap: 8px;
+    height: 26px;
+    font-size: 12px;
+    color: var(--ss-text);
+    white-space: nowrap;
+  }
+  .dd-strip-row[data-tone="codex"] { --c: var(--dd-codex); }
+  .dd-strip-row b { font-size: 13px; font-weight: 500; color: var(--ss-text-strong); }
+  .dd-strip-row strong { font-weight: 600; color: var(--ss-text-strong); font-variant-numeric: tabular-nums; }
+  .dd-strip-reset { min-width: 98px; font-variant-numeric: tabular-nums; }
+  .dd-strip-bar { height: 6px; border-radius: 3px; background: var(--ss-ink-3); overflow: hidden; }
+  .dd-strip-bar i { display: block; height: 100%; border-radius: 3px; background: var(--c); }
+  .dd-panel[data-layout="compact"] .dd-strip-row { grid-template-columns: 14px 46px 46px 1fr auto; }
+
+  .dd-cleanup {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 14px 0;
+    font-size: 12px;
+    color: var(--ss-text);
+  }
+  .dd-cleanup span { flex: 1; }
+  .dd-cleanup svg { flex: none; color: var(--ss-icon); }
+
+  .dd-pace-key {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--ss-text);
+  }
+  .dd-pace-key i { width: 2px; height: 9px; border-radius: 1px; background: var(--ss-text-strong); opacity: 0.7; }
+
+  .dd-widgets { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .dd-widget { display: flex; flex-direction: column; height: 130px; padding: 12px 14px; }
+  .dd-widget-title { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; color: var(--ss-text); white-space: nowrap; }
+  .dd-widget strong {
+    margin-top: 8px;
+    font-size: 22px;
+    line-height: 1.1;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--ss-text-strong);
+    font-variant-numeric: tabular-nums;
+  }
+  .dd-widget strong small { margin-left: 4px; font-size: 12px; font-weight: 600; letter-spacing: 0; color: var(--ss-text); }
+  .dd-widget-foot { margin-top: auto; font-size: 12px; color: var(--ss-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dd-days { display: flex; gap: 4px; margin-top: 6px; }
+  .dd-days > span { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; width: 12px; height: 32px; font-size: 9px; color: var(--ss-text); }
+  .dd-days i { width: 10px; border-radius: 2px; background: var(--ss-ink-5); }
+  .dd-days [data-today] { font-weight: 600; color: var(--ss-text-strong); }
+  .dd-days [data-today] i { background: var(--dd-claude); }
+  .dd-compare { display: grid; gap: 4px; margin-top: 8px; }
+  .dd-compare > span { display: grid; grid-template-columns: 38px 1fr 34px; align-items: center; gap: 6px; font-size: 10px; color: var(--ss-text); }
+  .dd-compare small:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  .dd-compare i { height: 5px; border-radius: 3px; background: var(--dd-claude); }
+  .dd-compare [data-past] i { background: var(--ss-ink-5); }
+  .dd-panel[data-layout="compact"] .dd-widget { padding: 10px 12px; }
+  .dd-panel[data-layout="compact"] .dd-compare > span { grid-template-columns: 34px 1fr; }
+  .dd-panel[data-layout="compact"] .dd-compare small:last-child { display: none; }
+}
+
+/* The usage card's range and token figures, shared by the hero's Usage tab and the usage feature demo */
+.dd {
+  .fd-tokens {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .fd-tokens div {
+    display: grid;
+    gap: 1px;
+    padding: 6px 9px;
+    border-radius: 9px;
+    background: var(--ss-ink-2);
+  }
+  .fd-tokens small { font-size: 11px; color: var(--ss-text); white-space: nowrap; }
+  .fd-tokens b { font-size: 13px; font-weight: 600; color: var(--ss-text-strong); font-variant-numeric: tabular-nums; }
+  .fd-range {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    margin-top: 8px;
+    padding: 2px;
+    border-radius: 8px;
+    background: var(--ss-ink-2);
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+    color: var(--ss-text-strong);
+  }
+  .fd-range span { padding: 3px 0; border-radius: 6px; }
+  .fd-range span[data-on] { background: var(--ss-surface); box-shadow: 0 0 0 0.5px var(--ss-line); }
+  .fd-box[data-layout="compact"] .fd-tokens,
+  .dd-panel[data-layout="compact"] .fd-tokens { grid-template-columns: 1fr 1fr; }
+  .dd-usage-head .dd-faint { margin-left: auto; }
+}
+
+.dd .dd-widgets { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.dd .dd-widget { min-width: 0; overflow: hidden; }
+.dd .dd-now-name small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

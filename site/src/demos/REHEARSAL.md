@@ -48,3 +48,21 @@ Reuses the hero's cards, limits and server rows (exported from `DashbarDemo.tsx`
 - Not checked: axe on the page with the new demos, light mode contact sheets, Safari/Firefox, a real screen reader pass.
 
 Updated for the app as of the permission prompts, cost and History work: the agents demo now shows a permission prompt answered with Allow once (cursor; the poster is the prompt itself, before the click), the limits demo shows the status line reading (no plan name or Experimental badge) and Codex's 7d window, and a sixth demo shows a usage card with its cost estimate. Checked in headless Chrome at 390, 905, 1000, 1180 and 1280, light and dark, reduced motion and played through; the film gate was not re-run.
+
+## Updated for the restructured panel (Overview and Usage)
+
+- **Hero:** Overview now shows what the app does: the Now card (title with the window arrow, session, context used,
+  subagents line, four labelled actions), Other workspaces, the plan limits strip (tightest windowed limit per agent,
+  "Usage ›") and the rebuildable caches line. The second tab is Usage: the limits card (with the even pace key, neutral
+  tracks, captions under the bars in the app's words), the two Claude widgets and the usage card running off the bottom.
+  The story is the same: Overview, Servers, then Usage, where the limits fill and the marks land (poster). Stage 480 × 716,
+  compact 358 × 680 (compact drops the context readout, the subagents line, the fourth action, the servers' memory and the
+  strip's reset column).
+- **Feature demos:** agents (Now card with the prompt above the quick actions, "Claude working · 4m · 3 subagents"),
+  limits (shared limits card; the weekly limit on course to run out is amber), usage (range, subagents line, Workspaces),
+  system (neutral bar charts, "Busiest right now" with share of all CPU), clean-up (rebuilt to the app's hover Trash
+  button and Move to Trash confirmation; the row closes and the total rolls from 7 GB to 5.52 GB).
+- **Window:** the sidebar's second page is Usage with no badge; the session count sits on Overview. Neutral icons and
+  sparkline. The workspace page's Agents card still shows one session without the subagent rows the app lists.
+- Checked in headless Chrome at 390, 905, 1100 and 1280, light and dark: no horizontal overflow, no console errors, the
+  hero plays to its poster and Replay restarts it, reduced motion shows the poster. The film gate was not re-run.

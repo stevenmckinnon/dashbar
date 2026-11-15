@@ -72,8 +72,8 @@ export function WindowDemo({ dark = false }: { dark?: boolean }) {
 /* ---------- Sidebar ---------- */
 
 const PAGES = [
-  { name: 'Overview', Icon: LayoutGrid },
-  { name: 'Agents', Icon: Sparkles, badge: '4' },
+  { name: 'Overview', Icon: LayoutGrid, badge: '4' },
+  { name: 'Usage', Icon: Sparkles },
   { name: 'Servers', Icon: Server, badge: '4' },
   { name: 'System', Icon: Cpu, badge: 'CPU 34%' },
   { name: 'Clean-up', Icon: Package, badge: '7 GB' },
@@ -141,10 +141,10 @@ function Head({ s }: { s: S }) {
 /* ---------- Overview ---------- */
 
 const CARDS = [
-  { letter: 'S', name: 'storefront-web', status: 'Claude is working · 4m', working: true, cpu: '12%', mem: '1.11 GB', energy: '3.1 W', port: ':3000' },
-  { letter: 'B', name: 'billing-api', status: 'Claude idle for 38m', cpu: '0.3%', mem: '512 MB', energy: '0.20 W', port: ':4000' },
-  { letter: 'D', name: 'docs-site', status: 'Claude idle for 1h 35m', cpu: '2%', mem: '610 MB', energy: '0.60 W', port: ':5173' },
-  { letter: 'N', name: 'notes-ios', status: 'Claude idle for 2h 50m', cpu: '0.1%', mem: '296 MB', energy: '0.05 W' },
+  { letter: 'S', name: 'storefront-web', status: 'Claude working · 4m · 3 subagents', working: true, cpu: '12%', mem: '1.11 GB', energy: '3.1 W', port: ':3000' },
+  { letter: 'B', name: 'billing-api', status: 'Claude idle · 38m', cpu: '0.3%', mem: '512 MB', energy: '0.20 W', port: ':4000' },
+  { letter: 'D', name: 'docs-site', status: 'Claude idle · 1h 35m', cpu: '2%', mem: '610 MB', energy: '0.60 W', port: ':5173' },
+  { letter: 'N', name: 'notes-ios', status: 'Claude idle · 2h 50m', cpu: '0.1%', mem: '296 MB', energy: '0.05 W' },
 ]
 
 function Overview() {
@@ -241,7 +241,7 @@ function Workspace({ s }: { s: S }) {
           <div className="dd-session wd-agent">
             <span className="wd-agent-dot" />
             <div className="dd-grow"><b>Add Stripe checkout and webhooks</b><small>Working 4m · Terminal · runs :3000</small></div>
-            <div className="dd-context"><span className="dd-meter"><i style={{ width: '34%' }} /></span><b>34%</b><small>context</small></div>
+            <div className="dd-context"><span className="dd-meter"><i style={{ width: '34%' }} /></span><b>34%</b><small>context used</small></div>
           </div>
         </div>
       </div>

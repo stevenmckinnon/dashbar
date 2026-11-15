@@ -77,7 +77,7 @@
   }
   .wd-nav[data-on] { background: var(--ss-ink-3); font-weight: 600; }
   .wd-nav span:not(.wd-side-tile) { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .wd-nav-icon { flex: none; color: var(--ss-accent-text); }
+  .wd-nav-icon { flex: none; color: var(--ss-icon); }
   .wd-nav em {
     font-style: normal;
     font-size: 11px;
@@ -255,7 +255,7 @@
     transition: height 0.7s cubic-bezier(0.25, 0.8, 0.25, 1);
   }
   .wd-spark i:nth-child(odd) { transition-delay: 0.04s; }
-  .wd-spark i:last-child { background: var(--ss-accent); }
+  .wd-spark i:last-child { background: var(--ss-text-strong); }   /* the latest sample, dark as in the app; blue is for links */
   .wd-spark svg {
     position: absolute;
     inset: 0;

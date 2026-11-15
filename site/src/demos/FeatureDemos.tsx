@@ -1,6 +1,6 @@
-import { Asterisk, ChevronRight, Code, Folder, Gauge, Hand, Layers, Server, Trash2 } from 'lucide-react'
-import { Badge, Bar, Chart, Check, Count, Stage, type Act } from '../stageshow/kit'
-import { CardHead, Limit, Servers, WorkspaceRow } from './DashbarDemo'
+import { Archive, Asterisk, ChevronRight, Flame, Hammer, Hand, Layers, Package, Split, Trash2, X } from 'lucide-react'
+import { Badge, Bar, Chart, Collapse, Count, Stage, type Act } from '../stageshow/kit'
+import { CardHead, FillerRow, LimitsCard, NowSession, NowTitle, QuickActions, Servers, WorkspaceRow } from './DashbarDemo'
 import './dashbar-demo.css'
 import './feature-demos.css'
 
@@ -8,7 +8,8 @@ import './feature-demos.css'
 // the panel and one event: a permission prompt arrives and is answered, a
 // limit bar fills and its pace mark lands, the hours rise and the cost
 // estimate rolls, servers arrive and two are marked, the system charts draw,
-// folders are ticked and the total rolls. All play once; none runs over 5 s.
+// a cache folder goes to the Trash and the total rolls. All play once; none
+// runs over 5 s.
 
 type Props = { dark?: boolean }
 const wide = { width: 592 }
@@ -40,30 +41,24 @@ async function agentsScript(a: Act<A>) {
   await a.move('rest')
 }
 
-const AGENTS_REST = { wide: { x: 470, y: 430 }, compact: { x: 280, y: 480 } }
+const AGENTS_REST = { wide: { x: 470, y: 410 }, compact: { x: 300, y: 400 } }
 
 export function AgentsDemo({ dark = false }: Props) {
   return (
-    <Frame height={476} compactHeight={516} initial={{ ask: false, done: false } as A} poster={{ ask: true, done: false } as A} script={agentsScript} cursor={{ at: 'rest', style: 'real' }} theme={dark ? 'dark' : 'light'}>
+    <Frame height={452} compactHeight={430} initial={{ ask: false, done: false } as A} poster={{ ask: true, done: false } as A} script={agentsScript} cursor={{ at: 'rest', style: 'real' }} theme={dark ? 'dark' : 'light'}>
       {(s: A, _r: any, layout: 'wide' | 'compact') => {
         const asking = s.ask && !s.done
         return (
           <>
             <div className="dd-card fd-fill">
-              <div className="dd-now-top">
-                <span className="dd-mono dd-mono--lg">B<i className="dd-dot" data-attention={asking || undefined} /></span>
-                <div className="dd-grow"><b>billing-api</b><small>node :4000 · 186 MB</small></div>
-                {asking ? <Badge tone="warning" dot>Needs permission 34s</Badge> : <Badge tone="success" dot>Working 1m</Badge>}
-              </div>
-              <div className="dd-session">
-                <span className="dd-claude"><Asterisk size={14} strokeWidth={2} /></span>
-                <div className="dd-grow"><b>Fix flaky invoice export test</b><small>Terminal</small></div>
-                <div className="dd-context"><span className="dd-meter"><i style={{ width: '12%' }} /></span><b>12%</b><small>context</small></div>
-              </div>
+              <NowTitle letter="B" name="billing-api" sub="node :4000 · 186 MB" attention={asking}>
+                {asking ? <Badge tone="warning" dot>Needs permission 34s</Badge> : <Badge tone="success" dot>Working 1s</Badge>}
+              </NowTitle>
+              <NowSession title="Fix flaky invoice export test" sub="Terminal" context={12} />
               <div className="fd-ask" data-open={asking || undefined}>
                 <div className="fd-ask-in">
                   <div className="fd-ask-box">
-                    <div className="fd-ask-head"><Hand size={15} strokeWidth={1.75} /><b>Run a command</b><span className="dd-faint">0:26</span></div>
+                    <div className="fd-ask-head"><Hand size={15} strokeWidth={1.75} /><b>Run a command</b><span className="dd-faint">0:26 left</span></div>
                     <div className="fd-ask-code"><code className="dd-code">npm test -- --runInBand src/invoices/export.test.ts</code></div>
                     <small className="fd-ask-why">Run the invoice export tests</small>
                     <div className="fd-ask-actions">
@@ -74,11 +69,14 @@ export function AgentsDemo({ dark = false }: Props) {
                   </div>
                 </div>
               </div>
+              <QuickActions port=":4000" />
             </div>
             <div className="dd-card fd-fill">
-              <CardHead icon={<Layers size={14} strokeWidth={1.75} />} tone="violet" title="Other workspaces" count="3" />
-              <WorkspaceRow tone="blue" letter="S" name="storefront-web" sub="Claude is working · 4m" port=":3000" note="server 412 MB" working />
-              <WorkspaceRow tone="red" letter="D" name="docs-site" sub="Claude idle for 1h 35m" port=":5173" note="server 144 MB" />
+              <CardHead icon={<Layers size={14} strokeWidth={1.75} />} tone="violet" title="Other workspaces" count="4" />
+              <WorkspaceRow tone="blue" letter="S" name="storefront-web" sub="Claude working · 4m · 3 subagents" port=":3000" note="server 412 MB" working />
+              <WorkspaceRow tone="red" letter="D" name="docs-site" sub="Claude idle · 1h 35m" port=":5173" note="server 144 MB" />
+              <WorkspaceRow tone="magenta" letter="N" name="notes-ios" sub="Claude idle · 2h 50m" note="1 agent" />
+              <FillerRow />
             </div>
             <span data-target="rest" style={{ position: 'absolute', left: AGENTS_REST[layout].x, top: AGENTS_REST[layout].y }} />
           </>
@@ -103,15 +101,7 @@ export function LimitsDemo({ dark = false }: Props) {
   return (
     <Frame height={380} compactHeight={390} initial={{ limits: false, marks: false } as L} poster={{ limits: true, marks: true } as L} script={limitsScript} theme={dark ? 'dark' : 'light'}>
       {(s: L) => (
-        <div className="dd-card">
-          <CardHead icon={<Gauge size={14} strokeWidth={1.75} />} tone="green" title="Plan limits" />
-          <div className="dd-who"><Asterisk size={14} strokeWidth={2} className="dd-claude-ink" /><b>Claude</b></div>
-          <Limit s={s} tone="claude" label="5-hour" resets="resets in 2 hours" used={55} mark={56} verdict="On pace to last until it resets" />
-          <Limit s={s} tone="claude" label="Weekly" resets="resets in 4 days" used={71} mark={50} verdict="At this rate, runs out Sat 14:20" attention />
-          <div className="dd-who"><Code size={14} strokeWidth={2} className="dd-codex-ink" /><b>Codex</b></div>
-          <Limit s={s} tone="codex" label="5h window" resets="resets in 3 hours" used={21} mark={40} verdict="Well under pace" />
-          <Limit s={s} tone="codex" label="7d window" resets="resets in 4 days" used={34} mark={42} verdict="On pace to last until it resets" />
-        </div>
+        <LimitsCard s={s} weekly={{ used: 71, mark: 50, verdict: 'At this rate, runs out Mon 19:40', attention: true }} />
       )}
     </Frame>
   )
@@ -163,8 +153,9 @@ export function UsageDemo({ dark = false }: Props) {
           <div className="dd-head fd-usage-head">
             <span className="dd-chip dd-claude-ink"><Asterisk size={15} strokeWidth={2} /></span>
             <b>Claude Code</b>
-            <span className="dd-faint">Today 153M</span>
+            <span className="dd-faint">153M tokens today</span>
           </div>
+          <div className="fd-range"><span data-on>Today</span><span>7d</span><span>14d</span></div>
           <div className="fd-tokens">
             {[['In', '1.2M'], ['Out', '640K'], ['Cache read', '148M'], ['Cache write', '2.9M']].map(([k, v]) => (
               <div key={k}><small>{k}</small><b>{v}</b></div>
@@ -174,6 +165,7 @@ export function UsageDemo({ dark = false }: Props) {
             <strong>≈ <Count value={s.on ? 5649 : 0} format={(n) => `$${(n / 100).toFixed(2)}`} /></strong>
             <span>at API prices</span>
           </div>
+          <div className="fd-sub"><Split size={13} strokeWidth={2} />Of which subagents 41M · ≈ $13.56 · 27%</div>
           <div className="fd-hours-head">
             <span>By hour, last 24 hours <i>· 6 sessions</i></span>
             <span className="fd-link">History<ChevronRight size={13} strokeWidth={2} /></span>
@@ -182,7 +174,7 @@ export function UsageDemo({ dark = false }: Props) {
             {HOURS.map((v, i) => <i key={i} data-zero={v === 0 || undefined} style={{ height: v === 0 || !s.on ? 2 : `${v}%`, transitionDelay: `${Math.max(0, i - 16) * 60}ms` }} />)}
           </div>
           <div className="fd-ranks">
-            <Rank title="Projects" items={PROJECTS} on={s.lists} />
+            <Rank title="Workspaces" items={PROJECTS} on={s.lists} />
             {layout !== 'compact' && <Rank title="Models" items={MODELS} on={s.lists} />}
           </div>
         </div>
@@ -220,10 +212,11 @@ type Y = { on: boolean; apps: number }
 
 const CPU = [14, 22, 18, 30, 24, 38, 26, 34, 21, 29, 23]
 const NET = [4, 9, 6, 14, 8, 20, 11, 16, 9, 12, 7]
+// Each app's share of all CPU, as the app's "Busiest right now" card gives it
 const APPS = [
-  { name: 'Xcode', pct: 62 },
-  { name: 'Chrome', pct: 41 },
-  { name: 'node', pct: 22 },
+  { name: 'Xcode', pct: 9.2 },
+  { name: 'Google Chrome', pct: 6.1 },
+  { name: 'Visual Studio Code', pct: 4.4 },
 ]
 
 async function systemScript(a: Act<Y>) {
@@ -233,11 +226,11 @@ async function systemScript(a: Act<Y>) {
   await a.stagger([1, 2, 3], (n) => a.set({ apps: n }), 180)
 }
 
-function Tile({ label, value, unit, children }: { label: string; value: number; unit: string; children: React.ReactNode }) {
+function Tile({ label, value, unit, format = (n) => String(n).padStart(2, '0'), children }: { label: string; value: number; unit: string; format?: (n: number) => string; children: React.ReactNode }) {
   return (
     <div className="dd-card fd-tile">
       <div className="fd-tile-top"><span>{label}</span></div>
-      <strong data-show={value > 0 || undefined}><Count value={value} format={(n) => String(n).padStart(2, '0')} /><small>{unit}</small></strong>
+      <strong data-show={value > 0 || undefined}><Count value={value} format={format} /><small>{unit}</small></strong>
       <div className="fd-tile-chart">{children}</div>
     </div>
   )
@@ -251,19 +244,19 @@ export function SystemDemo({ dark = false }: Props) {
         return (
           <>
             <div className="fd-tiles">
-              <Tile label="CPU" value={s.on ? 29 : 0} unit="%">
-                <Chart data={CPU} width={cw} height={44} show={s.on} />
+              <Tile label="CPU" value={s.on ? 34 : 0} unit="%">
+                <Chart data={CPU} kind="bars" width={cw} height={44} show={s.on} />
               </Tile>
-              <Tile label="Network" value={s.on ? 12 : 0} unit="MB/s">
-                <Chart data={NET} width={cw} height={44} show={s.on} />
+              <Tile label="Network" value={s.on ? 24 : 0} format={(n) => (n / 10).toFixed(1)} unit="MB/s">
+                <Chart data={NET} kind="bars" width={cw} height={44} show={s.on} />
               </Tile>
             </div>
             <div className="dd-card fd-fill">
-              <CardHead icon={<Server size={14} strokeWidth={1.75} />} tone="blue" title="Busiest apps" />
+              <CardHead icon={<Flame size={14} strokeWidth={1.75} />} tone="blue" title="Busiest right now"><span className="fd-head-end">share of all CPU</span></CardHead>
               {APPS.map((p, i) => (
                 <div className="fd-app fd-in" key={p.name} data-show={s.apps > i || undefined}>
                   <b>{p.name}</b>
-                  <span className="fd-track"><i style={{ width: s.apps > i ? `${p.pct}%` : 0 }} /></span>
+                  <span className="fd-track"><i style={{ width: s.apps > i ? `${(p.pct / 12) * 100}%` : 0 }} /></span>
                   <span className="dd-faint">{p.pct}%</span>
                 </div>
               ))}
@@ -277,43 +270,78 @@ export function SystemDemo({ dark = false }: Props) {
 
 /* ---------- 6. Clean-up ---------- */
 
-type C = { checked: number }
+// The Clean-up tab: rebuildable folders, largest first. The cursor rests on
+// one, its Trash button appears, it asks once, and the folder goes to the
+// Trash: the row closes and the total rolls down. The poster is the list after.
+type C = { hover: boolean; confirm: boolean; gone: boolean }
 
 const FOLDERS = [
-  { name: 'Xcode', kind: 'DerivedData', mb: 2300 },
-  { name: 'storefront-web', kind: 'node_modules', mb: 1480 },
-  { name: 'notes-ios', kind: '.build', mb: 1150 },
-  { name: 'billing-api', kind: 'node_modules', mb: 920 },
-  { name: 'storefront-web', kind: '.next', mb: 610 },
+  { name: 'Xcode', kind: 'DerivedData', mb: 2300, Icon: Hammer },
+  { name: 'storefront-web', kind: 'node_modules', mb: 1480, Icon: Package },
+  { name: 'notes-ios', kind: '.build', mb: 1150, Icon: Hammer },
+  { name: 'billing-api', kind: 'node_modules', mb: 920, Icon: Package },
+  { name: 'storefront-web', kind: '.next', mb: 610, Icon: Archive },
+  { name: 'docs-site', kind: 'node_modules', mb: 540, Icon: Package },
 ]
+const GONE = 1
 
 // Decimal units, three figures at most, as the app writes them (Finder's units)
 const gb = (mb: number) => (mb < 1000 ? `${Math.round(mb)} MB` : `${Number((mb / 1000).toPrecision(3))} GB`)
-const total = (n: number) => FOLDERS.slice(0, n).reduce((t, f) => t + f.mb, 0)
+const TOTAL = FOLDERS.reduce((t, f) => t + f.mb, 0)
 
 async function cleanupScript(a: Act<C>) {
-  await a.wait(900)
-  await a.stagger([1, 2, 3], (n) => a.set({ checked: n }), 520)
+  await a.wait(700)
+  await a.move('row')
+  await a.set({ hover: true })
+  await a.wait(350)
+  await a.move('trash')
+  await a.wait(150)
+  await a.click()
+  await a.set({ confirm: true })
+  await a.wait(500)
+  await a.move('confirm')
+  await a.wait(150)
+  await a.click()
+  await a.set({ gone: true, hover: false })
+  await a.wait(300)
+  await a.move('rest')
 }
+
+const CLEANUP_REST = { wide: { x: 470, y: 306 }, compact: { x: 280, y: 314 } }
 
 export function CleanupDemo({ dark = false }: Props) {
   return (
-    <Frame height={369} compactHeight={369} initial={{ checked: 0 } as C} poster={{ checked: 3 } as C} script={cleanupScript} theme={dark ? 'dark' : 'light'}>
-      {(s: C) => (
-        <div className="dd-card fd-fill">
-          <CardHead icon={<Folder size={14} strokeWidth={1.75} />} tone="violet" title="Folders you can clear" />
-          {FOLDERS.map((f, i) => (
-            <div className="fd-folder" key={f.name + f.kind}>
-              <Check on={s.checked > i} size={18} />
-              <div className="dd-grow"><b>{f.name}</b><small><code className="dd-code">{f.kind}</code></small></div>
-              <span className="dd-faint">{gb(f.mb)}</span>
-            </div>
-          ))}
-          <div className="fd-action">
-            <span className="fd-total"><Count value={total(s.checked)} format={gb} /><small> to get back</small></span>
-            <span className="fd-btn" data-on={s.checked > 0 || undefined}><Trash2 size={14} strokeWidth={1.75} />Move to Trash</span>
+    <Frame height={330} compactHeight={338} initial={{ hover: false, confirm: false, gone: false } as C} poster={{ hover: false, confirm: false, gone: true } as C} script={cleanupScript} cursor={{ at: 'rest', style: 'real' }} theme={dark ? 'dark' : 'light'}>
+      {(s: C, _r: any, layout: 'wide' | 'compact') => (
+        <>
+          <div className="dd-card fd-fill">
+            <CardHead icon={<Package size={14} strokeWidth={1.75} />} tone="violet" title="Clean-up">
+              <span className="fd-head-end"><Count value={s.gone ? TOTAL - FOLDERS[GONE].mb : TOTAL} format={gb} /></span>
+            </CardHead>
+            {FOLDERS.map((f, i) => {
+              const row = (
+                <div className="fd-folder" data-hover={(i === GONE && s.hover) || undefined} data-target={i === GONE ? 'row' : undefined}>
+                  <f.Icon size={14} strokeWidth={1.75} className="fd-folder-icon" />
+                  <div className="dd-grow"><b>{f.name}</b><small><code className="dd-code">{f.kind}</code></small></div>
+                  {i === GONE && s.confirm ? (
+                    <>
+                      <span className="fd-confirm" data-target="confirm">Move to Trash</span>
+                      <X size={14} strokeWidth={1.75} className="fd-folder-icon" />
+                    </>
+                  ) : (
+                    <>
+                      <span className="dd-faint">{gb(f.mb)}</span>
+                      <span className="fd-trash" data-show={(i === GONE && s.hover) || undefined} data-target={i === GONE ? 'trash' : undefined}><Trash2 size={14} strokeWidth={1.75} /></span>
+                    </>
+                  )}
+                </div>
+              )
+              return i === GONE ? <Collapse key={f.name + f.kind} open={!s.gone}>{row}</Collapse> : <div key={f.name + f.kind}>{row}</div>
+            })}
+            <small className="fd-note">Moves to the Trash. Reinstall packages or rebuild to get them back.</small>
           </div>
-        </div>
+          <span data-target="rest" style={{ position: 'absolute', left: CLEANUP_REST[layout].x, top: CLEANUP_REST[layout].y }} />
+        </>
       )}
     </Frame>
   )
