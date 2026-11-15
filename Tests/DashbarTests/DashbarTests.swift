@@ -681,6 +681,18 @@ private func session(id: String, root: String = "/dev/app", busy: Bool = false, 
         #expect(!again)
         #expect(closes)
     }
+
+    /// The first run checks the menu bar panel itself opened, so the popout being open must not count.
+    @Test func eachWindowIsTrackedOnItsOwn() {
+        var v = SurfaceVisibility()
+        _ = report(&v, true, "window")
+        #expect(!v.isVisible("panel"))
+        _ = report(&v, true, "panel")
+        #expect(v.isVisible("panel"))
+        _ = report(&v, false, "panel")
+        #expect(!v.isVisible("panel"))
+        #expect(v.isVisible("window"))
+    }
 }
 
 // MARK: - Plan limits (experimental Claude, parsing only)

@@ -160,11 +160,17 @@ final class OnboardingWindow: NSObject, NSWindowDelegate {
         return window
     }
 
-    /// "Open Dashbar": close, then open the menu bar panel so they see where it lives.
+    /// "Open Dashbar": close, then try to open the menu bar panel so they see where it lives. That can't be relied on
+    /// (below), so if the panel hasn't reported itself on screen shortly after, the Dashbar window opens instead:
+    /// the button always shows them Dashbar.
     private func finish() {
         window?.close()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
-            if !Self.clickStatusItem(), let store = self?.store { AppWindow.shared.show(store: store) }
+            Self.clickStatusItem()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+                guard let store = self?.store, !store.menuBarPanelVisible else { return }
+                AppWindow.shared.show(store: store)
+            }
         }
     }
 
@@ -174,15 +180,17 @@ final class OnboardingWindow: NSObject, NSWindowDelegate {
         DispatchQueue.main.async { closing?.contentViewController = nil }
     }
 
-    /// Opens the MenuBarExtra's panel by clicking its status item. SwiftUI has no API for it.
-    private static func clickStatusItem() -> Bool {
-        for window in NSApp.windows where window.className == "NSStatusBarWindow" {
+    /// Tries to open the MenuBarExtra's panel by clicking its status item; SwiftUI has no API for it. This is a best
+    /// effort: on macOS 27 the status item is system-hosted (the click reaches the app as a scene action, not through
+    /// the button), the button has no target or action, and `performClick` does nothing. `finish()` checks the result.
+    private static func clickStatusItem() {
+        NSApp.activate(ignoringOtherApps: true)
+        for window in NSApp.windows where window.className == "NSStatusBarWindow" && window.isVisible {
             if let button = findButton(in: window.contentView) {
                 button.performClick(nil)
-                return true
+                return
             }
         }
-        return false
     }
 
     private static func findButton(in view: NSView?) -> NSStatusBarButton? {

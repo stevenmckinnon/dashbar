@@ -187,6 +187,8 @@ final class Store: ObservableObject {
     /// Limit alerts already sent, so each fires once per window even across relaunches.
     private var sentLimitAlerts = LimitAlerts.prune(Set(UserDefaults.standard.stringArray(forKey: "limitAlertsSent") ?? []))
     private var panelVisible: Bool { surfaces.anyVisible }
+    /// Whether the menu bar panel itself is on screen (not the popout), as its view last reported.
+    var menuBarPanelVisible: Bool { surfaces.isVisible("panel") }
     /// Demo stores hold invented data and never collect anything.
     private var isDemo = false
     private let planRecorder = PlanHistoryRecorder()
@@ -938,6 +940,7 @@ final class Coalescer<Request>: @unchecked Sendable {
 struct SurfaceVisibility {
     private var visible = Set<String>()
     var anyVisible: Bool { !visible.isEmpty }
+    func isVisible(_ surface: String) -> Bool { visible.contains(surface) }
 
     /// Records one window's state. Returns whether "is anything visible" changed, which is when the store reacts.
     mutating func set(_ isVisible: Bool, surface: String) -> Bool {
