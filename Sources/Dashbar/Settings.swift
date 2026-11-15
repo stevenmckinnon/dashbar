@@ -496,12 +496,15 @@ private struct GeneralSettings: View {
                     Text("30 seconds").tag(30.0)
                 }
             }
-            Section("Overview shows") {
+            // Split by where each toggle applies: the first two change only the panel, the token totals only the window.
+            Section("Overview in the panel") {
                 Toggle("Current workspace", isOn: $settings.showNow)
-                // Only the window's Overview has these now; the panel shows them on its Usage tab, always.
-                Toggle("Today and this week, in the window", isOn: $settings.showWidgets)
-                    .help("The token totals at the foot of the Dashbar window's Overview. In the panel they're on the Usage tab.")
                 Toggle("Servers outside projects", isOn: $settings.showServers)
+            }
+            Section("Overview in the window") {
+                // The panel shows these on its Usage tab, always.
+                Toggle("Today and this week", isOn: $settings.showWidgets)
+                    .help("The token totals at the foot of the Dashbar window's Overview. In the panel they're on the Usage tab.")
             }
             Section("Usage") {
                 Toggle("Estimated cost at API prices", isOn: $showCost)
