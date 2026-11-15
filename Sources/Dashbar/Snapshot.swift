@@ -8,6 +8,12 @@ import DashbarStatus
 enum Snapshot {
     static var store: Store?
 
+    /// `DASHBAR_SNAPSHOT_SCALE=4` renders the offline panel and the island at more pixels per point than the default 2,
+    /// so they stay sharp when a video scales them up. (`--hosted` can't: the live view rasterises at the screen's scale.)
+    static var scale: CGFloat? {
+        Double(ProcessInfo.processInfo.environment["DASHBAR_SNAPSHOT_SCALE"] ?? "").map { CGFloat($0) }
+    }
+
     static func schedule(to path: String) {
         if let tab = ProcessInfo.processInfo.environment["DASHBAR_TAB"] {
             UserDefaults.standard.set(tab, forKey: "panelTab")
@@ -207,7 +213,7 @@ enum Snapshot {
                 .background(dark ? Color(white: 0.12) : Color(white: 0.97))
                 .environment(\.colorScheme, dark ? .dark : .light)
             let renderer = ImageRenderer(content: view)
-            renderer.scale = 2
+            renderer.scale = scale ?? 2
             if let img = renderer.nsImage, let tiff = img.tiffRepresentation,
                let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
                 try? png.write(to: URL(fileURLWithPath: path))
@@ -265,7 +271,7 @@ enum IslandSnapshot {
         }
         let scene = IslandScene(mode: mode, style: style, dark: dark, notch: notch).environmentObject(store)
         let renderer = ImageRenderer(content: scene)
-        renderer.scale = 2
+        renderer.scale = Snapshot.scale ?? 2
         if let img = renderer.nsImage, let tiff = img.tiffRepresentation,
            let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
             try? png.write(to: URL(fileURLWithPath: path))
