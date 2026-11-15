@@ -565,6 +565,58 @@ private func permissionGroups(_ p: PermissionBridge.Paths) throws -> [[String: A
         #expect(seen.isEmpty)
     }
 
+    /// Transcript lines as Claude Code writes them: an assistant message with a tool call, a user message with its result.
+    func transcript(_ entries: [(kind: String, id: String, name: String, input: [String: Any], at: Date)]) -> Data {
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let lines = entries.map { e -> Data in
+            let block: [String: Any] = e.kind == "use"
+                ? ["type": "tool_use", "id": e.id, "name": e.name, "input": e.input]
+                : ["type": "tool_result", "tool_use_id": e.id, "content": "denied", "is_error": true]
+            let o: [String: Any] = ["type": e.kind == "use" ? "assistant" : "user", "timestamp": iso.string(from: e.at),
+                                    "message": ["role": e.kind == "use" ? "assistant" : "user", "content": [block]]]
+            return try! JSONSerialization.data(withJSONObject: o)
+        }
+        return Data(lines.joined(separator: Data([0x0A])))
+    }
+
+    @Test func aPromptSettledByTheHostIsNoticedFromTheTranscript() {
+        // Created 10 s before `now`. The host (or an automatic denial) settled it without the session file ever
+        // saying "permission prompt": the call's result is in the transcript.
+        let r = PermissionRequest.parse(json(input: ["command": "rm -f x", "description": "Tidy up"]))!
+        let call = (kind: "use", id: "toolu_1", name: "Bash", input: ["command": "rm -f x", "description": "Tidy up"] as [String: Any], at: now.addingTimeInterval(-11))
+        let result = (kind: "result", id: "toolu_1", name: "", input: [String: Any](), at: now.addingTimeInterval(-8))
+        #expect(PermissionRequest.settledInTranscript(r, tail: transcript([call, result])))
+        // Still pending: the call is there, its result isn't.
+        #expect(!PermissionRequest.settledInTranscript(r, tail: transcript([call])))
+        // An earlier run of the same command, finished before this request arrived, doesn't count.
+        let earlier = (kind: "use", id: "toolu_0", name: "Bash", input: call.input, at: now.addingTimeInterval(-60))
+        let earlierResult = (kind: "result", id: "toolu_0", name: "", input: [String: Any](), at: now.addingTimeInterval(-59))
+        #expect(!PermissionRequest.settledInTranscript(r, tail: transcript([earlier, earlierResult, call])))
+        // A result for a different call (another tool, or the same tool with other input) doesn't count either.
+        let other = (kind: "use", id: "toolu_2", name: "Bash", input: ["command": "ls"] as [String: Any], at: now.addingTimeInterval(-11))
+        let otherResult = (kind: "result", id: "toolu_2", name: "", input: [String: Any](), at: now.addingTimeInterval(-8))
+        #expect(!PermissionRequest.settledInTranscript(r, tail: transcript([call, other, otherResult])))
+        let read = (kind: "use", id: "toolu_3", name: "Read", input: call.input, at: now.addingTimeInterval(-11))
+        let readResult = (kind: "result", id: "toolu_3", name: "", input: [String: Any](), at: now.addingTimeInterval(-8))
+        #expect(!PermissionRequest.settledInTranscript(r, tail: transcript([read, readResult])))
+        // Garbage and an empty transcript are not settled.
+        #expect(!PermissionRequest.settledInTranscript(r, tail: Data("not json\n{\"tool_\"\n".utf8)))
+        #expect(!PermissionRequest.settledInTranscript(r, tail: Data()))
+    }
+
+    @Test func anEditIsMatchedOnWhatTheRequestKeeps() {
+        // The script leaves out file contents and edits, so an Edit request has only the path: that is what is compared.
+        let r = PermissionRequest.parse(json(tool: "Edit", input: ["file_path": "/p/a.swift"]))!
+        let call = (kind: "use", id: "toolu_9", name: "Edit",
+                    input: ["file_path": "/p/a.swift", "old_string": "a", "new_string": "b"] as [String: Any], at: now.addingTimeInterval(-11))
+        let result = (kind: "result", id: "toolu_9", name: "", input: [String: Any](), at: now.addingTimeInterval(-5))
+        #expect(PermissionRequest.settledInTranscript(r, tail: transcript([call, result])))
+        // A request with no input to compare is never matched by name alone.
+        let bare = PermissionRequest.parse(json(tool: "Edit", input: [:]))!
+        #expect(!PermissionRequest.settledInTranscript(bare, tail: transcript([call, result])))
+    }
+
     @Test func markingKeepsTheSessionsAccount() {
         var s = LiveSession(id: "s1", pid: 1, name: "n", cwd: "/x", status: "busy", since: now, entrypoint: "cli", root: "/x")
         s.account = "Work"

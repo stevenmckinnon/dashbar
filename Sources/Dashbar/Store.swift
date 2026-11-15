@@ -203,6 +203,10 @@ final class Store: ObservableObject {
     private var notifiedRequests = Set<String>()
     /// Requests whose session Claude Code's own file has shown at its permission prompt (see `answeredInTerminal`).
     private var promptsSeen = Set<String>()
+    /// Per pending request, the transcript size last looked at (`settledElsewhere`), so an unchanged one isn't read again.
+    private var transcriptChecked: [String: UInt64] = [:]
+    /// Session transcripts found for pending requests. Main thread only (the live queue has its own, in `ContextReader`).
+    private var transcriptPaths: [String: URL] = [:]
 
     /// `demo` fills the store with invented data and starts nothing: no scanning, timers, watchers or
     /// Keychain access. Used for README and website screenshots (`Dashbar --snapshot out.png --demo`).
@@ -607,9 +611,51 @@ final class Store: ObservableObject {
         applyPermissions(permissionQueue.read())
     }
 
+    /// Requests whose tool call already has a result in the session's transcript (`PermissionRequest.settledInTranscript`).
+    private func settledElsewhere(_ requests: [PermissionRequest]) -> [String] {
+        let pending = Set(requests.map(\.id))
+        transcriptChecked = transcriptChecked.filter { pending.contains($0.key) }
+        transcriptPaths = transcriptPaths.filter { id, _ in requests.contains { $0.sessionId == id } }
+        var settled: [String] = []
+        for r in requests {
+            guard let url = transcriptURL(for: r) else { continue }
+            let size = UInt64((try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+            guard transcriptChecked[r.id] != size else { continue }
+            transcriptChecked[r.id] = size
+            if PermissionRequest.settledInTranscript(r, tail: Self.tail(of: url, bytes: 256 * 1024)) { settled.append(r.id) }
+        }
+        return settled
+    }
+
+    /// `<projects>/<project>/<sessionId>.jsonl` in the request's account (or its session's own folder).
+    private func transcriptURL(for r: PermissionRequest) -> URL? {
+        let id = r.sessionId
+        guard !id.isEmpty, id.utf8.count <= 128, id.unicodeScalars.allSatisfy({ CharacterSet.alphanumerics.contains($0) || $0 == "-" }) else { return nil }
+        if let known = transcriptPaths[id] { return known }
+        let projects = rawSessions.first { $0.id == id }?.configDir.map { URL(fileURLWithPath: $0).appendingPathComponent("projects") }
+            ?? (claudeAccounts.first { $0.key == r.account } ?? claudeAccounts.first { $0.isDefault })?.projectsDir
+        guard let projects else { return nil }
+        let dirs = (try? FileManager.default.contentsOfDirectory(at: projects, includingPropertiesForKeys: nil)) ?? []
+        for dir in dirs {
+            let f = dir.appendingPathComponent("\(id).jsonl")
+            if FileManager.default.fileExists(atPath: f.path) { transcriptPaths[id] = f; return f }
+        }
+        return nil
+    }
+
+    private nonisolated static func tail(of url: URL, bytes: UInt64) -> Data {
+        guard let h = try? FileHandle(forReadingFrom: url) else { return Data() }
+        defer { try? h.close() }
+        let size = (try? h.seekToEnd()) ?? 0
+        try? h.seek(toOffset: size > bytes ? size - bytes : 0)
+        return (try? h.readToEnd()) ?? Data()
+    }
+
     private func applyPermissions(_ requests: [PermissionRequest]) {
         // Answered in the terminal: stop the waiting hook and drop the prompt here.
-        let answered = PermissionRequest.answeredInTerminal(requests, sessions: rawSessions, seen: &promptsSeen)
+        var answered = PermissionRequest.answeredInTerminal(requests, sessions: rawSessions, seen: &promptsSeen)
+        // Settled by the host or an automatic denial, which the session file doesn't show: see the transcript.
+        answered += settledElsewhere(requests.filter { !answered.contains($0.id) })
         for id in answered { try? permissionQueue.answer(id, .terminal) }
         let requests = requests.filter { !answered.contains($0.id) }
         let live = Set(requests.map(\.id))

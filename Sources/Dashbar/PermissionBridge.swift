@@ -494,14 +494,7 @@ struct PermissionRequest: Identifiable, Equatable {
         let wait = min(Double(PermissionBridge.maxWait), max(5, (o["wait"] as? NSNumber)?.doubleValue ?? Double(PermissionBridge.defaultWait)))
         var input: [String: String] = [:]
         if let raw = o["tool_input"] as? [String: Any] {
-            for (key, value) in raw {
-                if let s = value as? String { input[key] = s }
-                else if let n = value as? NSNumber { input[key] = n.stringValue }
-                else if JSONSerialization.isValidJSONObject(value),
-                        let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys, .withoutEscapingSlashes]) {
-                    input[key] = String(decoding: data, as: UTF8.self)
-                }
-            }
+            for (key, value) in raw { input[key] = inputText(value) }
         }
         let agent = (o["agent_type"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         let account = (o["account"] as? String).flatMap { a in
@@ -512,6 +505,15 @@ struct PermissionRequest: Identifiable, Equatable {
                                  created: Date(timeIntervalSince1970: created),
                                  expires: Date(timeIntervalSince1970: created + wait),
                                  pid: (o["pid"] as? NSNumber)?.int32Value ?? 0, account: account)
+    }
+
+    /// One tool input value as text: strings as they are, numbers in their usual form, anything else as sorted JSON.
+    static func inputText(_ value: Any) -> String? {
+        if let s = value as? String { return s }
+        if let n = value as? NSNumber { return n.stringValue }
+        guard JSONSerialization.isValidJSONObject(value),
+              let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys, .withoutEscapingSlashes]) else { return nil }
+        return String(decoding: data, as: UTF8.self)
     }
 
     /// The name of the account it came from, only while Dashbar reads more than one Claude Code account.
@@ -678,6 +680,44 @@ extension PermissionRequest {
         }
         seen.formIntersection(requests.map(\.id).filter { !answered.contains($0) })
         return answered
+    }
+
+    /// Settled without Dashbar or the terminal prompt: by the host's own approval (T3 Code and other Agent SDK hosts run
+    /// the hook beside their own prompt, and whichever decides first applies) or by an automatic denial. Claude Code
+    /// doesn't stop the hook then, and the session file may never say "permission prompt" (the session stays busy), so
+    /// `answeredInTerminal` can't see it. The transcript can: the hook's input has no tool-use id, but the tool call it
+    /// asks about is in the transcript with the same name and input, and once that call has a result written after the
+    /// request arrived (the tool's output, or the denial), the request was settled.
+    ///
+    /// `tail` is the end of the session's transcript (JSON lines), read in memory as for the context readout; nothing from
+    /// it is kept. An input with nothing to compare, or a call that isn't found (a subagent's, kept in its own file),
+    /// counts as not settled: the prompt then stays until its hook stops, as before.
+    static func settledInTranscript(_ r: PermissionRequest, tail: Data) -> Bool {
+        guard !r.input.isEmpty else { return false }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let marker = Data("\"tool_".utf8)
+        var calls = Set<String>()
+        for line in tail.split(separator: 0x0A) where line.range(of: marker) != nil {
+            guard let o = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any],
+                  let message = o["message"] as? [String: Any],
+                  let content = message["content"] as? [[String: Any]] else { continue }
+            for block in content {
+                switch block["type"] as? String {
+                case "tool_use":
+                    guard block["name"] as? String == r.tool, let id = block["id"] as? String,
+                          let input = block["input"] as? [String: Any],
+                          r.input.allSatisfy({ key, value in input[key].flatMap(inputText) == value }) else { continue }
+                    calls.insert(id)
+                case "tool_result":
+                    guard let id = block["tool_use_id"] as? String, calls.contains(id),
+                          let stamp = (o["timestamp"] as? String).flatMap(iso.date(from:)), stamp >= r.created else { continue }
+                    return true
+                default: continue
+                }
+            }
+        }
+        return false
     }
 
     /// Sessions with a pending request read as "Needs permission" from the moment the request arrives (Claude Code's
