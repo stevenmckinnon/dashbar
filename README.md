@@ -106,6 +106,89 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
   green "Done · project" for five seconds when one finishes. Settings → Menu Bar picks the text beside the icon
   (nothing, the count, or the count and how long the longest-running agent has been at it).
 
+## Command-line tool
+
+Dashbar comes with `dashbar`, a small command that prints what Dashbar knows, for tmux status bars, shell prompts and
+scripts. It reads a status file the running app keeps up to date and never reads agent logs itself, so it costs nothing
+and Dashbar has to be running.
+
+```console
+$ dashbar
+Needs you
+  billing-api     Claude · needs permission · 32s
+Working
+  storefront-web  Claude · 4m · 3 subagents
+Idle
+  docs-site       Claude · 1h 35m
+Plan limits
+  Claude 5-hour   55% · resets in 2h 11m
+  Claude Weekly   38% · resets Thu 06:02
+  Codex Weekly    34% · resets Thu 20:26
+Today
+  Claude 152.7M tokens · Codex 9.5M tokens
+Servers
+  storefront-web  :3000 node
+
+$ dashbar line
+⚠ 1 needs you · 1 working · Claude 5h 55%
+```
+
+- `dashbar` or `dashbar status`: agents that need you, agents working and idle, every plan limit (the one closest to
+  running out first, with its pace), today's tokens and dev servers.
+- `dashbar line`: one line for a status bar or prompt. Add `--ascii` where `⚠` and `·` don't draw (it prints
+  `! 1 needs you | 1 working | Claude 5h 55%`). An arrow (`↑`, or `(!)`) after a limit means it's on course to run out.
+- `dashbar status --json`: the same status as JSON, with each limit's pace worked out when you ask.
+- `--local` reads a local build (Dashbar Local) instead of the release; without it, the release is read if it's
+  running, otherwise the local build.
+
+If Dashbar isn't running, `dashbar` prints nothing on standard output, says why on standard error and exits non-zero,
+so a status bar shows nothing rather than old figures. Exit status: `0` printed the current status, `2` Dashbar hasn't
+saved a status yet (open Dashbar 0.7.1 or later), `3` Dashbar isn't running, `4` the status file can't be read, `64`
+an unknown command or option.
+
+**Install:** Homebrew links it for you. With the DMG, link it yourself (or copy the same command from Settings →
+Integrations → Command-line tool):
+
+```bash
+sudo mkdir -p /usr/local/bin && sudo ln -sf /Applications/Dashbar.app/Contents/Helpers/dashbar /usr/local/bin/dashbar
+```
+
+**tmux** (`~/.tmux.conf`; tmux reruns it every `status-interval` seconds):
+
+```tmux
+set -g status-right '#(dashbar line --ascii)'
+set -g status-interval 10
+```
+
+**zsh prompt** (`~/.zshrc`):
+
+```zsh
+setopt prompt_subst
+RPROMPT='$(dashbar line 2>/dev/null)'
+```
+
+**Starship** (`~/.config/starship.toml`):
+
+```toml
+[custom.dashbar]
+command = "dashbar line"
+when = "command -v dashbar"
+format = "[$output]($style) "
+```
+
+**Claude Code:** `dashbar line` works as Claude Code's [status line](https://code.claude.com/docs/en/statusline)
+command too (`"statusLine": {"type": "command", "command": "dashbar line"}`). If Dashbar's plan limits bridge is already
+in your status line, press Remove in Settings → Integrations, set the status line to `dashbar line`, then press Add to
+Status Line again: the bridge runs your status line after saving the limits, so both work. An agent can also run
+`dashbar status --json` to see which dev servers and agents are already running.
+
+The status file is `~/Library/Caches/Dashbar/CLI/status.json` (a local build's is under `Dashbar Local`), readable only
+by you. It holds each session's tool, state, workspace folder and how long it's been in that state, plan percentages
+and reset times, today's token counts and dev server ports: never prompts, session titles, session ids, permission
+request details or sign-ins. Dashbar rewrites it only when something in it changes, at most every 3 seconds. Servers are
+as of the last time Dashbar read ports, which it does while its panel or window is open; `dashbar` leaves out any that
+have stopped since.
+
 ## How it differs
 
 - **Local only.** It reads the session logs Claude Code, Codex and Gemini CLI already write on your Mac (`~/.claude`, `~/.codex`, `~/.gemini` and any account folders you add), lists listening ports with libproc and measures folders. No browser cookies, no Full Disk Access, no account, no analytics.
