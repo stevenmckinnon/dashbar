@@ -54,24 +54,28 @@ struct DashboardView: View {
     @FocusState private var searchFocused: Bool
     @Namespace private var focusScope
 
-    /// One height for every tab. Letting the panel follow each tab's content made the menu bar window
-    /// lag behind on tab switches and reopen at a stale size, leaving unpainted space around the panel.
-    private var panelHeight: CGFloat {
-        let visible = NSScreen.main?.visibleFrame.height ?? 900
-        return max(420, min(680, visible - 160))
-    }
+    /// The panel fits the current tab: its scroll area is as tall as the cards, up to a cap that follows the screen,
+    /// past which the tab scrolls (`PanelSizing`, applied by `PanelScrollFit` and `PanelWindowFitter`). The first try
+    /// (a `ScrollView` with only a `maxHeight`) lagged behind tab switches and reopened at a stale size with unpainted
+    /// space, because MenuBarExtra grows its window to fit but never shrinks it. Now the height comes out of the same
+    /// layout pass that lays out the cards (no measuring into state and laying out again), and the window is set to
+    /// it in that pass, without animation. It changes only when the cards change size: a tab switch, a row coming or
+    /// going, never a collector tick that leaves them as they were. Hidden, the window still follows, so it reopens
+    /// at the right size.
+    private var scrollCap: CGFloat { PanelSizing.maxScroll(screenHeight: NSScreen.main?.visibleFrame.height ?? 900) }
 
     var body: some View {
         VStack(spacing: 0) {
             Header()
             TabBar(selection: Binding(get: { forcedTab ?? tab }, set: { tab = $0 }))
             if scrolls {
-                ScrollView {
-                    cards
-                        .frame(maxWidth: .infinity, alignment: .top)
-                        .id(forcedTab ?? tab)   // each tab opens scrolled to the top
+                PanelScrollFit(cap: scrollCap) {
+                    ScrollView {
+                        cards
+                            .frame(maxWidth: .infinity, alignment: .top)
+                            .id(forcedTab ?? tab)   // each tab opens scrolled to the top
+                    }
                 }
-                .frame(height: panelHeight)
                 .mask {
                     // Content fades out as it scrolls under the filter bar.
                     VStack(spacing: 0) {
@@ -115,6 +119,7 @@ struct DashboardView: View {
         // The window's see-through material turns muddy grey over a white page; a mostly opaque base keeps the panel legible on any backdrop.
         .background { if scrolls { Color(nsColor: .windowBackgroundColor).opacity(0.86) } }
         .background { if scrolls { WindowVisibilityReader { store.setPanelVisible($0, surface: "panel") } } } // not in offline snapshots
+        .background { if scrolls { PanelWindowFitter() } }
         .onAppear { store.setPanelVisible(true, surface: "panel") }
         .onDisappear { store.setPanelVisible(false, surface: "panel") }
     }
@@ -171,6 +176,41 @@ struct DashboardView: View {
         .padding(.horizontal, UI.gutter)
         .padding(.top, 2)
         .padding(.bottom, 20)
+    }
+}
+
+/// The panel's scroll area height. Pure, so the clamp and rounding are tested.
+enum PanelSizing {
+    /// Short tabs (an empty Servers list) still get a panel that reads as one, not a strip.
+    static let minScroll: CGFloat = 120
+    /// The cap: the old fixed height, which leaves room for the menu bar, the header and the bottom bar.
+    static func maxScroll(screenHeight: CGFloat) -> CGFloat { max(420, min(680, screenHeight - 160)) }
+
+    /// Whole points, rounded up so the last line is never cut by a fraction.
+    static func quantise(_ height: CGFloat) -> CGFloat {
+        guard height.isFinite, height > 0 else { return 0 }
+        return (height - 0.01).rounded(.up)
+    }
+
+    /// The content's height in whole points, at least `minScroll`, at most `cap`.
+    static func scrollHeight(content: CGFloat, cap: CGFloat) -> CGFloat {
+        min(cap, max(minScroll, quantise(content)))
+    }
+}
+
+/// Sizes the panel's scroll view to its content's height, clamped by `PanelSizing`, inside one layout pass: it asks
+/// the scroll view for its ideal height (the cards' full height) and takes the clamped value as its own.
+struct PanelScrollFit: Layout {
+    var cap: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let scroll = subviews.first else { return .zero }
+        let ideal = scroll.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
+        return CGSize(width: proposal.width ?? ideal.width, height: PanelSizing.scrollHeight(content: ideal.height, cap: cap))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: bounds.origin, proposal: ProposedViewSize(bounds.size))
     }
 }
 
@@ -242,6 +282,46 @@ struct TabBar: View {
         .background(RoundedRectangle(cornerRadius: UI.innerRadius + 3, style: .continuous).fill(Color.primary.opacity(0.05)))
         .padding(.horizontal, UI.gutter)
         .padding(.bottom, 8)
+    }
+}
+
+/// Keeps the menu bar window as tall as the panel. MenuBarExtra grows its window when the panel gets taller but never
+/// shrinks it: a shorter tab would sit centred in the old frame with unpainted space above and below. This view fills
+/// the panel's background, so its own height is the panel's, and it sets the window to that height (top edge pinned
+/// under the menu bar, no animation) in the same AppKit layout pass, and again whenever the window comes on screen.
+struct PanelWindowFitter: NSViewRepresentable {
+    func makeNSView(context: Context) -> FitterView { FitterView() }
+    func updateNSView(_ view: FitterView, context: Context) {}
+
+    final class FitterView: NSView {
+        private var observer: NSObjectProtocol?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if let observer { NotificationCenter.default.removeObserver(observer) }
+            observer = nil
+            guard let window else { return }
+            observer = NotificationCenter.default.addObserver(
+                forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main
+            ) { [weak self] _ in MainActor.assumeIsolated { self?.fit() } }
+            fit()
+        }
+
+        override func setFrameSize(_ newSize: NSSize) {
+            super.setFrameSize(newSize)
+            fit()
+        }
+
+        private func fit() {
+            guard let window, bounds.height > 0 else { return }
+            let content = window.contentRect(forFrameRect: window.frame)
+            let height = bounds.height.rounded()
+            guard abs(content.height - height) >= 1 else { return }
+            let target = NSRect(x: content.minX, y: content.maxY - height, width: content.width, height: height)
+            window.setFrame(window.frameRect(forContentRect: target), display: true, animate: false)
+        }
+
+        deinit { if let observer { NotificationCenter.default.removeObserver(observer) } }
     }
 }
 
