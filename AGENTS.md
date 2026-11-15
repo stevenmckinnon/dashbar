@@ -58,7 +58,7 @@ DASHBAR_DEMO_STATUSLINE=1 Dashbar --snapshot out.png --demo # Claude plan limits
 DASHBAR_DEMO_WORST=1 DASHBAR_DEMO_PERMISSION=1 Dashbar --snapshot out.png --demo --hosted  # worst case: 10 sessions, a server on 12 ports, a long command, 4 prompts
 DASHBAR_ISLAND_HEIGHT=1000 DASHBAR_DEMO_WORST=1 DASHBAR_DEMO_PERMISSION=1 Dashbar --snapshot out.png --demo --island list  # a tall island, uncropped
 DASHBAR_SNAPSHOT_SCALE=4 Dashbar --snapshot out.png --demo --dark   # offline panel (and --island) at 4x, sharp enough to scale up in video; not --hosted
-Dashbar --snapshot x --demo --app --onscreen   # the window on screen for 8s (prints its number) for `screencapture -o -l`, which draws Liquid Glass
+Dashbar --snapshot x --demo --app --onscreen   # the window on screen for 8s (prints its number) for `screencapture -o -l`, which draws Liquid Glass and the sidebar's icons (the offline --app render garbles them: use this for published pictures)
 Dashbar --snapshot out.png --demo --hosted                    # real scrolling panel, so native controls draw
 Dashbar --snapshot out.png --demo --island finished --dark    # the island over a made-up menu bar and notch: collapsed,
                                                               # needsyou, finished, waiting, permission or list
