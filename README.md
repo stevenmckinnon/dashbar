@@ -131,7 +131,7 @@ swift test              # tests
 ./build.sh --run        # build "Dashbar Local.app" and launch it
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for local builds, releasing and the rules for changes. Bugs and ideas go in [issues](https://github.com/stevenmckinnon/dashbar/issues); security reports are described in [SECURITY.md](SECURITY.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for local builds, releasing and the rules for changes. Bugs and ideas go in [issues](https://github.com/stevenmckinnon/dashbar/issues); security reports are described in [SECURITY.md](SECURITY.md). For anything else, email [hello@usedashbar.com](mailto:hello@usedashbar.com).
 
 ## Privacy
 

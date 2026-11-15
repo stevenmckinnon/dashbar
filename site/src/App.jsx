@@ -396,6 +396,7 @@ function Footer() {
           <li><a href={`${REPO}/releases`}>Releases</a></li>
           <li><a href={`${REPO}/issues`}>Issues</a></li>
           <li><a href={`${REPO}/blob/main/LICENSE`}>Licence</a></li>
+          <li><a href="mailto:hello@usedashbar.com">hello@usedashbar.com</a></li>
         </ul>
         <div className="last">
           <p>© 2026 Steve McKinnon. Free and open source under the MIT licence.</p>
