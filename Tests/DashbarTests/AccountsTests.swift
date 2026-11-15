@@ -90,6 +90,42 @@ import Testing
         ]).write(to: dir.appendingPathComponent(file))
     }
 
+    @Test func anAccountWhoseFolderIsMissingIsNeitherReadNorCounted() throws {
+        let fx = try Fixture(); defer { fx.remove() }
+        let personal = try fx.dir("personal")
+        let work = AgentAccounts.normalise(fx.root.appendingPathComponent("work").path)   // never created
+        let all = AgentAccounts.resolve(.claude, saved: [AgentAccount(kind: .claude, path: work, label: "Work")],
+                                        environment: ["CLAUDE_CONFIG_DIR": personal.path], home: fx.root)
+        #expect(all.map(\.label) == ["Default", "Work"])
+
+        let missing = AgentAccounts.missingFolders(all)
+        #expect(missing == [work])
+        let read = AgentAccounts.readable(all, missing: missing)
+        #expect(read.map(\.path) == [all[0].path])
+
+        // One account read: its sessions carry no account name, as with only one set up.
+        try session("p1", status: "busy", in: all[0].sessionsDir, "1.json")
+        #expect(ClaudeSessions.readChecked(accounts: read).sessions.map(\.account) == [nil])
+
+        // A file where the folder should be doesn't count either.
+        try Data().write(to: URL(fileURLWithPath: work))
+        #expect(AgentAccounts.missingFolders(all) == [work])
+        try FileManager.default.removeItem(atPath: work)
+
+        // Once the folder exists the next check reads it, and both accounts are named.
+        try session("w1", status: "idle", in: all[1].sessionsDir, "1.json")
+        let now = AgentAccounts.readable(all, missing: AgentAccounts.missingFolders(all))
+        #expect(now.count == 2)
+        #expect(ClaudeSessions.readChecked(accounts: now).sessions.map(\.account) == ["Default", "Work"])
+    }
+
+    @Test func theDefaultAccountIsReadEvenWithoutItsFolder() {
+        let all = AgentAccounts.resolve(.claude, saved: [], environment: ["CLAUDE_CONFIG_DIR": "/nonexistent/dashbar-tests"],
+                                        home: URL(fileURLWithPath: "/nonexistent"))
+        #expect(AgentAccounts.missingFolders(all).isEmpty)
+        #expect(AgentAccounts.readable(all, missing: []).count == 1)
+    }
+
     @Test func sessionsFromEveryAccountAreMergedAndLabelled() throws {
         let fx = try Fixture(); defer { fx.remove() }
         let all = try accounts(fx)

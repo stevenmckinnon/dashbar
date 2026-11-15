@@ -105,6 +105,24 @@ enum AgentAccounts {
         return out
     }
 
+    /// The added accounts whose folder isn't there, by path. The default account is always read, so it is never listed.
+    /// One `stat` per added account: cheap enough for every minute's refresh.
+    static func missingFolders(_ accounts: [ResolvedAccount],
+                               exists: (String) -> Bool = folderExists) -> Set<String> {
+        Set(accounts.filter { !$0.isDefault && !exists($0.path) }.map(\.path))
+    }
+
+    static func folderExists(_ path: String) -> Bool {
+        var isFolder: ObjCBool = false
+        return FileManager.default.fileExists(atPath: path, isDirectory: &isFolder) && isFolder.boolValue
+    }
+
+    /// The accounts to read: the default, and each added one whose folder exists. A missing folder stays in Settings
+    /// (with a warning there) but is neither scanned nor counted, so one account in use isn't named as one of two.
+    static func readable(_ accounts: [ResolvedAccount], missing: Set<String>) -> [ResolvedAccount] {
+        accounts.filter { $0.isDefault || !missing.contains($0.path) }
+    }
+
     /// "~/.claude-work" → "Work", "~/.codex_personal" → "Personal", anything else → its folder name.
     static func suggestedLabel(forFolder path: String) -> String {
         var name = URL(fileURLWithPath: path).lastPathComponent

@@ -223,7 +223,7 @@ final class Store: ObservableObject {
             AppWindow.shared.show(store: self, page: .tab(.agents))   // the plan limits live there
         }
         worker.start(live: { [weak self] in self?.apply($0) }, usage: { [weak self] in self?.apply($0) })
-        setAccounts(claude: settings.claudeAccounts, codex: settings.codexAccounts)
+        followAccounts()
         refresh(usage: true, servers: true, panel: true)
         scanCleanup()
         startTimer()
@@ -233,8 +233,18 @@ final class Store: ObservableObject {
             .debounce(for: .seconds(0.3), scheduler: RunLoop.main)
             .sink { [weak self] _ in
                 guard let self else { return }
-                self.setAccounts(claude: self.settings.claudeAccounts, codex: self.settings.codexAccounts)
+                self.settings.refreshAccountFolders()
+                self.followAccounts()
                 self.settings.refreshClaudePermissions()
+                self.refresh(usage: true, servers: false, panel: self.panelVisible)
+            }
+            .store(in: &subscriptions)
+        // A folder found or lost (checked each minute and when Settings → Accounts opens) starts or stops its account.
+        // The new set is passed in: `@Published` sends before the property changes.
+        settings.$missingAccountFolders.dropFirst().removeDuplicates()
+            .sink { [weak self] missing in
+                guard let self else { return }
+                guard self.followAccounts(missing: missing) else { return }
                 self.refresh(usage: true, servers: false, panel: self.panelVisible)
             }
             .store(in: &subscriptions)
@@ -282,10 +292,20 @@ final class Store: ObservableObject {
             .store(in: &subscriptions)
     }
 
+    /// Reads the accounts in Settings whose folders exist (`missing`, or Settings' last check). Returns whether that
+    /// changed which accounts are read.
+    @discardableResult
+    private func followAccounts(missing: Set<String>? = nil) -> Bool {
+        let missing = missing ?? settings.missingAccountFolders
+        return setAccounts(claude: AgentAccounts.readable(settings.claudeAccounts, missing: missing),
+                           codex: AgentAccounts.readable(settings.codexAccounts, missing: missing))
+    }
+
     /// Points the collectors and the file watcher at these accounts' folders. One watcher covers every folder, so more
     /// accounts add paths to one FSEvents stream, not more streams or timers.
-    private func setAccounts(claude: [ResolvedAccount], codex: [ResolvedAccount]) {
-        guard claude != claudeAccounts || codex != codexAccounts else { return }
+    @discardableResult
+    private func setAccounts(claude: [ResolvedAccount], codex: [ResolvedAccount]) -> Bool {
+        guard claude != claudeAccounts || codex != codexAccounts else { return false }
         claudeAccounts = claude
         codexAccounts = codex
         plan.accounts = claude
@@ -301,6 +321,7 @@ final class Store: ObservableObject {
             }
         }
         refreshAccountLimits()
+        return true
     }
 
     /// Reads what each added Claude account's status line bridge saved. A few small files: cheap enough for every refresh.
@@ -361,6 +382,7 @@ final class Store: ObservableObject {
         } else if minute {
             plan.statusLineChanged()
         }
+        if minute { settings.refreshAccountFolders() }   // an added account's folder created or removed since
         if minute { refreshAccountLimits() }
         if minute { watcher?.restart() }            // pick up folders created since launch
         if panelVisible, tick % every(Self.cleanupInterval) == 0 { scanCleanup() }   // nothing shows it while closed

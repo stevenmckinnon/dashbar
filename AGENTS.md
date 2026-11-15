@@ -66,6 +66,7 @@ Dashbar --snapshot x --demo --island live --onscreen          # the real control
 Dashbar --snapshot out.png --demo --onboarding [--dark]       # the first-run window, with invented folders
 Dashbar --snapshot out.png --demo --settings integrations [--dark]  # one Settings tab: general, notifications, menuBar, folders, accounts, integrations, about (DASHBAR_SETTINGS_HEIGHT=1200 to see a whole long tab)
 DASHBAR_DEMO_ACCOUNTS=2 DASHBAR_DEMO_PERMISSION=1 Dashbar --snapshot out.png --demo --settings integrations  # two accounts, the hook in one
+DASHBAR_DEMO_ACCOUNTS=missing Dashbar --snapshot out.png --demo --settings accounts  # a Work account whose folder is missing (warned, not read or counted)
 Dashbar --bench                                               # collector timings
 Dashbar --snapshot out.json --demo --cli                      # the dashbar command's status file, from demo data
 DASHBAR_STATUS_FILE=out.json "build/Dashbar Local.app/Contents/Helpers/dashbar" line   # the tool on that file (skips the running check)

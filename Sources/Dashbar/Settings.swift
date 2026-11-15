@@ -79,6 +79,19 @@ final class AppSettings: ObservableObject {
     var claudeAccounts: [ResolvedAccount] { AgentAccounts.resolve(.claude, saved: accounts) }
     var codexAccounts: [ResolvedAccount] { AgentAccounts.resolve(.codex, saved: accounts) }
 
+    /// Added account folders that don't exist, by path. Kept up to date by `refreshAccountFolders()`, which the store
+    /// calls every minute and Settings → Accounts on opening, so a folder created later is read without a relaunch.
+    @Published private(set) var missingAccountFolders: Set<String> = []
+    /// The accounts Dashbar reads and counts: the default, and each added one whose folder exists.
+    var readClaudeAccounts: [ResolvedAccount] { AgentAccounts.readable(claudeAccounts, missing: missingAccountFolders) }
+    var readCodexAccounts: [ResolvedAccount] { AgentAccounts.readable(codexAccounts, missing: missingAccountFolders) }
+
+    func refreshAccountFolders() {
+        guard !CommandLine.arguments.contains("--demo") else { return }   // demo renders set their own
+        let missing = AgentAccounts.missingFolders(claudeAccounts + codexAccounts)
+        if missing != missingAccountFolders { missingAccountFolders = missing }
+    }
+
     nonisolated static func loadAccounts(from defaults: UserDefaults) -> [AgentAccount] {
         guard let data = defaults.data(forKey: Key.accounts) else { return [] }
         return (try? JSONDecoder().decode([AgentAccount].self, from: data)) ?? []
@@ -245,16 +258,21 @@ final class AppSettings: ObservableObject {
         if CommandLine.arguments.contains("--demo") {
             menuLimit = true
             // For `--settings` renders, in memory only: two Claude accounts, and the permission hook in the first.
+            // DASHBAR_DEMO_ACCOUNTS=missing sets up the same two with the Work folder missing, so only one is read.
             let env = ProcessInfo.processInfo.environment
-            if env["DASHBAR_DEMO_ACCOUNTS"].flatMap(Int.init).map({ $0 >= 2 }) == true {
+            let demoAccounts = env["DASHBAR_DEMO_ACCOUNTS"]
+            let work = AgentAccounts.normalise(homeDir.appendingPathComponent(".claude-work").path)
+            if demoAccounts.flatMap(Int.init).map({ $0 >= 2 }) == true || demoAccounts == "missing" {
                 accounts = [AgentAccount(kind: .claude, path: AgentAccounts.defaultPath(.claude), label: "Personal"),
-                            AgentAccount(kind: .claude, path: homeDir.appendingPathComponent(".claude-work").path, label: "Work")]
+                            AgentAccount(kind: .claude, path: work, label: "Work")]
             }
+            if demoAccounts == "missing" { missingAccountFolders = [work] }
             if env["DASHBAR_DEMO_PERMISSION"] != nil {
                 claudePermissions = true
                 claudePermissionsStatus = .installed
             }
         }
+        refreshAccountFolders()
     }
 }
 
@@ -644,8 +662,8 @@ private struct IntegrationSettings: View {
                 Text(statusLineExplanation).settingsFooter()
             }
             Section {
-                if settings.claudeAccounts.count > 1 {
-                    ForEach(settings.claudeAccounts) { accountPermissionsRow($0) }
+                if settings.readClaudeAccounts.count > 1 {
+                    ForEach(settings.readClaudeAccounts) { accountPermissionsRow($0) }
                 } else {
                     permissionsRow
                 }
@@ -736,7 +754,7 @@ private struct IntegrationSettings: View {
     }
 
     private var permissionsExplanation: String {
-        let file = settings.claudeAccounts.count > 1 ? "that account's settings.json"
+        let file = settings.readClaudeAccounts.count > 1 ? "that account's settings.json"
             : Fmt.tilde(PermissionBridge.Paths.default().settings.path)
         return "Adds one PermissionRequest hook to \(file). When Claude Code asks to use a tool, Dashbar shows Allow once "
             + "and Deny while the terminal asks too, so you can answer in either place. Dashbar never answers by itself or "
@@ -782,8 +800,8 @@ private struct IntegrationSettings: View {
             + "Adding Dashbar points statusLine in \(file) at a small script that saves just those numbers on this Mac, "
             + "then runs the status line you had, so it looks the same. The file is backed up first. No network, no "
             + "Keychain. Remove puts your previous status line back exactly."
-            + (settings.claudeAccounts.count > 1
-                ? " This is \(settings.claudeAccounts[0].label)'s; add other accounts' in Accounts." : "")
+            + (settings.readClaudeAccounts.count > 1
+                ? " This is \(settings.readClaudeAccounts[0].label)'s; add other accounts' in Accounts." : "")
     }
 }
 
@@ -872,6 +890,7 @@ private struct AccountSettings: View {
         }
         .formStyle(.grouped)
         .onAppear {
+            settings.refreshAccountFolders()
             settings.refreshClaudeStatusLine()
             findSuggestions()
         }
@@ -897,13 +916,14 @@ private struct AccountSettings: View {
             Text("\(kind.name) accounts")
         } footer: {
             Text(kind == .claude
-                 ? "Each account is a folder you run Claude Code with, set by CLAUDE_CONFIG_DIR (for example ~/.claude-work). Dashbar reads its sessions and usage, and names them by account once there's more than one. Plan limits come from each account's own status line."
+                 ? "Each account is a folder you run Claude Code with, set by CLAUDE_CONFIG_DIR (for example ~/.claude-work). Dashbar reads its sessions and usage, and names them by account once more than one folder is there. Plan limits come from each account's own status line."
                  : "Each account is a folder you run Codex with, set by CODEX_HOME. Dashbar reads its sessions for usage and limits.")
                 .settingsFooter()
         }
     }
 
     @ViewBuilder private func row(_ account: ResolvedAccount) -> some View {
+        let missing = settings.missingAccountFolders.contains(account.path)
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 TextField("Name", text: Binding(
@@ -913,13 +933,24 @@ private struct AccountSettings: View {
                     .labelsHidden()
                     .textFieldStyle(.plain)
                     .font(.body.weight(.medium))
-                Text(Fmt.tilde(account.path) + (account.isDefault ? " · default" : ""))
-                    .font(.caption).foregroundStyle(.secondary)
-                    .lineLimit(1).truncationMode(.middle)
-                    .help(account.path)
+                if missing {
+                    // Kept as the user saved it: they may create the folder, or sign in with that account, later.
+                    Label("Folder not found: \(Fmt.tilde(account.path))", systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption).foregroundStyle(.red)
+                        .lineLimit(1).truncationMode(.middle)
+                        .help(account.path)
+                    Text("Dashbar reads this account once the folder exists.")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text(Fmt.tilde(account.path) + (account.isDefault ? " · default" : ""))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .lineLimit(1).truncationMode(.middle)
+                        .help(account.path)
+                }
             }
             Spacer(minLength: 8)
-            if account.kind == .claude { statusLineButton(account) }
+            if account.kind == .claude, !missing { statusLineButton(account) }
             if !account.isDefault {
                 Button {
                     problem = settings.removeAccount(account)
