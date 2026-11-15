@@ -4,6 +4,8 @@ A free, open-source Mac menu bar app that shows which Claude Code and Codex agen
 
 **[Website](https://usedashbar.com/)** · [Download](https://github.com/stevenmckinnon/dashbar/releases/latest) · [Homebrew](#install) · [What's new](https://github.com/stevenmckinnon/dashbar/releases)
 
+https://github.com/user-attachments/assets/e2f3b494-7473-4e81-be36-fe026a8cdb00
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/overview-dark.png">
