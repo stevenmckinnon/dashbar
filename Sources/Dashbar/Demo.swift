@@ -302,6 +302,12 @@ enum DemoData {
             l.started = now.addingTimeInterval(-6 * 3600)
             store.listeners.append(l)
         }
+        // DASHBAR_DEMO_IDLE=1: Codex is installed but unused in the period and reports no limits, so its Usage card folds.
+        if ProcessInfo.processInfo.environment["DASHBAR_DEMO_IDLE"] != nil {
+            store.codex = UsageSummary(found: true)
+            store.codexLimits = []
+            store.codexAccountLimits = []
+        }
         // DASHBAR_DEMO_NO_LIMITS=1: no plan limits from any tool (nothing set up yet, or nothing reported).
         if ProcessInfo.processInfo.environment["DASHBAR_DEMO_NO_LIMITS"] != nil {
             store.claudePlan = nil
