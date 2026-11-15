@@ -98,7 +98,7 @@ section[id], [id="top"] { scroll-margin-top: 88px; }
 .hero-copy { padding-top: clamp(0px, 10vh, 104px); }
 .hero h1 { font-size: clamp(3rem, 6.2vw, 5.5rem); letter-spacing: -0.045em; line-height: 0.98; }
 .lede { margin-top: 28px; max-width: 34ch; font-size: var(--step-lead); line-height: 1.42; color: var(--muted); }
-.lede b { color: var(--ink); font-weight: 600; }
+.lede strong { color: var(--ink); font-weight: 600; }
 .actions { margin-top: 40px; display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
 .note { margin-top: 20px; color: var(--muted); font-size: var(--step-ui); }
 

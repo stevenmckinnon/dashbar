@@ -31,6 +31,7 @@ jobs:
         working-directory: site
       - run: npm run build
         working-directory: site
+      # v3 on purpose: v4 skips dotfolders, which would drop site/dist/.well-known.
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site/dist

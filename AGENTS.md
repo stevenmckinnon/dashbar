@@ -16,9 +16,9 @@ the app does; this file is how to work on it.
 | `scripts/release.sh` | Signed, notarised, stapled DMG plus the Sparkle `appcast.xml` entry |
 | `scripts/make-dmg.sh`, `packaging/dmg/` | The styled installer window (arrow, caption, icon positions), built with `dmgbuild` (`pip3 install dmgbuild`). `make-background.sh` redraws `background.png`; it is 1x only because macOS 27's Finder mis-sized every Retina variant |
 | `packaging/homebrew/dashbar.rb` | The cask. The live copy is in the separate `stevenmckinnon/homebrew-tap` repo |
-| `site/` | Vite and React product site. `src/demos/` holds the Stageshow demos, `src/stageshow/` the vendored kit (MIT, see its `NOTICE.md`), `src/faq.js` the FAQ (also written into `index.html` as structured data at build time) |
+| `site/` | Vite and React product site. `src/demos/` holds the Stageshow demos, `src/stageshow/` the vendored kit (MIT, see its `NOTICE.md`), `src/faq.js` the FAQ (also written into `index.html` as structured data at build time), `src/content.js` the rest of the page's words. `agent-files.js` turns those, `release-notes/` and `appcast.xml` into `/index.md`, `/llms.txt`, `/llms-full.txt`, `sitemap.xml`, the install skill under `/.well-known/agent-skills/` and `/.well-known/ai-catalog.json` at build time, so edit the copy in `content.js` or `faq.js`, never in those outputs |
 | `release-notes/` | One `X.Y.Z.md` per release (bullets of user-facing changes). Feeds Sparkle's update dialog, the GitHub release and the site's "What's new" (`site/src/releases.js`, which only shows versions that are in `appcast.xml`) |
-| `docs/images/` | README pictures and the site's `og.png`; the site serves this folder as its public root. `og.png` is built from `scripts/og/og.html` by `scripts/render-og.sh` (headless Chrome); rerun it after re-rendering `overview-dark.png` |
+| `docs/images/` | README pictures, the site's `og.png` and `robots.txt` (Content Signals: search, AI input and AI training all allowed); the site serves this folder as its public root. `og.png` is built from `scripts/og/og.html` by `scripts/render-og.sh` (headless Chrome); rerun it after re-rendering `overview-dark.png` |
 | `appcast.xml` | The update feed. Served from `raw.githubusercontent.com/.../main/appcast.xml` |
 | `scripts/stats.py`, `.github/workflows/stats.yml` | Daily copy of GitHub's release download counts (and repo traffic, with a `TRAFFIC_TOKEN` secret) to CSVs on the `stats` branch. Reads only what GitHub already keeps; the app is not involved |
 
@@ -156,6 +156,7 @@ images stay clean.
   (Instrument Sans). Respect `prefers-reduced-motion`. Every demo plays once and has a Replay pill.
 - Do not invent facts on the site: no user counts, quotes, star counts or prices. FAQ answers must state
   what the app really does today.
+- GitHub Pages can't add headers or negotiate content, so agents find the Markdown copy through `llms.txt` and the `<link rel="alternate">` in `index.html`. Keep `actions/upload-pages-artifact` at v3: v4 leaves out dotfolders, which would drop `/.well-known/`.
 - Site demos mirror the app. When a visual in the app changes (tiles, header icons, card layout), update
   `site/src/demos/` to match, then re-render `docs/images/` (and `og.png` with `scripts/render-og.sh`) and re-check the demos' heights.
 

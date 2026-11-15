@@ -5,14 +5,13 @@ import { RELEASE_NOTES, LATEST_VERSION, inline } from "./releases";
 import { DashbarDemo } from "./demos/DashbarDemo";
 import { AgentsDemo, LimitsDemo, UsageDemo, ServersDemo, SystemDemo, CleanupDemo } from "./demos/FeatureDemos";
 import { WindowDemo } from "./demos/WindowDemo";
+import { REPO, BREW, HERO, FEATURES_INTRO, FEATURES, WINDOW, PACE, PRIVACY, INSTALL, FOOTER } from "./content";
 
-const REPO = "https://github.com/stevenmckinnon/dashbar";
 // The DMG itself, so the button downloads straight away. The version comes from the update feed at build time;
 // if the feed can't be read it falls back to the releases page.
 const DOWNLOAD = LATEST_VERSION
   ? `${REPO}/releases/download/v${LATEST_VERSION}/Dashbar-${LATEST_VERSION}.dmg`
   : `${REPO}/releases/latest`;
-const BREW = "brew install --cask stevenmckinnon/tap/dashbar";
 
 /** A picture in the visitor's colour scheme: *-light.png by default, *-dark.png in dark mode. */
 function Shot({ name, alt, width, height, className, lazy = true }) {
@@ -113,13 +112,13 @@ function Hero() {
   return (
     <header className="wrap hero">
       <div className="hero-copy">
-        <h1 id="top">Your agents, in the menu bar</h1>
-        <p className="lede">Dashbar shows which <b>Claude Code</b> and <b>Codex</b> sessions are working, how much of your plan is left, and which dev servers are idling. Free and open source.</p>
+        <h1 id="top">{HERO.headline}</h1>
+        <p className="lede"><Inline text={HERO.lede} /></p>
         <div className="actions">
           <DownloadButton />
           <BrewCommand />
         </div>
-        <p className="note">{LATEST_VERSION ? <>Version {LATEST_VERSION}. </> : null}Needs macOS 14 or later. Notarised by Apple. MIT licence.</p>
+        <p className="note">{LATEST_VERSION ? <>Version {LATEST_VERSION}. </> : null}{HERO.note}</p>
       </div>
       <div className="demo" data-ss-fill="">
         <div role="img" aria-label="A short animation of Dashbar's panel, opened from the menu bar. Overview shows the workspace where Claude is working, the other workspaces, the tightest plan limits and 7 GB of rebuildable caches. Then the dev servers, two of them marked barely used, and the Usage tab, with a card for Claude Code and one for Codex, where the plan limits fill, today’s hours rise and Claude’s 5-hour limit lasts until it resets at this rate.">
@@ -136,29 +135,29 @@ function Hero() {
 
 /* ---------- What it shows ---------- */
 
-const ITEMS = [
-  { name: "Agents, and when they need you", Demo: AgentsDemo,
-    body: <>Each Claude Code session by project: working, idle or waiting for you, for how long, and how full its context window is. Click one to go back to the app it runs in. Turn on permission prompts in Settings and a request shows up under its session with Allow once and Deny. The terminal still asks too, and Dashbar never answers by itself.</> },
-  { name: "Plan limits, with pace", Demo: LimitsDemo,
-    body: <>Your 5-hour and weekly limits, with a mark for where an even pace would be and a projection of when you would run out at the current rate. Each tool has its own card, and the one closest to running out comes first. Codex’s limits come from its own logs. Claude’s come from Claude Code’s status line: add Dashbar to it in Settings and your usage updates after each Claude Code reply, with no network request.</> },
-  { name: "Usage and estimated cost", Demo: UsageDemo,
-    body: <>Tokens for Claude Code and Codex today, or over the last 7 or 14 days, by hour or by day, and what they would cost at public API list prices. One choice at the top sets the span for every card, and in the Dashbar window each card also lists its projects and models. The cost is a guide, not your bill, and Settings can hide it. History, in the Dashbar window, keeps 30 days of usage and how full each plan window got.</> },
-  { name: "Idle servers", Demo: ServersDemo,
-    body: <>Dev servers grouped under the project that owns them. One that has been up for over an hour and is barely using the CPU is marked, and so is one an agent started.</> },
-  { name: "System", Demo: SystemDemo,
-    body: <>CPU, memory, GPU, network and battery, and the busiest apps right now. None of it is new; it is just in the same place as everything else.</> },
-  { name: "Clean-up", Demo: CleanupDemo,
-    body: <>Finds <code>node_modules</code>, <code>.next</code>, build folders and Xcode’s DerivedData, shows what you would get back, and moves them to the Trash only after you confirm.</> },
-];
+// Each feature's words are in content.js; its demo is matched by name.
+const DEMOS = {
+  "Agents, and when they need you": AgentsDemo,
+  "Plan limits, with pace": LimitsDemo,
+  "Usage and estimated cost": UsageDemo,
+  "Idle servers": ServersDemo,
+  System: SystemDemo,
+  "Clean-up": CleanupDemo,
+};
 
-function Feature({ Demo, name, body }) {
+const ITEMS = FEATURES.map(({ name, text }) => {
+  if (!DEMOS[name]) throw new Error(`No demo for the feature "${name}"`);
+  return { name, text, Demo: DEMOS[name] };
+});
+
+function Feature({ Demo, name, text }) {
   const dark = useDark();
   const [run, setRun] = useState(0);
   return (
     <article className="feature">
       <div className="feature-text">
         <h3>{name}</h3>
-        <p>{body}</p>
+        <p><Inline text={text} /></p>
         <button className="replay-pill" type="button" onClick={() => setRun((n) => n + 1)}>
           <RotateCw size={14} strokeWidth={2} aria-hidden="true" />Replay<span className="sr-only"> the {name.toLowerCase()} demo</span>
         </button>
@@ -177,7 +176,7 @@ function Features() {
     <section className="wrap features" id="features" aria-labelledby="features-h">
       <div className="section-head">
         <h2 id="features-h">What it shows</h2>
-        <p>Everything an agent-heavy day throws at your Mac, in one small panel.</p>
+        <p>{FEATURES_INTRO}</p>
       </div>
       <div className="feature-list">
         {ITEMS.map((it) => <Feature key={it.name} {...it} />)}
@@ -194,15 +193,15 @@ function WindowSection() {
   return (
     <section className="wrap window" id="window" aria-labelledby="window-h">
       <div className="section-head window-head">
-        <h2 id="window-h">Or a whole window</h2>
-        <p>Press <kbd>⌃⌥D</kbd>, or the arrow at the top of the panel, and Dashbar opens as a window. Its pages and every running workspace sit in a sidebar. A workspace’s page adds up what it is using right now, its dev servers, its agents and everything they started, and shows the processes behind the numbers. You can stop a server, quit a process or move the workspace’s caches to the Trash from there. History shows 30 days of usage and estimated cost, and how full each plan window got.</p>
+        <h2 id="window-h">{WINDOW.heading}</h2>
+        <p>{WINDOW.before} <kbd>{WINDOW.shortcut}</kbd>{WINDOW.after}</p>
       </div>
       <div className="window-demo">
         <div role="img" aria-label="A short animation of the Dashbar window. It opens on Overview, with a card for each workspace. Clicking storefront-web opens its page: uptime 52 minutes, CPU 12%, memory 1.11 GB and energy 3.1 watts, its dev server on port 3000, its Claude Code session at 34% context, and the processes behind the numbers.">
           <div aria-hidden="true"><WindowDemo key={run} dark={dark} /></div>
         </div>
         <div className="caption-row">
-          <p className="caption">The menu bar panel stays the quick glance. Clicking a workspace there opens its page here.</p>
+          <p className="caption">{WINDOW.caption}</p>
           <button className="replay-pill" type="button" onClick={() => setRun((n) => n + 1)}><RotateCw size={14} strokeWidth={2} aria-hidden="true" />Replay<span className="sr-only"> the window demo</span></button>
         </div>
       </div>
@@ -238,8 +237,8 @@ function Pace() {
   return (
     <section className="wrap pace" id="pace" aria-labelledby="pace-h">
       <div className="pace-text">
-        <h2 id="pace-h">When would you run out?</h2>
-        <p>Dashbar projects your current rate forward to 100%. Move the slider to try it: you are {ELAPSED_HOURS} hours into a {WINDOW_HOURS}-hour window.</p>
+        <h2 id="pace-h">{PACE.heading}</h2>
+        <p>{`${PACE.lead} Move the slider to try it: you are `}{ELAPSED_HOURS} hours into a {WINDOW_HOURS}-hour window.</p>
         <div className="control">
           <label htmlFor="used"><span>Used so far</span><output htmlFor="used">{used}%</output></label>
           <input id="used" type="range" min="0" max="100" step="1" value={used} onChange={(e) => setUsed(+e.target.value)} aria-valuetext={`${used} percent used`} />
@@ -252,7 +251,7 @@ function Pace() {
           <div className="bar" data-fill={r.fill}><i style={{ width: `${used}%` }} /><u style={{ left: `calc(${EVEN_PACE}% - 1.5px)` }} /></div>
           <p data-fill={r.fill}>{r.state}</p>
         </div>
-        <p className="pace-note">The bar is a copy of the one in the app. The mark is where an even pace would be by now.</p>
+        <p className="pace-note">{PACE.note}</p>
       </div>
     </section>
   );
@@ -318,29 +317,21 @@ function Privacy() {
   return (
     <section className="privacy" id="privacy" aria-labelledby="privacy-h">
       <div className="privacy-inner">
-        <h2 id="privacy-h">What it reads and sends</h2>
+        <h2 id="privacy-h">{PRIVACY.heading}</h2>
         <div className="reads">
           <h3>Reads</h3>
           <ul>
-            <li>Claude Code’s session files and transcripts: <code>~/.claude/sessions</code> and <code>~/.claude/projects</code></li>
-            <li>Codex’s session logs: <code>~/.codex/sessions</code></li>
-            <li>The same folders for any other Claude Code or Codex account you add in Settings</li>
-            <li>If you use Google’s agents: Gemini CLI’s chat logs in <code>~/.gemini/tmp</code>, and only the status columns of the Antigravity app’s conversation list, opened read-only. If you add Dashbar to the Antigravity CLI’s status line, its plan quota and each session’s folder, model, token totals and state. Never titles, transcripts or your Google sign-in.</li>
-            <li>The listening ports on your Mac and the processes behind them, through the system’s own process API</li>
-            <li>The folders you choose, to size the caches in clean-up</li>
-            <li>If you add Dashbar to Claude Code’s status line: the plan usage Claude Code passes it after each reply. Dashbar changes only that one setting, keeps a backup, and puts your previous status line back when you remove it.</li>
-            <li>If you turn on answering permission prompts: what Claude Code is about to ask you (the command, file or address), through a hook Dashbar adds to Claude Code’s settings. File contents and edits are left out, and nothing leaves your Mac.</li>
+            {PRIVACY.reads.map((item) => <li key={item}><Inline text={item} /></li>)}
           </ul>
         </div>
         <div className="sends">
           <h3>Sends</h3>
-          <p>Nothing, with two exceptions. The app has no account and no analytics.</p>
+          <p>{PRIVACY.sendsIntro}</p>
           <ul>
-            <li>If you turn on the experimental way of reading Claude plan limits: one request to <code>api.anthropic.com</code> with Claude Code’s own sign-in. Dashbar never refreshes or stores that sign-in. The status line way sends nothing.</li>
-            <li>Update checks, from version 0.3.0: a small feed fetched from GitHub to see whether a newer version exists.</li>
+            {PRIVACY.sends.map((item) => <li key={item}><Inline text={item} /></li>)}
           </ul>
           <p className="check">The code is <a href={REPO}>on GitHub</a> if you want to check.</p>
-          <p className="site-note">This website, not the app, counts visits with Cloudflare Web Analytics, which uses no cookies.</p>
+          <p className="site-note">{PRIVACY.siteNote}</p>
         </div>
       </div>
     </section>
@@ -354,17 +345,17 @@ function Install() {
     <section className="wrap install" id="install" aria-labelledby="install-h">
       <div className="install-inner">
         <Mark size={56} />
-        <h2 id="install-h">Put your agents in the menu bar</h2>
-        <p className="install-lede">Free and open source. The app has no account and no analytics.</p>
+        <h2 id="install-h">{INSTALL.heading}</h2>
+        <p className="install-lede">{INSTALL.lede}</p>
         <div className="ways">
           <div className="how">
             <h3>Download</h3>
-            <p>Open the DMG and drag Dashbar to Applications. It is signed and notarised by Apple, and needs macOS 14 or later.</p>
+            <p>{INSTALL.download}</p>
             <DownloadButton />
           </div>
           <div className="how brew">
             <h3>Homebrew</h3>
-            <p>One command. <code>brew upgrade</code> keeps it current.</p>
+            <p><Inline text={INSTALL.brew} /></p>
             <BrewCommand className="block" />
           </div>
         </div>
@@ -381,7 +372,7 @@ function Footer() {
       <div className="footer-inner wrap">
         <div className="who">
           <a className="brand" href="#top"><Mark /> Dashbar</a>
-          <p>A menu bar app for Claude Code and Codex. Made by <a href="https://steve.mn">Steve McKinnon</a>.</p>
+          <p>{`${FOOTER.about} Made by `}<a href="https://steve.mn">Steve McKinnon</a>.</p>
         </div>
         <ul className="links" aria-label="On this page">
           <li><a href="#features">Features</a></li>
@@ -401,7 +392,7 @@ function Footer() {
         </ul>
         <div className="last">
           <p>© 2026 Steve McKinnon. Free and open source under the MIT licence.</p>
-          <p>Dashbar is not affiliated with Anthropic or OpenAI. Claude and Codex are their trademarks.</p>
+          <p>{FOOTER.trademarks}</p>
         </div>
       </div>
     </footer>
