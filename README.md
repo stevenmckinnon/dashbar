@@ -7,12 +7,12 @@ A free, open-source Mac menu bar app that shows which Claude Code and Codex agen
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/overview-dark.png">
-    <img src="docs/images/overview-light.png" alt="Dashbar's Overview tab: working agents, servers, clean-up size and token usage" width="360">
+    <img src="docs/images/overview-light.png" alt="Dashbar's Overview tab: the working agent's workspace with its quick actions, the other workspaces, each tool's tightest plan limit and the size of rebuildable caches" width="360">
   </picture>
   &nbsp;
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/agents-dark.png">
-    <img src="docs/images/agents-light.png" alt="Dashbar's Agents tab: plan limits with pace, workspaces and usage" width="360">
+    <img src="docs/images/agents-light.png" alt="Dashbar's Usage tab: plan limits with pace, today's and the last 7 days' tokens, and Claude Code's usage" width="360">
   </picture>
 </p>
 
@@ -65,7 +65,7 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
 - **Island** (Settings → Notifications; on for new installs): when an agent finishes or stops for you, a black banner grows out of the MacBook notch (or just below the middle of the menu bar on other screens) with the session's title and project, then folds back into the notch after a few seconds (hover holds it open). Click it to go back to the session; with answering permission prompts on, Allow once and Deny work right there. Between moments it draws nothing, so the notch and the menus around it are untouched. Optionally it keeps a small status beside the notch (amber "needs you", else green "working") that lists your sessions on hover; that can cover the last menus of a menu-heavy app. If another app already draws at the notch, it sits just below that app's (or choose left or right of the notch), and it can stand in for the matching notifications.
 - **First run**: a short welcome window says what Dashbar reads and lets you turn on notifications, open at login and Claude plan limits. macOS asks about notifications only when you turn one on. It's in the gear menu as Welcome… later.
 - **Notifications** (each can be turned off in Settings): when an agent finishes a stretch of work, when it needs you, and when a plan limit runs low: at 80%, when it's on course to run out before it resets, and when it's used up, once per window.
-- **Tabs**: Overview · Agents · Servers · System · Clean-up (⌘1–⌘5). Overview tiles jump to their tab.
+- **Tabs**: Overview · Usage · Servers · System · Clean-up (⌘1–⌘5). Overview puts what needs you first: waiting permission prompts, then the workspace whose agent is waiting, working or went idle in the last 10 minutes, the other workspaces, servers outside them, a strip with each account's tightest plan limit (click it for Usage) and, from 1 GB, a line to Clean-up. Usage has the plan limits with their pace, today's and the last 7 days' tokens, and each tool's usage.
 - **Menu bar stats** (optional, in Settings): CPU, memory, download speed and, with Claude plan limits on, what's left
   of your Claude 5-hour or weekly limit, beside the icon.
 - **Plan limits**: Codex's 5-hour and weekly limits from its own logs. Claude's come from Claude Code's
