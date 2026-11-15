@@ -3,6 +3,19 @@
     <channel>
         <title>Dashbar</title>
         <item>
+            <title>0.7.1</title>
+            <pubDate>Sun, 15 Nov 2026 18:26:34 +0000</pubDate>
+            <sparkle:version>179</sparkle:version>
+            <sparkle:shortVersionString>0.7.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[- **The dashbar command**: type `dashbar` in Terminal to see which agents need you, which are working and how much of each plan limit is left, or put `dashbar line` in your tmux status bar or shell prompt. It reads what Dashbar already shows, so Dashbar has to be running. Homebrew adds it to your PATH; with the DMG, copy the command from Settings → Integrations
+- **A notification when a used-up limit resets**: once a 5-hour or Weekly limit has been used up, Dashbar tells you when it resets so you can pick up where you left off. It's covered by the same setting, now "When a plan limit runs low or resets"
+- The Claude Code status line script no longer writes session ids to disk. Dashbar updates the script by itself the next time it opens
+- `brew uninstall --cask --zap dashbar` now also removes Dashbar's caches
+]]></description>
+            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.7.1/Dashbar-0.7.1.dmg" length="8760060" type="application/octet-stream" sparkle:edSignature="NIO7phln4kA89RSzlDLF29ZNlsvYLhpj4CFmuzItrdsJrsM+DRjqTwga2fVD/655Wqzxfk8qz5/yg5hokEf1Dw=="/>
+        </item>
+        <item>
             <title>0.7.0</title>
             <pubDate>Sun, 15 Nov 2026 11:58:18 +0000</pubDate>
             <sparkle:version>161</sparkle:version>
@@ -40,16 +53,6 @@
             <description sparkle:format="markdown"><![CDATA[- Claude plan limits no longer ask for your Keychain password every day. Claude Code rewrites its sign-in each time it renews it, which undid "Always Allow"; Dashbar now reads the sign-in the same way Claude Code does, so macOS doesn't ask. Turning the setting on is the only permission it needs
 ]]></description>
             <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.6.2/Dashbar-0.6.2.dmg" length="5188127" type="application/octet-stream" sparkle:edSignature="EnsQPcSnF7nTBfbMFfV9DZeGNgezdAveJ2jtmLY/nrCMKucsaQ5swnz0lmMtzUk/qLM1NmMe0SiqJk0O3O0JBQ=="/>
-        </item>
-        <item>
-            <title>0.6.1</title>
-            <pubDate>Mon, 09 Nov 2026 23:06:05 +0000</pubDate>
-            <sparkle:version>52</sparkle:version>
-            <sparkle:shortVersionString>0.6.1</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[- Fixed: the Dashbar window could be dragged down to almost nothing. It now stops at a size that fits its pages, and a window left tiny opens at that size again
-]]></description>
-            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.6.1/Dashbar-0.6.1.dmg" length="5181127" type="application/octet-stream" sparkle:edSignature="YV6pn3PgEHMGHKnNmaw2sKT21HZdnXIbgKC0dkJo+2BBIATW4mJTlVf74ryM1bglSdkxtpia7njfK/sDqCBFDA=="/>
         </item>
     </channel>
 </rss>
