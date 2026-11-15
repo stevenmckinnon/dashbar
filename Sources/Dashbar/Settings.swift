@@ -498,7 +498,9 @@ private struct GeneralSettings: View {
             }
             Section("Overview shows") {
                 Toggle("Current workspace", isOn: $settings.showNow)
-                Toggle("Today and this week", isOn: $settings.showWidgets)
+                // Only the window's Overview has these now; the panel shows them on its Usage tab, always.
+                Toggle("Today and this week, in the window", isOn: $settings.showWidgets)
+                    .help("The token totals at the foot of the Dashbar window's Overview. In the panel they're on the Usage tab.")
                 Toggle("Servers outside projects", isOn: $settings.showServers)
             }
             Section("Usage") {
