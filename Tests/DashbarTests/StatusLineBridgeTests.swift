@@ -283,6 +283,23 @@ import Testing
         #expect(FileManager.default.fileExists(atPath: file.path))
     }
 
+    @Test func sessionMarkersNeverNameTheSession() throws {
+        let fx = try Fixture(); defer { fx.remove() }
+        _ = try run(fx, stdin: sample(session: "4f1c2a9e-7b3d-4e55-9a10-c0ffee123456", apiMs: 100))
+        _ = try run(fx, stdin: sample(session: "other-session", apiMs: 100))
+        let seen = fx.root.appendingPathComponent("caches/claude-statusline-sessions")
+        let names = try FileManager.default.contentsOfDirectory(atPath: seen.path).sorted()
+        #expect(names.count == 2)
+        for name in names {
+            #expect(name.count == 16 && name.allSatisfy(\.isHexDigit))
+            #expect(!name.contains("4f1c2a9e") && !name.contains("other"))
+            #expect(try String(contentsOf: seen.appendingPathComponent(name), encoding: .utf8) == "100")
+        }
+        // The same session always maps to the same marker, so an idle rerun is still recognised.
+        _ = try run(fx, stdin: sample(session: "other-session", apiMs: 100))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: seen.path).count == 2)
+    }
+
     @Test func neverRunsItselfAsThePreviousStatusLine() throws {
         let fx = try Fixture(); defer { fx.remove() }
         let r = try run(fx, stdin: sample(), previous: "/bin/sh '/x/claude-statusline-bridge.sh'")

@@ -21,7 +21,7 @@ enum StatusLineBridge {
     /// affecting the status line.
     static let script = #"""
     #!/bin/sh
-    # Dashbar's Claude Code status line bridge (version 2). Dashbar added it with your consent.
+    # Dashbar's Claude Code status line bridge (version 3). Dashbar added it with your consent.
     # Claude Code runs this after each reply with the session's details as JSON on stdin. It saves only the
     # rate_limits part (your plan usage percentages and reset times) and the time to a file Dashbar reads, then
     # runs the status line you had before, if any, with the same input. It sends nothing anywhere.
@@ -36,6 +36,10 @@ enum StatusLineBridge {
       limits=$(printf '%s' "$input" | /usr/bin/plutil -extract rate_limits json -o - - 2>/dev/null) || return 0
       case $limits in '{'*'}') ;; *) return 0 ;; esac
       session=$(printf '%s' "$input" | /usr/bin/plutil -extract session_id raw -o - - 2>/dev/null | /usr/bin/tr -cd 'A-Za-z0-9_-')
+      # Each session's marker is named by a hash of its id, so the id itself is never written down.
+      if [ -n "$session" ]; then
+        session=$(printf 'dashbar:%s' "$session" | { /sbin/sha256 -q 2>/dev/null || /sbin/md5 -q; } | /usr/bin/cut -c1-16)
+      fi
       api=$(printf '%s' "$input" | /usr/bin/plutil -extract cost.total_api_duration_ms raw -o - - 2>/dev/null | /usr/bin/tr -cd '0-9.')
       seen="$out_dir/claude-statusline-sessions"
       /bin/mkdir -p "$seen" || return 0
