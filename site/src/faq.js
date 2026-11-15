@@ -22,7 +22,7 @@ export const FAQ = [
   { q: "How do I update it?",
     a: "From version 0.3.0 Dashbar checks for updates itself: open Settings, then About, then Check for Updates. With Homebrew, run brew upgrade --cask dashbar." },
   { q: "How do I uninstall it?",
-    a: "If you added Dashbar to Claude Code’s or the Antigravity CLI’s status line, or turned on permission prompts, press Remove for each in Settings, under Integrations, first, so their settings go back to how they were. Then quit Dashbar and drag it to the Trash. With Homebrew, run brew uninstall --cask dashbar, and add --zap to remove its settings too." },
+    a: "If you added Dashbar to Claude Code’s or the Antigravity CLI’s status line, or turned on permission prompts, press Remove for each in Settings, under Integrations, first, so their settings go back to how they were. Then quit Dashbar and drag it to the Trash. With Homebrew, run brew uninstall --cask dashbar, and add --zap to remove its settings, data and caches too." },
   { q: "Is it affiliated with Anthropic or OpenAI?",
     a: "No. Dashbar is an independent open source project." },
 ];

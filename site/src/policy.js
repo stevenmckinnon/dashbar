@@ -54,7 +54,7 @@ export const POLICY = {
           "Caches, in `~/Library/Caches/Dashbar`: the latest plan reading (usage percentages, reset times and the plan name) and what a status line you added Dashbar to passed it.",
           "If you turn on answering permission prompts, requests and your answers pass through files in `~/Library/Application Support/Dashbar/Permissions` that only your user account can read.",
         ] },
-        { text: "To remove everything, delete those folders and that file after you uninstall. `brew uninstall --cask --zap dashbar` removes the settings and the Application Support folder for you." },
+        { text: "To remove everything, delete those folders and that file after you uninstall. `brew uninstall --cask --zap dashbar` removes all of them for you, along with the caches macOS keeps for the app." },
       ],
     },
     {

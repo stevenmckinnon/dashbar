@@ -18,6 +18,11 @@ cask "dashbar" do
 
   zap trash: [
     "~/Library/Application Support/Dashbar",
+    "~/Library/Caches/Dashbar",
+    "~/Library/Caches/fun.dashbar.app",
+    "~/Library/Caches/fun.dashbar.app.sparkle",
+    "~/Library/HTTPStorages/fun.dashbar.app",
     "~/Library/Preferences/fun.dashbar.app.plist",
+    "~/Library/Saved Application State/fun.dashbar.app.savedState",
   ]
 end
