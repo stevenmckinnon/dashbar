@@ -194,7 +194,7 @@ function WindowSection() {
     <section className="wrap window" id="window" aria-labelledby="window-h">
       <div className="section-head window-head">
         <h2 id="window-h">{WINDOW.heading}</h2>
-        <p>{WINDOW.before} <kbd>{WINDOW.shortcut}</kbd>{WINDOW.after}</p>
+        <p>{`${WINDOW.before} `}<kbd>{WINDOW.shortcut}</kbd>{WINDOW.after}</p>
       </div>
       <div className="window-demo">
         <div role="img" aria-label="A short animation of the Dashbar window. It opens on Overview, with a card for each workspace. Clicking storefront-web opens its page: uptime 52 minutes, CPU 12%, memory 1.11 GB and energy 3.1 watts, its dev server on port 3000, its Claude Code session at 34% context, and the processes behind the numbers.">

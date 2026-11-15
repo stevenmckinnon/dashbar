@@ -167,7 +167,7 @@ export function llmsTxt(all) {
   return [
     `# Dashbar`,
     `> ${plain(HERO.lede)}`,
-    `Dashbar is a native menu bar app for macOS 14 or later, on Apple silicon and Intel. It reads Claude Code’s and Codex’s session files on the Mac, the listening ports and processes, and the folders you choose. It is free and open source under the MIT licence, with no account and no analytics.${version ? ` The current version is ${version}.` : ""}`,
+    `Dashbar is a native menu bar app for macOS 14 or later, on Apple silicon and Intel. It reads Claude Code’s and Codex’s session files on the Mac, the listening ports and processes, and the folders you choose. It is free and open source under the MIT licence. The app has no account and no analytics.${version ? ` The current version is ${version}.` : ""}`,
     `## Docs`,
     [
       `- [Homepage as Markdown](${SITE}index.md): features, what it reads and sends, what’s new, the FAQ and how to install`,
@@ -194,9 +194,10 @@ export function llmsTxt(all) {
   ].join("\n\n") + "\n";
 }
 
-/** sitemap.xml with every public URL. */
+/** sitemap.xml. index.md is left out so search engines don't index it as a copy of the page; llms.txt and
+ * the <link rel="alternate"> in index.html point agents to it. */
 export function sitemap(lastmod) {
-  const urls = ["", "index.md", "llms.txt", "llms-full.txt"];
+  const urls = ["", "llms.txt", "llms-full.txt"];
   const mod = lastmod ? `<lastmod>${lastmod}</lastmod>` : "";
   return [
     `<?xml version="1.0" encoding="UTF-8"?>`,
