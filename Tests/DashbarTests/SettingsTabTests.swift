@@ -25,17 +25,18 @@ import Testing
     }
 
     @Test func savedOldTabIsMoved() throws {
-        let defaults = try #require(UserDefaults(suiteName: "SettingsTabTests-\(UUID().uuidString)"))
-        defaults.set("labs", forKey: SettingsTab.key)
-        SettingsTab.migrateSaved(defaults)
-        #expect(defaults.string(forKey: SettingsTab.key) == "integrations")
+        try withTestDefaults { defaults in
+            defaults.set("labs", forKey: SettingsTab.key)
+            SettingsTab.migrateSaved(defaults)
+            #expect(defaults.string(forKey: SettingsTab.key) == "integrations")
 
-        defaults.set("gone", forKey: SettingsTab.key)
-        SettingsTab.migrateSaved(defaults)
-        #expect(defaults.string(forKey: SettingsTab.key) == "general")
+            defaults.set("gone", forKey: SettingsTab.key)
+            SettingsTab.migrateSaved(defaults)
+            #expect(defaults.string(forKey: SettingsTab.key) == "general")
 
-        defaults.set("menuBar", forKey: SettingsTab.key)
-        SettingsTab.migrateSaved(defaults)
-        #expect(defaults.string(forKey: SettingsTab.key) == "menuBar")
+            defaults.set("menuBar", forKey: SettingsTab.key)
+            SettingsTab.migrateSaved(defaults)
+            #expect(defaults.string(forKey: SettingsTab.key) == "menuBar")
+        }
     }
 }

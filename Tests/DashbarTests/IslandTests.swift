@@ -71,10 +71,11 @@ import Testing
     }
 
     @Test func thePillIsOptInAndOffByDefault() throws {
-        let defaults = try #require(UserDefaults(suiteName: "IslandTests-pill-\(UUID().uuidString)"))
-        #expect(!IslandSettings.Values.read(defaults).showsPill)
-        defaults.set(true, forKey: IslandSettings.showsPillKey)
-        #expect(IslandSettings.Values.read(defaults).showsPill)
+        try withTestDefaults { defaults in
+            #expect(!IslandSettings.Values.read(defaults).showsPill)
+            defaults.set(true, forKey: IslandSettings.showsPillKey)
+            #expect(IslandSettings.Values.read(defaults).showsPill)
+        }
         #expect(IslandPresenter().mode(status: .working(1), showsPill: true) == .collapsed(.working(1)))
     }
 
@@ -188,14 +189,15 @@ import Testing
     }
 
     @Test func settingsReadDefaultsWhenUnset() throws {
-        let defaults = try #require(UserDefaults(suiteName: "IslandTests-\(UUID().uuidString)"))
-        let v = IslandSettings.Values.read(defaults)
-        #expect(v == IslandSettings.Values(enabled: false, position: .automatic, expandOnFinish: true, expandOnNeedsYou: true,
-                                           replacesNotifications: false))
-        defaults.set(true, forKey: IslandSettings.enabledKey)
-        defaults.set("right", forKey: IslandSettings.positionKey)
-        #expect(IslandSettings.Values.read(defaults).enabled)
-        #expect(IslandSettings.Values.read(defaults).position == .right)
+        try withTestDefaults { defaults in
+            let v = IslandSettings.Values.read(defaults)
+            #expect(v == IslandSettings.Values(enabled: false, position: .automatic, expandOnFinish: true, expandOnNeedsYou: true,
+                                               replacesNotifications: false))
+            defaults.set(true, forKey: IslandSettings.enabledKey)
+            defaults.set("right", forKey: IslandSettings.positionKey)
+            #expect(IslandSettings.Values.read(defaults).enabled)
+            #expect(IslandSettings.Values.read(defaults).position == .right)
+        }
     }
 
     // MARK: Placement

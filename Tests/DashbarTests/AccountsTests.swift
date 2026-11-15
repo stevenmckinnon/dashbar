@@ -60,16 +60,15 @@ import Testing
     }
 
     @Test func accountsPersistAndReload() throws {
-        let suite = "dashbar-tests-\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
-        #expect(AppSettings.loadAccounts(from: defaults).isEmpty)
-        let accounts = [AgentAccount(kind: .claude, path: "/Users/x/.claude-work", label: "Work"),
-                        AgentAccount(kind: .codex, path: "/Users/x/.codex-work", label: "")]
-        AppSettings.saveAccounts(accounts, to: defaults)
-        #expect(AppSettings.loadAccounts(from: defaults) == accounts)
-        AppSettings.saveAccounts([], to: defaults)
-        #expect(defaults.object(forKey: AppSettings.Key.accounts) == nil)
+        try withTestDefaults { defaults in
+            #expect(AppSettings.loadAccounts(from: defaults).isEmpty)
+            let accounts = [AgentAccount(kind: .claude, path: "/Users/x/.claude-work", label: "Work"),
+                            AgentAccount(kind: .codex, path: "/Users/x/.codex-work", label: "")]
+            AppSettings.saveAccounts(accounts, to: defaults)
+            #expect(AppSettings.loadAccounts(from: defaults) == accounts)
+            AppSettings.saveAccounts([], to: defaults)
+            #expect(defaults.object(forKey: AppSettings.Key.accounts) == nil)
+        }
     }
 }
 

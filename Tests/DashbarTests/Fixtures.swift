@@ -71,3 +71,23 @@ struct Fixture {
         return ["timestamp": now, "type": "event_msg", "payload": payload]
     }
 }
+
+/// Runs `body` with a throwaway preferences domain that lives in a temporary folder, then removes it.
+///
+/// A suite named by an absolute path keeps its plist at that path. A plain name such as `dashbar-tests-<UUID>`
+/// would put it in ~/Library/Preferences, and cfprefsd writes an empty file there some seconds after the process
+/// exits, even after `removePersistentDomain`, so every test run left files behind.
+func withTestDefaults<T>(_ body: (UserDefaults) throws -> T) throws -> T {
+    let folder = FileManager.default.temporaryDirectory
+        .appendingPathComponent("dashbar-tests-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let suite = folder.appendingPathComponent("defaults").path
+    guard let defaults = UserDefaults(suiteName: suite) else { throw TestDefaultsError.unavailable(suite) }
+    defer {
+        defaults.removePersistentDomain(forName: suite)
+        try? FileManager.default.removeItem(at: folder)
+    }
+    return try body(defaults)
+}
+
+enum TestDefaultsError: Error { case unavailable(String) }
