@@ -10,6 +10,9 @@
   --accent: oklch(0.5 0.12 215);
   --arc: oklch(0.72 0.12 205);
   --signal: oklch(0.72 0.17 52);
+  --attention: oklch(0.78 0.16 80);
+  --attention-text: oklch(0.5 0.12 70);
+  --danger: oklch(0.56 0.2 27);
   --track: oklch(0.88 0.015 215);
   --menubar: oklch(0.24 0.02 215);
   --menubar-ink: oklch(0.96 0.01 215);
@@ -39,6 +42,8 @@
     --accent: oklch(0.8 0.12 205);
     --arc: oklch(0.8 0.12 205);
     --track: oklch(0.3 0.03 215);
+    --attention-text: oklch(0.8 0.14 80);
+    --danger: oklch(0.68 0.18 25);
     --line: oklch(0.25 0.022 215);
     --desk: oklch(0.225 0.024 215);
   }
@@ -168,6 +173,11 @@ section[id], [id="top"] { scroll-margin-top: 88px; }
 .bar i { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--signal); }
 .bar u { position: absolute; top: -3px; bottom: -3px; width: 3px; border-radius: 2px; background: var(--ink); text-decoration: none; }
 .limit p { margin-top: 12px; color: var(--muted); }
+/* As in the app: amber while it is on course to run out, red once it is (nearly) used up */
+.bar[data-fill="attention"] i { background: var(--attention); }
+.bar[data-fill="problem"] i { background: var(--danger); }
+.limit p[data-fill="attention"] { color: var(--attention-text); }
+.limit p[data-fill="problem"] { color: var(--danger); }
 .figure { margin-top: 0; font-size: clamp(4.5rem, 10vw, 9rem); font-weight: 650; letter-spacing: -0.05em; line-height: 0.85; font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: 0.08em; flex-wrap: wrap; }
 .figure small { font-size: 0.24em; font-weight: 600; letter-spacing: -0.02em; color: var(--muted); }
 .pace-note { margin-top: 20px; max-width: 44ch; color: var(--muted); }

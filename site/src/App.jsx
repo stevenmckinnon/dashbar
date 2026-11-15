@@ -118,7 +118,7 @@ function Hero() {
         <p className="note">{LATEST_VERSION ? <>Version {LATEST_VERSION}. </> : null}Needs macOS 14 or later. Notarised by Apple. MIT licence.</p>
       </div>
       <div className="demo" data-ss-fill="">
-        <div role="img" aria-label="A short animation of Dashbar's panel, opened from the menu bar. It shows the dev servers, two of them marked barely used, then the plan limits, where the 5-hour limit is on pace to last until it resets.">
+        <div role="img" aria-label="A short animation of Dashbar's panel, opened from the menu bar. Overview shows the workspace where Claude is working, the other workspaces, the tightest plan limits and 7 GB of rebuildable caches. Then the dev servers, two of them marked barely used, and the Usage tab, where the plan limits fill and the 5-hour limit lasts until it resets at this rate.">
           <div aria-hidden="true"><DashbarDemo key={run} dark={dark} /></div>
         </div>
         <div className="caption-row">
@@ -212,17 +212,20 @@ const WINDOW_HOURS = 5;
 const ELAPSED_HOURS = 2;
 const EVEN_PACE = (ELAPSED_HOURS / WINDOW_HOURS) * 100;
 
+// The same rules and words as the app (RateLimit.pace and LimitBar.text). The bar is the agent's colour, amber
+// while it is on course to run out, red from 90% used or once it is used up.
 function paceResult(used) {
-  if (used >= 100) return { text: "Out", unit: "until it resets", state: "Used up until it resets" };
+  if (used >= 100) return { text: "Out", unit: "until it resets", state: "Used up until it resets", fill: "problem" };
+  const fill = used >= 90 ? "problem" : undefined;
+  const steady = used < EVEN_PACE - 10 ? "At this rate, plenty left when it resets" : "At this rate, lasts until it resets";
   const perHour = used / ELAPSED_HOURS;
-  if (perHour <= 0) return { text: "All", unit: "to spare", state: "On pace to last until it resets" };
+  if (perHour <= 0) return { text: "All", unit: "to spare", state: steady, fill };
   const hoursLeft = (100 - used) / perHour;
-  if (hoursLeft >= WINDOW_HOURS - ELAPSED_HOURS) {
-    return { text: "Lasts", unit: "until it resets", state: used < EVEN_PACE - 10 ? "Well under pace" : "On pace to last until it resets" };
-  }
+  if (hoursLeft >= WINDOW_HOURS - ELAPSED_HOURS) return { text: "Lasts", unit: "until it resets", state: steady, fill };
   const h = Math.floor(hoursLeft);
   const mins = Math.round((hoursLeft - h) * 60); // taste-skill-ignore: minutes, as on a clock
-  return { text: h > 0 ? `${h}h ${String(mins).padStart(2, "0")}m` : `${mins}m`, unit: "to run out", state: "At this rate, you run out before it resets" };
+  const at = new Date(Date.now() + hoursLeft * 3600e3).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return { text: h > 0 ? `${h}h ${String(mins).padStart(2, "0")}m` : `${mins}m`, unit: "to run out", state: `At this rate, runs out at ${at}`, fill: fill ?? "attention" };
 }
 
 function Pace() {
@@ -241,9 +244,9 @@ function Pace() {
       <div className="pace-result">
         <div className="figure" aria-live="polite" aria-atomic="true"><span>{r.text}</span><small>{r.unit}</small></div>
         <div className="limit" aria-hidden="true">
-          <div className="limit-head"><b>5-hour</b><span>resets in {WINDOW_HOURS - ELAPSED_HOURS} hours</span><span className="used">{used}% used</span></div>
-          <div className="bar"><i style={{ width: `${used}%` }} /><u style={{ left: `calc(${EVEN_PACE}% - 1.5px)` }} /></div>
-          <p>{r.state}</p>
+          <div className="limit-head"><b>5-hour</b><span>resets in {WINDOW_HOURS - ELAPSED_HOURS}h</span><span className="used">{used}% used</span></div>
+          <div className="bar" data-fill={r.fill}><i style={{ width: `${used}%` }} /><u style={{ left: `calc(${EVEN_PACE}% - 1.5px)` }} /></div>
+          <p data-fill={r.fill}>{r.state}</p>
         </div>
         <p className="pace-note">The bar is a copy of the one in the app. The mark is where an even pace would be by now.</p>
       </div>
@@ -318,6 +321,7 @@ function Privacy() {
             <li>Claude Code’s session files and transcripts: <code>~/.claude/sessions</code> and <code>~/.claude/projects</code></li>
             <li>Codex’s session logs: <code>~/.codex/sessions</code></li>
             <li>The same folders for any other Claude Code or Codex account you add in Settings</li>
+            <li>If you use Google’s agents: Gemini CLI’s chat logs in <code>~/.gemini/tmp</code>, and only the status columns of the Antigravity app’s conversation list, opened read-only. If you add Dashbar to the Antigravity CLI’s status line, its plan quota and each session’s folder, model, token totals and state. Never titles, transcripts or your Google sign-in.</li>
             <li>The listening ports on your Mac and the processes behind them, through the system’s own process API</li>
             <li>The folders you choose, to size the caches in clean-up</li>
             <li>If you add Dashbar to Claude Code’s status line: the plan usage Claude Code passes it after each reply. Dashbar changes only that one setting, keeps a backup, and puts your previous status line back when you remove it.</li>

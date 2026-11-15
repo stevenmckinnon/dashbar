@@ -2,7 +2,7 @@
 // structured data in index.html, so the two can never disagree.
 export const FAQ = [
   { q: "Which agents does Dashbar support?",
-    a: "Claude Code and Codex get full support: it reads their session files on your Mac for working status and usage. Other tools, such as T3 Code, Cursor, Gemini CLI and Aider, show up as a chip when they are running, without usage numbers. If you want one added, open an issue on GitHub." },
+    a: "Claude Code and Codex get full support: it reads their session files on your Mac for working status and usage. If you use Google’s agents, Gemini CLI shows its sessions and usage, and Antigravity its sessions, plus usage and plan limits once you add Dashbar to the Antigravity CLI’s status line. Other tools, such as T3 Code, Cursor and Aider, show up as a chip when they are running, without usage numbers. If you want one added, open an issue on GitHub." },
   { q: "Can I keep it open in a window?",
     a: "Yes. Press Control-Option-D, or the arrow at the top of the panel, to open the Dashbar window: the panel’s pages, History and every running workspace in a sidebar. A workspace’s page shows its uptime, CPU, memory and energy, its dev servers and agents, and the processes behind the numbers. It never starts anything. It acts only when you click: stopping a server, quitting a process after you confirm, or moving a workspace’s caches to the Trash. A pin keeps it on top of other windows." },
   { q: "Does it work on Intel Macs?",
@@ -22,7 +22,7 @@ export const FAQ = [
   { q: "How do I update it?",
     a: "From version 0.3.0 Dashbar checks for updates itself: open Settings, then About, then Check for Updates. With Homebrew, run brew upgrade --cask dashbar." },
   { q: "How do I uninstall it?",
-    a: "If you added Dashbar to Claude Code’s status line or turned on permission prompts, press Remove for each in Settings, under Integrations, first, so Claude Code’s settings go back to how they were. Then quit Dashbar and drag it to the Trash. With Homebrew, run brew uninstall --cask dashbar, and add --zap to remove its settings too." },
+    a: "If you added Dashbar to Claude Code’s or the Antigravity CLI’s status line, or turned on permission prompts, press Remove for each in Settings, under Integrations, first, so their settings go back to how they were. Then quit Dashbar and drag it to the Trash. With Homebrew, run brew uninstall --cask dashbar, and add --zap to remove its settings too." },
   { q: "Is it affiliated with Anthropic or OpenAI?",
     a: "No. Dashbar is an independent open source project." },
 ];
