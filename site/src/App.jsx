@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
-import { ArrowDownToLine, Check, Copy, RotateCw, Star } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowDownToLine, Check, Copy, Play, RotateCw, Star } from "lucide-react";
 import { FAQ } from "./faq";
 import { RELEASE_NOTES, LATEST_VERSION, inline } from "./releases";
 import { DashbarDemo } from "./demos/DashbarDemo";
 import { AgentsDemo, LimitsDemo, UsageDemo, ServersDemo, SystemDemo, CleanupDemo } from "./demos/FeatureDemos";
 import { WindowDemo } from "./demos/WindowDemo";
-import { REPO, BREW, HERO, FEATURES_INTRO, FEATURES, WINDOW, PACE, PRIVACY, INSTALL } from "./content";
+import { REPO, BREW, HERO, TOUR, FEATURES_INTRO, FEATURES, WINDOW, PACE, PRIVACY, INSTALL } from "./content";
 import { Mark, Footer } from "./Chrome";
 
 // The DMG itself, so the button downloads straight away. The version comes from the update feed at build time;
@@ -121,6 +121,47 @@ function Hero() {
         </div>
       </div>
     </header>
+  );
+}
+
+/* ---------- The launch film ---------- */
+
+// Never autoplays and loads nothing until asked: the poster is all a visitor downloads unless they press play.
+function Tour() {
+  const video = useRef(null);
+  const [started, setStarted] = useState(false);
+  const play = () => {
+    const v = video.current;
+    if (!v) return;
+    v.currentTime = 0;
+    v.play();
+    setStarted(true);
+  };
+  return (
+    <section className="wrap tour" id="tour" aria-labelledby="tour-h">
+      <div className="section-head">
+        <h2 id="tour-h">{TOUR.heading}</h2>
+        <p>{TOUR.lede}</p>
+      </div>
+      <div className="tour-film">
+        <div className="film">
+          <video ref={video} src="/launch.mp4" poster="/launch-poster.jpg" preload="none" playsInline muted
+            controls={started} width="1920" height="1080"
+            aria-label="Dashbar's 30-second launch film. The menu bar icon turns to a raised hand; the notch opens on a permission prompt and Allow once is pressed. Then the Overview panel with every session by project, the Claude and Codex plan limits filling with their pace marks, idle dev servers, 7 GB of caches you can rebuild, and the Dashbar window's History page." />
+          {!started && (
+            <button className="film-play" type="button" onClick={play}>
+              <Play size={18} strokeWidth={2.25} aria-hidden="true" />Play<span className="sr-only"> the 30-second film</span>
+            </button>
+          )}
+        </div>
+        <div className="caption-row">
+          <p className="caption">{TOUR.caption}</p>
+          {started && (
+            <button className="replay-pill" type="button" onClick={play}><RotateCw size={14} strokeWidth={2} aria-hidden="true" />Replay<span className="sr-only"> the film</span></button>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -362,6 +403,7 @@ export default function App() {
       <NavBar />
       <Hero />
       <main>
+        <Tour />
         <Features />
         <WindowSection />
         <Pace />

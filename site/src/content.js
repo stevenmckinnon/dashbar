@@ -13,6 +13,13 @@ export const HERO = {
   note: "Needs macOS 14 or later. Notarised by Apple. MIT licence.",
 };
 
+// The launch film: video/ builds it, docs/images/launch.mp4 is the web encode.
+export const TOUR = {
+  heading: "See it in 30 seconds",
+  lede: "A permission prompt answered from the notch, your plan limits with pace, idle dev servers, caches you can rebuild and the Dashbar window.",
+  caption: "No sound. Every screen is the real app, showing made-up projects.",
+};
+
 export const FEATURES_INTRO = "Everything an agent-heavy day throws at your Mac, in one small panel.";
 
 export const FEATURES = [

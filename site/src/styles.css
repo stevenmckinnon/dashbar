@@ -134,8 +134,8 @@ section[id], [id="top"] { scroll-margin-top: 88px; }
   .section-head p { margin-top: 16px; }
 }
 /* A hairline between the big sections, from one edge of the content to the other. */
-.features, .window, .pace { position: relative; }
-.features::before, .window::before, .pace::before { content: ""; position: absolute; top: 0; left: var(--margin); right: var(--margin); border-top: 1px solid var(--line); }
+.tour, .features, .window, .pace { position: relative; }
+.tour::before, .features::before, .window::before, .pace::before { content: ""; position: absolute; top: 0; left: var(--margin); right: var(--margin); border-top: 1px solid var(--line); }
 
 /* ---------- Features: one row each, the words on the left and the demo on the page's right edge ---------- */
 .features { display: grid; grid-template-columns: repeat(12, 1fr); gap: var(--gap); padding-block: var(--section) calc(var(--section) - 24px); }
@@ -325,3 +325,22 @@ section[id], [id="top"] { scroll-margin-top: 88px; }
 .policy li::marker { color: var(--muted); }
 .policy strong { font-weight: 600; }
 @media (max-width: 760px) { .policy { padding-block: 32px 88px; } .policy section { margin-top: 44px; } }
+
+/* ---------- The launch film ---------- */
+.tour { display: grid; grid-template-columns: repeat(12, 1fr); gap: var(--gap); padding-block: var(--section); }
+.tour-film { grid-column: 1 / -1; min-width: 0; margin-top: 64px; }
+.film { position: relative; border-radius: 16px; overflow: hidden; background: #081114; aspect-ratio: 16 / 9; }
+.film video { display: block; width: 100%; height: 100%; object-fit: cover; }
+.film::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--line); pointer-events: none; }
+.film-play { position: absolute; left: clamp(12px, 2.4%, 28px); bottom: clamp(12px, 4%, 28px); display: inline-flex; align-items: center; gap: 8px;
+  min-height: 52px; padding: 0 26px 0 22px; border: 0; border-radius: 999px; background: #EEF3F5; color: #081114;
+  font: inherit; font-weight: 600; cursor: pointer; transition: scale 160ms; }
+.film-play:active { scale: 0.97; }
+.film-play:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 999px; }
+@media (prefers-reduced-motion: reduce) { .film-play { transition: none; } .film-play:active { scale: 1; } }
+@media (max-width: 900px) {
+  .tour { display: block; padding-block: 80px; }
+  .tour-film { margin-top: 32px; }
+  .film { border-radius: 12px; }
+  .film-play { min-height: 44px; padding: 0 20px 0 16px; }
+}
