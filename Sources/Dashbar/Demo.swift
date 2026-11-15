@@ -291,16 +291,35 @@ enum DemoData {
         store.cleanupScanned = true
         if ProcessInfo.processInfo.environment["DASHBAR_DEMO_GOOGLE"] != nil { applyGoogle(to: store, now: now) }
         if ProcessInfo.processInfo.environment["DASHBAR_DEMO_WORST"] != nil { applyWorstCase(to: store, now: now, home: home) }
-        if ProcessInfo.processInfo.environment["DASHBAR_DEMO_QUIET"] != nil { applyQuiet(to: store, now: now) }
+        if let quiet = ProcessInfo.processInfo.environment["DASHBAR_DEMO_QUIET"] { applyQuiet(to: store, now: now, long: quiet == "long") }
+        // DASHBAR_DEMO_LOOSE_SERVER=1 adds a dev server outside every workspace (a Docker container), which Overview lists.
+        if ProcessInfo.processInfo.environment["DASHBAR_DEMO_LOOSE_SERVER"] != nil {
+            var l = Listener(pid: 9400, port: 5432, command: "com.docker.backend", address: "127.0.0.1")
+            l.cmdline = "com.docker.backend postgres:16"
+            l.isDev = true   // a Docker container by its command line (`isDocker`)
+            l.memory = 164 * 1_048_576
+            l.started = now.addingTimeInterval(-6 * 3600)
+            store.listeners.append(l)
+        }
+        // DASHBAR_DEMO_NO_LIMITS=1: no plan limits from any tool (nothing set up yet, or nothing reported).
+        if ProcessInfo.processInfo.environment["DASHBAR_DEMO_NO_LIMITS"] != nil {
+            store.claudePlan = nil
+            store.claudeAccountLimits = []
+            store.codexLimits = []
+            store.codexAccountLimits = []
+            store.antigravityLimits = nil
+        }
         applyHistory(to: store, now: now)
         store.lastUpdated = now
     }
 
     /// DASHBAR_DEMO_QUIET=1: an ordinary quiet moment. Every agent idle, no dev servers, no subagents or prompts, and
-    /// plan limits at 0% early in their windows (too early for a pace reading), with one small weekly figure.
-    @MainActor static func applyQuiet(to store: Store, now: Date) {
+    /// plan limits at 0% early in their windows (too early for a pace reading), with one small weekly figure. The last
+    /// agent went idle 4 minutes ago, so Overview still features it; =long makes that 32 minutes, so nothing is featured.
+    @MainActor static func applyQuiet(to store: Store, now: Date, long: Bool = false) {
         store.sessions = store.sessions.map { s in
-            var quiet = LiveSession(id: s.id, pid: s.pid, name: s.name, cwd: s.cwd, status: "idle", since: s.since,
+            let since = long ? min(s.since, now.addingTimeInterval(-32 * 60)) : s.since
+            var quiet = LiveSession(id: s.id, pid: s.pid, name: s.name, cwd: s.cwd, status: "idle", since: since,
                                     entrypoint: s.entrypoint, root: s.root)
             quiet.account = s.account; quiet.configDir = s.configDir; quiet.agent = s.agent
             return quiet
