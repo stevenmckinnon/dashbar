@@ -54,7 +54,7 @@ enum CLIStatus {
             usageToday: usage(store, now: now),
             servers: store.devListeners.map {
                 StatusSnapshot.Server(workspace: $0.isDocker ? nil : $0.project, folder: $0.isDocker ? nil : $0.root,
-                                      port: $0.port, command: $0.command, pid: $0.pid)
+                                      port: $0.port, command: $0.command, pid: $0.pid, title: $0.title)
             })
     }
 

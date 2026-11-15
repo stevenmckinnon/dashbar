@@ -115,15 +115,15 @@ and Dashbar has to be running.
 ```console
 $ dashbar
 Needs you
-  billing-api     Claude · needs permission · 32s
+  billing-api  Claude · needs permission · 32s
 Working
   storefront-web  Claude · 4m · 3 subagents
 Idle
-  docs-site       Claude · 1h 35m
+  docs-site  Claude · 1h 35m
 Plan limits
-  Claude 5-hour   55% · resets in 2h 11m
-  Claude Weekly   38% · resets Thu 06:02
-  Codex Weekly    34% · resets Thu 20:26
+  Claude 5-hour  55% · resets in 2h 11m
+  Claude Weekly  38% · resets Thu 06:02
+  Codex Weekly   34% · resets Thu 20:26
 Today
   Claude 152.7M tokens · Codex 9.5M tokens
 Servers
@@ -134,7 +134,9 @@ $ dashbar line
 ```
 
 - `dashbar` or `dashbar status`: agents that need you, agents working and idle, every plan limit (the one closest to
-  running out first, with its pace), today's tokens and dev servers.
+  running out first, with its pace), today's tokens and dev servers. It follows the panel: an account is named only
+  when more than one is in use, a long list of limits leaves out its rows at 0% (and says how many), tools with no
+  tokens today are left out, and servers are listed one per process, as on the Servers tab.
 - `dashbar line`: one line for a status bar or prompt. Add `--ascii` where `⚠` and `·` don't draw (it prints
   `! 1 needs you | 1 working | Claude 5h 55%`). An arrow (`↑`, or `(!)`) after a limit means it's on course to run out.
 - `dashbar status --json`: the same status as JSON, with each limit's pace worked out when you ask.

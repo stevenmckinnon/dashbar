@@ -14,7 +14,7 @@ import DashbarStatus
         "provider", "plan", "readAt", "stale", "problem",
         "label", "window", "windowSeconds", "usedPercent", "resetsAt", "pace", "runsOutAt",
         "day", "tools", "input", "output", "cacheRead", "cacheWrite", "total",
-        "port", "command",
+        "port", "command", "title",
     ]
 
     static func keys(_ value: Any) -> Set<String> {
@@ -220,17 +220,17 @@ import DashbarStatus
         #expect(out.stderr.isEmpty)
         #expect(out.stdout == """
         Needs you
-          billing-api     Claude · needs permission · 2m
+          billing-api  Claude · needs permission · 2m
         Working
           storefront-web  Claude · 4m · 3 subagents
           docs-site       Gemini CLI · 12m
         Idle
-          notes-ios       Claude · 1h 35m
+          notes-ios  Claude · 1h 35m
         Plan limits
-          Claude 5-hour   55% · resets in 2h 10m
-          Claude Weekly   31% · resets Tue 09:00
-          Codex Weekly    20% · resets Wed 08:00
-          Codex 5-hour    reset since the last reading
+          Claude 5-hour  55% · resets in 2h 10m
+          Claude Weekly  31% · resets Tue 09:00
+          Codex Weekly   20% · resets Wed 08:00
+          Codex 5-hour   reset since the last reading
         Today
           Claude 12.4M tokens · Codex 3.1M tokens
         Servers
@@ -288,6 +288,142 @@ import DashbarStatus
         let status = run([]).stdout
         #expect(status.hasPrefix("Warning: Couldn't read Claude Code's live sessions.\n"))
         #expect(status.contains(#/\n  Claude +Open Claude Code to renew its sign-in\.\n/#))
+    }
+
+    /// An account is named only while more than one of the tool's accounts shows up, as with only one set up.
+    @Test func accountNamedOnlyWithMoreThanOne() throws {
+        defer { try? FileManager.default.removeItem(at: home) }
+        var one = Self.fixture
+        one.sessions = one.sessions.map { var s = $0; if s.tool == "claude" { s.account = "Personal" }; return s }
+        one.limits[0].account = "Personal"
+        try save(one, as: .release)
+        var status = run([]).stdout
+        #expect(!status.contains("Personal"))
+        #expect(status.contains("  storefront-web  Claude · 4m · 3 subagents\n"))
+        #expect(status.contains("  Claude 5-hour  55%"))
+        #expect(run(["line"]).stdout == "⚠ 1 needs you · 2 working · Claude 5h 55%\n")
+
+        var two = one
+        two.sessions[1].account = "Work"
+        try save(two, as: .release)
+        status = run([]).stdout
+        #expect(status.contains("  storefront-web  Claude · Work · 4m · 3 subagents\n"))
+        #expect(status.contains("  billing-api  Claude · Personal · needs permission · 2m\n"))
+        #expect(status.contains("  Claude · Personal 5-hour  55%"))
+        #expect(run(["line"]).stdout == "⚠ 1 needs you · 2 working · Claude · Personal 5h 55%\n")
+
+        // The second account only in the plan limits counts too.
+        var limitsOnly = one
+        limitsOnly.limits.append(.init(provider: "claude", account: "Work", limits: [.init(label: "5-hour", usedPercent: 3)]))
+        try save(limitsOnly, as: .release)
+        #expect(run([]).stdout.contains("  billing-api  Claude · Personal · needs permission · 2m\n"))
+    }
+
+    @Test func toolsWithNoTokensTodayAreLeftOut() throws {
+        defer { try? FileManager.default.removeItem(at: home) }
+        var some = Self.fixture
+        some.usageToday?.tools.append(.init(tool: "google", name: "Antigravity CLI", input: 0, output: 0, cacheRead: 0, cacheWrite: 0))
+        some.usageToday?.tools[1] = .init(tool: "codex", name: "Codex", input: 0, output: 0, cacheRead: 0, cacheWrite: 0)
+        try save(some, as: .release)
+        var status = run([]).stdout
+        #expect(status.contains("Today\n  Claude 12.4M tokens\nServers"))
+        #expect(!status.contains("0 tokens"))
+
+        var none = some
+        none.usageToday?.tools[0] = .init(tool: "claude", name: "Claude", input: 0, output: 0, cacheRead: 0, cacheWrite: 0)
+        try save(none, as: .release)
+        status = run([]).stdout
+        #expect(!status.contains("Today"))
+        #expect(!status.contains("tokens"))
+    }
+
+    /// Rows at 0% fold as in the panel: only in a list of more than three, and never the tightest.
+    @Test func limitsAtZeroFoldOnlyInALongList() throws {
+        defer { try? FileManager.default.removeItem(at: home) }
+        func weekly(_ label: String, _ used: Double) -> StatusSnapshot.Limit {
+            .init(label: label, window: "Weekly", windowSeconds: 7 * 86400, usedPercent: used,
+                  resetsAt: Self.now.addingTimeInterval(6 * 86400))
+        }
+        var short = Self.fixture
+        short.limits = [.init(provider: "antigravity", limits: [weekly("Gemini · Weekly", 0), weekly("Argon · Weekly", 5),
+                                                                 weekly("Other models · Weekly", 0)])]
+        try save(short, as: .release)
+        var status = run([]).stdout
+        #expect(status.contains("  Antigravity Gemini · Weekly        0%"))
+        #expect(status.contains("  Antigravity Other models · Weekly  0%"))
+        #expect(!status.contains("more at 0%"))
+
+        var long = short
+        long.limits[0].limits += [weekly("Flash · Weekly", 0), weekly("Image · Weekly", 12)]
+        try save(long, as: .release)
+        status = run([]).stdout
+        #expect(status.contains("""
+        Plan limits
+          Antigravity Image · Weekly  12% · resets Thu 08:00
+          Antigravity Argon · Weekly  5% · resets Thu 08:00
+          Antigravity                 3 more at 0%
+
+        """))
+
+        // All at 0%: the first keeps its row.
+        var idle = long
+        idle.limits[0].limits = idle.limits[0].limits.map { var l = $0; l.usedPercent = 0; return l }
+        try save(idle, as: .release)
+        status = run([]).stdout
+        #expect(status.contains("  Antigravity Gemini · Weekly  0%"))
+        #expect(status.contains("  Antigravity                  4 more at 0%"))
+        #expect(run(["line"]).stdout.hasSuffix("Antigravity wk 0%\n"))
+    }
+
+    /// Servers read as the panel's Servers card: one row per process, Docker named as such, two ports and a count.
+    @Test func serversAsThePanelNamesThem() throws {
+        defer { try? FileManager.default.removeItem(at: home) }
+        var fixture = Self.fixture
+        fixture.servers = [
+            .init(workspace: "storefront-web", folder: "/Users/demo/Development/storefront-web", port: 3000, command: "node",
+                  pid: 4300, title: "storefront-web"),
+            .init(workspace: nil, folder: nil, port: 55433, command: "com.docker.backend", pid: 4400, title: "Docker container"),
+            .init(workspace: nil, folder: nil, port: 55432, command: "com.docker.backend", pid: 4400, title: "Docker container"),
+            .init(workspace: nil, folder: nil, port: 5173, command: "vite", pid: 4500, title: "vite"),
+            .init(workspace: nil, folder: nil, port: 8000, command: "python3", pid: 4600),
+            .init(workspace: nil, folder: nil, port: 8001, command: "python3", pid: 4600),
+            .init(workspace: nil, folder: nil, port: 8002, command: "python3", pid: 4600),
+            .init(workspace: nil, folder: nil, port: 8003, command: "python3", pid: 4600),
+        ]
+        try save(fixture, as: .release)
+        let reader = StatusReader(home: home, isRunning: { pid, _ in pid == 4242 })
+        let format = StatusFormat(now: Self.now, timeZone: TimeZone(identifier: "UTC")!, locale: Locale(identifier: "en_GB"),
+                                  isAlive: { _ in true })
+        let status = DashbarCLI.run([], context: .init(reader: reader, format: format, environment: [:], version: nil)).stdout
+        #expect(status.hasSuffix("""
+        Servers
+          storefront-web    :3000 node
+          Docker container  :55432 :55433 com.docker.backend
+          vite              :5173
+          python3           :8000 :8001 +2
+
+        """))
+
+        // A snapshot from before titles: Docker is still named, never by its process name.
+        var old = fixture
+        old.servers = old.servers.map { var s = $0; s.title = nil; return s }
+        #expect(old.servers[1].name == "Docker container")
+        #expect(old.servers[0].name == "storefront-web")
+    }
+
+    /// The tool folds limit rows itself (it can't link the app), so its rule must match `RateLimit.fold`.
+    @Test func foldMatchesTheApp() {
+        let shares: [Double] = [0, 0.4, 0.6, 5, 40]
+        for count in 1...6 {
+            var combos: [[Double]] = [[]]
+            for _ in 0..<count { combos = combos.flatMap { c in shares.map { c + [$0] } } }
+            for used in combos {
+                let app = RateLimit.fold(used.enumerated().map { RateLimit(label: "\($0.offset)", usedPercent: $0.element, resetsAt: nil) })
+                let tool = StatusSnapshot.Limit.folded(used.enumerated().map { .init(label: "\($0.offset)", usedPercent: $0.element) })
+                #expect(Set(app.folded.map { Int($0.label)! }) == tool, "\(used)")
+            }
+        }
+        #expect(StatusSnapshot.Limit.foldAbove == RateLimit.foldAbove)
     }
 
     @Test func tokensFromAnotherDayAreLeftOut() throws {

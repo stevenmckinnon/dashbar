@@ -188,13 +188,24 @@ public struct StatusSnapshot: Codable, Equatable, Sendable {
         public var command: String
         /// So a reader can leave out a server that has stopped since.
         public var pid: Int32
+        /// The panel's name for its row: the workspace, "Docker container", or the process name for one outside every
+        /// project. Nil in snapshots from before it was added.
+        public var title: String?
 
-        public init(workspace: String?, folder: String?, port: Int, command: String, pid: Int32) {
+        public init(workspace: String?, folder: String?, port: Int, command: String, pid: Int32, title: String? = nil) {
             self.workspace = workspace
             self.folder = folder
             self.port = port
             self.command = command
             self.pid = pid
+            self.title = title
+        }
+
+        /// `title`, or for an older snapshot the same name worked out from what it has.
+        public var name: String {
+            if let title { return title }
+            if workspace == nil, command.hasPrefix("com.docke") { return "Docker container" }
+            return workspace ?? command
         }
     }
 }
@@ -324,5 +335,37 @@ extension StatusSnapshot {
             return g
         }
         return copy
+    }
+}
+
+// MARK: - Which rows the panel shows
+
+extension StatusSnapshot.Limit {
+    /// Lists longer than this can fold their rows at 0% (the app's `RateLimit.foldAbove`).
+    public static let foldAbove = 3
+
+    /// The same rule as the app's `RateLimit.fold` (a test keeps them in step): in a list of more than three, two or more
+    /// at 0% used fold away, except the tightest (the most used, or the first when all are at 0%), which always shows.
+    /// Returns the folded rows' positions in `limits`.
+    public static func folded(_ limits: [Self]) -> Set<Int> {
+        guard limits.count > foldAbove else { return [] }
+        func isZero(_ l: Self) -> Bool { Int(max(0, l.usedPercent).rounded()) == 0 }
+        guard limits.filter(isZero).count >= 2 else { return [] }
+        let tightest = limits.indices.max {
+            limits[$0].usedPercent < limits[$1].usedPercent || (limits[$0].usedPercent == limits[$1].usedPercent && $0 > $1)
+        }
+        let folded = Set(limits.indices.filter { isZero(limits[$0]) && $0 != tightest })
+        return folded.count >= 2 ? folded : []
+    }
+}
+
+extension StatusSnapshot {
+    /// Whether to name `tool`'s accounts: only while more than one of its accounts shows up, in its sessions or its plan
+    /// limits. The app names accounts once more than one is set up; this also leaves the name out when the others have
+    /// nothing to show, so one account in use reads "Claude", as it would with only one set up.
+    public func namesAccounts(of tool: String) -> Bool {
+        let accounts = Set(sessions.filter { $0.tool == tool }.compactMap(\.account)
+                           + limits.filter { $0.provider == tool }.compactMap(\.account))
+        return accounts.count > 1
     }
 }
