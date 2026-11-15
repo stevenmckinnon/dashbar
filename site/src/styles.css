@@ -79,7 +79,17 @@ code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.88em
 .nav ul a:not(.btn) { display: block; color: var(--muted); text-decoration: none; padding: 8px 12px; border-radius: 999px; transition: color 160ms, background-color 160ms; }
 .nav ul li:last-child { margin-left: 12px; }
 @media (hover: hover) { .nav ul a:not(.btn):hover { color: var(--ink); background: var(--surface); } }
-@media (max-width: 860px) { .nav ul li:not(:last-child) { display: none; } }
+/* Star on GitHub: a quiet pill beside Install, so the download stays the one dark button. */
+.btn.ghost { position: relative; gap: 8px; padding: 0 16px 0 14px; background: var(--surface); color: var(--ink); font-weight: 500; transition: background-color 160ms; }
+.btn.ghost:focus-visible { border-radius: 999px; }
+.nav ul li.nav-star { margin-left: 8px; }
+@media (hover: hover) { .btn.ghost:hover { opacity: 1; background: var(--surface-2); } }
+@media (max-width: 860px) {
+  .nav ul li:not(:last-child):not(.nav-star) { display: none; }
+  /* Icon only on narrow screens; the label stays for screen readers. */
+  .btn.ghost { width: 38px; padding: 0; }
+  .btn.ghost .label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
 section[id], [id="top"] { scroll-margin-top: 88px; }
 
 /* ---------- Hero ---------- */

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowDownToLine, Check, Copy, RotateCw } from "lucide-react";
+import { ArrowDownToLine, Check, Copy, RotateCw, Star } from "lucide-react";
 import { FAQ } from "./faq";
 import { RELEASE_NOTES, LATEST_VERSION, inline } from "./releases";
 import { DashbarDemo } from "./demos/DashbarDemo";
@@ -95,7 +95,11 @@ function NavBar() {
           <li><a href="#pace">Pace</a></li>
           <li><a href="#privacy">Privacy</a></li>
           <li><a href="#faq">FAQ</a></li>
-          <li><a href={REPO}>GitHub</a></li>
+          <li className="nav-star">
+            <a className="btn small ghost" href={REPO}>
+              <Star size={16} strokeWidth={1.75} aria-hidden="true" /><span className="label">Star on GitHub</span>
+            </a>
+          </li>
           <li><a className="btn small" href="#install">Install</a></li>
         </ul>
       </nav>
