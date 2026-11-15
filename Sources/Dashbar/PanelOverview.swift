@@ -234,12 +234,16 @@ struct Widget<Content: View>: View {
     }
 }
 
-/// Claude's tokens for each of the last seven days, today last and in Claude's colour, each bar over its weekday's
-/// initial in the user's language. Bars keep a bar's width however wide the widget is.
+/// A tool's tokens for each day, today last and in the tool's colour (earlier days neutral), each bar over its
+/// weekday's initial in the user's language. Bars keep a bar's width however wide the widget is, unless `stretch`
+/// shares the width out between them (the Usage tab's cards).
 struct DayBars: View {
     let points: [DayPoint]
     let tint: Color
-    static let height: CGFloat = 20
+    var height: CGFloat = 20
+    var stretch = false
+    /// What VoiceOver calls the chart.
+    var label = "Claude tokens by day, last 7 days"
 
     var body: some View {
         let maxV = Double(points.map(\.tokens).max() ?? 0)
@@ -251,18 +255,19 @@ struct DayBars: View {
                         Capsule().fill(Color.primary.opacity(0.12)).frame(height: 1)
                         RoundedRectangle(cornerRadius: 2)
                             .fill(p.isToday ? tint : UI.dataPast)
-                            .frame(height: maxV > 0 ? Meter.width(Double(p.tokens) / maxV, in: Self.height, minimum: 2) : 0)
+                            .frame(height: maxV > 0 ? Meter.width(Double(p.tokens) / maxV, in: height, minimum: 2) : 0)
                     }
-                    .frame(width: 10, height: Self.height, alignment: .bottom)
+                    .frame(width: stretch ? nil : 10, height: height, alignment: .bottom)
+                    .frame(maxWidth: stretch ? 22 : nil)
                     Text(Self.initial(p.date)).font(.system(size: UI.Size.micro, weight: p.isToday ? .semibold : .regular))
                         .foregroundStyle(p.isToday ? AnyShapeStyle(.primary) : AnyShapeStyle(UI.textSecondary))
                         .fixedSize()
                 }
-                .frame(minWidth: 12)
+                .frame(minWidth: 12, maxWidth: stretch ? .infinity : nil)
             }
         }
         .accessibilityElement()
-        .accessibilityLabel("Claude tokens by day, last 7 days")
+        .accessibilityLabel(label)
         .accessibilityValue(points.map { "\($0.isToday ? "today" : Self.dayName($0.date)) \(Fmt.tokens($0.tokens))" }.joined(separator: ", "))
     }
 

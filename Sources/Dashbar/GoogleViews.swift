@@ -20,18 +20,17 @@ enum GoogleUsage {
 
 // MARK: - Plan limits
 
-/// Antigravity's quota in the plan limits card: each model group's windows, from its CLI's status line.
+/// Antigravity's quota in its Usage card: each model group's windows, from its CLI's status line.
 struct AntigravityLimitsBlock: View {
     let limits: AntigravityLimits?
     let connected: Bool
+    /// "Antigravity · Google AI Pro" over the rows, when the card's title doesn't already say whose limits they are.
+    var showsHeader = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                Image(systemName: UI.googleSymbol).font(.system(size: UI.Size.caption, weight: .bold)).foregroundStyle(UI.google)
-                    .accessibilityHidden(true)
-                Text(["Antigravity", limits?.planTier].compactMap { $0 }.joined(separator: " · "))
-                    .font(.system(size: UI.Size.body, weight: .medium))
+            if showsHeader {
+                LimitsSubheader(text: ["Antigravity", limits?.planTier].compactMap { $0 }.joined(separator: " · "))
             }
             if let problem = limits?.problem {
                 HStack(alignment: .top, spacing: 6) {

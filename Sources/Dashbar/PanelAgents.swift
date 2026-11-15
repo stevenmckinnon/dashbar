@@ -2,85 +2,289 @@ import SwiftUI
 import Charts
 import AppKit
 
-// MARK: - Usage
+// MARK: - Usage tab
 
-struct UsageCard: View {
-    @EnvironmentObject var store: Store
+/// One tool on the Usage tab, as its card shows it. Built from the store by `Store.usageServices`.
+struct ServiceUsage: Identifiable {
+    let service: UsageRules.Service
+    var id: UsageRules.Service { service }
+    /// "Claude Code · Max 5x", "Codex", "Gemini CLI · Antigravity".
     let title: String
-    var icon: String? = nil
+    let icon: String
+    /// The glyph's colour, and the fill for the card's meters and bars.
     let tint: Color
+    let fill: Color
     let summary: UsageSummary
-    let loading: Bool
-    var limits: [RateLimit] = []
-    /// Each account's share, shown only with more than one account.
+    var loading = false
+    /// Each account's share, listed only with more than one account.
     var accounts: [AccountUsage] = []
     /// Added to the cost's explanation (Antigravity's own estimates).
     var costNote: String? = nil
-    @State private var period = UsagePeriod.today
+    /// Every limit the card's rows show, across accounts.
+    var limits: [RateLimit] = []
+    /// Something the card must say, so it never folds (`UsageRules.Digest.hasNotice`).
+    var hasNotice = false
+    /// A small label after the title: "Experimental" for Claude's plan limits read from the endpoint.
+    var badge: String? = nil
+    /// Plan limits are loading.
+    var busy = false
+
+    func digest(_ period: UsagePeriod) -> UsageRules.Digest {
+        let usage = summary.period(period)
+        return UsageRules.Digest(service: service, limits: limits, tokens: summary.found ? usage.totals.total : 0,
+                                 cost: summary.found ? usage.cost : 0, hasNotice: hasNotice)
+    }
+}
+
+extension Store {
+    /// The tools the Usage tab has a card for, in Claude Code, Codex, Google order (`UsageRules.order` sorts them).
+    /// Claude Code always has one; Codex and Google's tools only for someone who uses them.
+    func usageServices(settings: AppSettings, antigravityInstalled: Bool) -> [ServiceUsage] {
+        let oneAccount = claudePlanLabel == nil && claudeAccountLimits.isEmpty
+        let experimental = claudePlan.map { $0.source == .endpoint } ?? (!settings.claudeStatusLine && settings.claudeLimits)
+        var out = [ServiceUsage(
+            service: .claude,
+            title: (["Claude Code", oneAccount ? claudePlan?.plan : nil] as [String?]).compactMap { $0 }.joined(separator: " · "),
+            icon: "asterisk", tint: UI.claude, fill: UI.claudeFill, summary: claude, loading: usageLoading,
+            accounts: claudeAccountUsage,
+            limits: (settings.showsClaudeLimits && claudePlan?.problem == nil ? claudePlan?.limits ?? [] : [])
+                + claudeAccountLimits.filter { $0.problem == nil }.flatMap(\.limits),
+            hasNotice: usageLoading || claude.warning != nil || !claude.found || !settings.showsClaudeLimits
+                || claudePlan?.problem != nil || claudeAccountLimits.contains { $0.problem != nil },
+            badge: oneAccount && settings.showsClaudeLimits && experimental ? "Experimental" : nil,
+            busy: oneAccount && settings.claudeLimits && claudePlanLoading)]
+        if codex.found || !codexAccountLimits.isEmpty {
+            out.append(ServiceUsage(
+                service: .codex, title: "Codex", icon: "chevron.left.forwardslash.chevron.right", tint: UI.codex, fill: UI.codex,
+                summary: codex, accounts: codexAccountUsage,
+                limits: codexAccountLimits.isEmpty ? codexLimits : codexAccountLimits.flatMap(\.limits),
+                hasNotice: codex.warning != nil))
+        }
+        // Only for someone with Google's tools: their transcripts, or the Antigravity CLI's bridge or a reading it left.
+        if google.found || antigravityLimits != nil || antigravityInstalled {
+            let name = google.found ? GoogleUsage.title(googleSources) : "Antigravity CLI"
+            // The plan tier names Antigravity's plan, so it joins the title only when the card is Antigravity's alone.
+            let tier = name.hasPrefix("Antigravity") ? antigravityLimits?.planTier : nil
+            out.append(ServiceUsage(
+                service: .google, title: ([name, tier] as [String?]).compactMap { $0 }.joined(separator: " · "),
+                icon: UI.googleSymbol, tint: UI.google, fill: UI.google, summary: google,
+                costNote: GoogleUsage.costNote(googleSources),
+                limits: antigravityLimits?.problem == nil ? antigravityLimits?.flattened ?? [] : [],
+                hasNotice: google.warning != nil || antigravityLimits?.problem != nil))
+        }
+        return out
+    }
+}
+
+/// The Usage tab, in the panel and the window: one period choice for every card, a line across tools, then one card
+/// per tool, the one closest to running out first (`UsageRules`).
+struct UsageTab: View {
+    @EnvironmentObject var store: Store
+    @ObservedObject private var settings = AppSettings.shared
+    @ObservedObject private var antigravity = AntigravitySettings.shared
+    @AppStorage(UsagePeriod.storageKey) private var periodRaw = UsagePeriod.today.rawValue
+    @AppStorage(CostLine.showKey) private var showCost = true
+    /// The window: two columns when there's room, and each card lists its workspaces and models.
+    var wide = false
+
+    var body: some View {
+        let period = UsagePeriod(rawValue: periodRaw) ?? .today
+        let now = Date()
+        let services = store.usageServices(settings: settings, antigravityInstalled: antigravity.status.isInstalled)
+        let digests = UsageRules.order(services.map { $0.digest(period) }, now: now)
+        let ordered = digests.compactMap { d in services.first { $0.service == d.service } }
+        let idle = Set(digests.filter(UsageRules.isIdle).map(\.service))
+        VStack(alignment: .leading, spacing: UI.gap) {
+            controls(period: period, digests: digests,
+                     paceMark: ordered.filter { !idle.contains($0.service) }.flatMap(\.limits).contains { $0.paceMark(now: now) != nil })
+            if wide && ordered.count > 1 {
+                // Two columns when both fit at the panel's width or more; cards alternate so the first two sit side by side.
+                let left = ordered.enumerated().filter { $0.offset % 2 == 0 }.map(\.element)
+                let right = ordered.enumerated().filter { $0.offset % 2 == 1 }.map(\.element)
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: UI.gap) {
+                        VStack(spacing: UI.gap) { cards(left, period: period, idle: idle) }.frame(minWidth: 400)
+                        VStack(spacing: UI.gap) { cards(right, period: period, idle: idle) }.frame(minWidth: 400)
+                    }
+                    VStack(spacing: UI.gap) { cards(ordered, period: period, idle: idle) }
+                }
+            } else {
+                cards(ordered, period: period, idle: idle)
+            }
+        }
+    }
+
+    private func cards(_ list: [ServiceUsage], period: UsagePeriod, idle: Set<UsageRules.Service>) -> some View {
+        ForEach(list) { ServiceUsageCard(service: $0, period: period, idle: idle.contains($0.service), detailed: wide) }
+    }
+
+    /// The period picker with the key to the meters' tick, and with two or more tools in use, their total.
+    private func controls(period: UsagePeriod, digests: [UsageRules.Digest], paceMark: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Picker("Period", selection: $periodRaw) {
+                    ForEach(UsagePeriod.allCases) { Text($0.short).tag($0.rawValue) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .controlSize(.small)
+                .frame(width: 168)
+                .help("The span every card below shows: today, the last 7 days or the last 14")
+                Spacer(minLength: 8)
+                if paceMark { PaceKey() }
+            }
+            if UsageRules.showsSummary(digests) {
+                let totals = UsageRules.totals(digests)
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(Fmt.tokens(totals.tokens)).font(.system(size: UI.Size.body, weight: .semibold).monospacedDigit())
+                    Text("tokens \(period.span) across \(totals.tools) tools")
+                        .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+                    Spacer(minLength: 6)
+                    if showCost && totals.cost > 0 {
+                        Text("\u{2248} \(Fmt.usd(totals.cost))").font(.system(size: UI.Size.body, weight: .semibold).monospacedDigit())
+                        Text("at API prices").font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+                    }
+                }
+                .lineLimit(1)
+                .help(CostLine.help(note: nil, missing: []))
+                .accessibilityElement(children: .combine)
+            }
+        }
+    }
+}
+
+/// One tool's card: its plan limits, then the period's tokens with a chart and where they went. The header opens the
+/// History page. An idle tool (no usage in the period, no limits) folds to the header alone.
+struct ServiceUsageCard: View {
+    @EnvironmentObject var store: Store
+    let service: ServiceUsage
+    let period: UsagePeriod
+    var idle = false
+    /// The window: the period's workspaces and models too.
+    var detailed = false
     @AppStorage(CostLine.showKey) private var showCost = true
 
     var body: some View {
-        let usage = summary.period(period)
-        Card(title: title, icon: icon, tint: tint, count: nil, trailing: period.tokensLine(usage.totals.total)) {
-            if loading {
-                HStack { ProgressView().controlSize(.small); Text("Scanning transcripts…").font(.caption).foregroundStyle(UI.textSecondary) }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            } else if !summary.found {
-                EmptyRow(text: "No transcripts found")
-            } else {
-                VStack(alignment: .leading, spacing: 10) {
-                    Picker("Period", selection: $period) {
-                        ForEach(UsagePeriod.allCases) { Text($0.short).tag($0) }
+        VStack(alignment: .leading, spacing: 12) {
+            header
+            if !idle {
+                // The limits and the tokens are two groups: more space between them than inside either.
+                VStack(alignment: .leading, spacing: 18) {
+                    ServiceLimits(service: service)
+                    if service.service == .claude || service.summary.found || service.summary.warning != nil { tokens }
+                }
+            }
+        }
+        .padding(.horizontal, UI.cardPadding)
+        .padding(.vertical, idle ? 9 : UI.cardPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .surface()
+    }
+
+    private var header: some View {
+        Button { AppWindow.shared.show(store: store, page: .history) } label: {
+            HStack(spacing: 7) {
+                IconChip(symbol: service.icon, tint: service.tint)
+                Text(service.title).font(.system(size: UI.Size.body, weight: .semibold))
+                    .lineLimit(1).truncationMode(.tail)
+                if let badge = service.badge { ExperimentalBadge(text: badge) }
+                Spacer(minLength: 6)
+                if service.busy { ProgressView().controlSize(.mini) }
+                if idle {
+                    Text(period.noUsage).font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary).lineLimit(1)
+                }
+                Image(systemName: "chevron.right").font(.system(size: UI.Size.micro, weight: .semibold))
+                    .foregroundStyle(UI.textSecondary)
+                    .accessibilityHidden(true)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressStyle())
+        .help("Open History: 30 days of usage and how full each plan window got")
+        .accessibilityLabel(idle ? "\(service.title), \(period.noUsage)" : service.title)
+        .accessibilityHint("Opens the History page")
+        .accessibilityAddTraits(.isHeader)   // the headings rotor still jumps between tools
+    }
+
+    @ViewBuilder private var tokens: some View {
+        let summary = service.summary
+        if service.loading {
+            HStack { ProgressView().controlSize(.small); Text("Scanning transcripts…").font(.caption).foregroundStyle(UI.textSecondary) }
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else if let warning = summary.warning {
+            // Never a quiet zero: say the figure is unknown, with the reason in the tooltip.
+            HStack(alignment: .top, spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(UI.textDanger).accessibilityHidden(true)
+                Text("Usage unknown: Dashbar can't read these logs.").fixedSize(horizontal: false, vertical: true)
+            }
+            .font(.system(size: UI.Size.caption))
+            .help(warning)
+            .accessibilityElement(children: .combine)
+            .accessibilityHint(warning)
+        } else if !summary.found {
+            EmptyRow(text: "No transcripts found")
+        } else {
+            let usage = summary.period(period)
+            VStack(alignment: .leading, spacing: 8) {
+                headline(usage)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(period == .today ? "By hour, last 24 hours · \(Self.sessions(summary.sessions24))" : "By day, last \(period.days) days")
+                        .font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
+                    if period == .today {
+                        HourBars(points: summary.last24, tint: service.fill)
+                    } else {
+                        DayBars(points: Array(summary.last14.suffix(period.days)), tint: service.fill, height: 40, stretch: true,
+                                label: "\(service.title) tokens by day, last \(period.days) days")
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .controlSize(.small)
-                    HStack(spacing: 6) {
-                        MiniStat(label: "In", value: usage.totals.input)
-                        MiniStat(label: "Out", value: usage.totals.output)
-                        MiniStat(label: "Cache read", value: usage.totals.cacheRead)
-                        MiniStat(label: "Cache write", value: usage.totals.cacheWrite)
+                }
+                Text(Self.split(usage.totals))
+                    .font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
+                    .lineLimit(1).minimumScaleFactor(0.9)
+                    .help("Input, output, and cache reads and writes, which together make the total")
+                if showCost && usage.totals.total > 0 && !usage.unpriced.isEmpty {
+                    Text("No price for \(usage.unpriced.joined(separator: ", ")), so it's left out of the cost")
+                        .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if usage.subagentTokens > 0 { SubagentShare(usage: usage, showCost: showCost) }
+                if detailed && !usage.projects.isEmpty {
+                    HStack(alignment: .top, spacing: 14) {
+                        RankList(title: "Workspaces", items: usage.projects, tint: service.fill, showCost: showCost)
+                        RankList(title: "Models", items: RankList.shortModels(usage.models), tint: service.fill, showCost: showCost)
                     }
-                    if showCost && usage.totals.total > 0 { CostLine(usage: usage, note: costNote) }
-                    if usage.subagentTokens > 0 { SubagentShare(usage: usage, showCost: showCost) }
-                    HStack {
-                        Text(period == .today ? "By hour, last 24 hours" : "By day, last \(period.days) days")
-                            .font(.system(size: UI.Size.caption, weight: .medium)).foregroundStyle(UI.textSecondary)
-                        if period == .today {
-                            Text("· \(summary.sessions24) sessions").font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
-                        }
-                        Spacer()
-                        Button { AppWindow.shared.show(store: store, page: .history) } label: {
-                            HStack(spacing: 2) {
-                                Text("History")
-                                Image(systemName: "chevron.right").font(.system(size: UI.Size.micro - 1, weight: .semibold))
-                                    .accessibilityHidden(true)
-                            }
-                        }
-                        .buttonStyle(PressStyle())
-                        .font(.system(size: UI.Size.caption, weight: .medium)).foregroundStyle(UI.textInfo)
-                        .help("Open the History page: 30 days of usage and how full each plan window got")
-                    }
-                    if period == .today { hourly } else { daily(Array(summary.last14.suffix(period.days))) }
-                    if !usage.projects.isEmpty {
-                        HStack(alignment: .top, spacing: 14) {
-                            RankList(title: "Workspaces", items: usage.projects, tint: tint, showCost: showCost)
-                            RankList(title: "Models", items: RankList.shortModels(usage.models), tint: tint, showCost: showCost)
-                        }
-                    }
-                    if accounts.count > 1 {
-                        RankList(title: "Accounts", items: Self.byAccount(accounts, period), tint: tint, showCost: showCost)
-                    }
-                    if !limits.isEmpty {
-                        LimitList(limits: limits, tint: tint)
-                        if limits.contains(where: { $0.paceMark() != nil }) {
-                            PaceKey().frame(maxWidth: .infinity, alignment: .trailing)
-                        }
-                    }
+                    .padding(.top, 4)
+                }
+                if service.accounts.count > 1 {
+                    RankList(title: "Accounts", items: Self.byAccount(service.accounts, period), tint: service.fill, showCost: showCost)
+                        .padding(.top, 4)
                 }
             }
         }
     }
+
+    /// "153M tokens today" with the estimated cost on the right.
+    private func headline(_ usage: PeriodUsage) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Text(Fmt.tokens(usage.totals.total))
+                .font(.system(size: UI.Size.numeral, weight: .semibold, design: .rounded).monospacedDigit()).lineLimit(1)
+            Text("tokens \(period.span)").font(.system(size: UI.Size.caption, weight: .semibold)).foregroundStyle(UI.textSecondary)
+                .fixedSize()
+            Spacer(minLength: 6)
+            if showCost && usage.cost > 0 {
+                Text("\u{2248} \(Fmt.usd(usage.cost))").font(.system(size: UI.Size.body, weight: .semibold).monospacedDigit())
+                Text("at API prices").font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary).fixedSize()
+            }
+        }
+        .help(showCost ? CostLine.help(note: service.costNote, missing: usage.unpriced) : "")
+        .accessibilityElement(children: .combine)
+    }
+
+    /// "In 1.2M · Out 640K · Cache read 148M · Cache write 2.9M": the total's parts on one line.
+    static func split(_ t: TokenTotals) -> String {
+        "In \(Fmt.tokens(t.input)) · Out \(Fmt.tokens(t.output)) · Cache read \(Fmt.tokens(t.cacheRead)) · Cache write \(Fmt.tokens(t.cacheWrite))"
+    }
+
+    static func sessions(_ n: Int) -> String { n == 1 ? "1 session" : "\(n) sessions" }
 
     /// Each account's tokens (and cost) for the period, largest first.
     static func byAccount(_ accounts: [AccountUsage], _ period: UsagePeriod) -> [Ranked] {
@@ -90,14 +294,21 @@ struct UsageCard: View {
         }
         .sorted { ($0.value, $1.name) > ($1.value, $0.name) }
     }
+}
 
-    private var hourly: some View {
-        let peak = Double(summary.last24.map(\.tokens).max() ?? 0)
-        return Chart(summary.last24) { p in
+/// Tokens by hour over the last 24 hours: the current hour in the tool's colour and earlier ones neutral, as the day
+/// bars draw today against earlier days.
+struct HourBars: View {
+    let points: [HourPoint]
+    let tint: Color
+
+    var body: some View {
+        let peak = Double(points.map(\.tokens).max() ?? 0)
+        Chart(points) { p in
             BarMark(x: .value("Hour", p.date, unit: .hour),
                     yStart: .value("Base", 0),
                     yEnd: .value("Tokens", max(Double(p.tokens), peak * 0.035)))
-                .foregroundStyle(p.tokens == 0 ? Color.primary.opacity(0.1) : (p.isNow ? tint : tint.opacity(0.45)))
+                .foregroundStyle(p.tokens == 0 ? Color.primary.opacity(0.1) : (p.isNow ? tint : UI.dataPast))
                 .cornerRadius(2)
         }
         .chartYScale(domain: 0...max(peak, 1))
@@ -107,71 +318,31 @@ struct UsageCard: View {
                 AxisValueLabel(format: .dateTime.hour(.defaultDigits(amPM: .abbreviated))).font(.system(size: UI.Size.micro))
             }
         }
-        .frame(height: 64)
-    }
-
-    private func daily(_ points: [DayPoint]) -> some View {
-        Chart(points) { p in
-            BarMark(x: .value("Day", p.date, unit: .day), y: .value("Tokens", p.tokens))
-                .foregroundStyle(p.isToday ? tint : tint.opacity(0.4))
-                .cornerRadius(2)
-        }
-        .chartYAxis {
-            AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { v in
-                AxisGridLine().foregroundStyle(Color.primary.opacity(0.08))
-                AxisValueLabel { if let n = v.as(Int.self) { Text(Fmt.tokens(n)).font(.system(size: UI.Size.micro)) } }
-            }
-        }
-        .chartXAxis {
-            AxisMarks(values: .stride(by: .day, count: points.count > 7 ? 3 : 1)) { _ in
-                AxisValueLabel(format: .dateTime.day().month(.abbreviated)).font(.system(size: UI.Size.micro))
-            }
-        }
-        .frame(height: 78)
-    }
-}
-
-struct MiniStat: View {
-    let label: String
-    let value: Int
-    var body: some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(label).font(.system(size: UI.Size.micro)).foregroundStyle(UI.textSecondary)
-            Text(Fmt.tokens(value)).font(.system(size: UI.Size.body, weight: .semibold, design: .rounded).monospacedDigit())
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 7).padding(.vertical, 5)
-        .background(RoundedRectangle(cornerRadius: UI.innerRadius, style: .continuous).fill(Color.primary.opacity(0.05)))
-        .accessibilityElement(children: .combine)   // the label with its number
+        .frame(height: 56)
+        .accessibilityLabel("Tokens by hour, last 24 hours")
     }
 }
 
 /// The period's estimated cost at API list prices. Neutral on purpose: it is an estimate, not a bill or a warning.
-struct CostLine: View {
+enum CostLine {
     static let showKey = "showCost"
-    let usage: PeriodUsage
-    var note: String? = nil
 
+    /// The tooltip on every cost figure.
+    static func help(note: String?, missing: [String]) -> String {
+        "An estimate of what these tokens would cost on the pay-as-you-go API, at list prices from \(Pricing.asOf). "
+            + "On a Claude, ChatGPT or Google AI plan you pay the plan's price, not this."
+            + (missing.isEmpty ? "" : " Usage on models without a known price is left out.")
+            + (note.map { " " + $0 } ?? "")
+    }
+}
+
+struct ExperimentalBadge: View {
+    var text = "Experimental"
     var body: some View {
-        let missing = usage.unpriced
-        let priced = usage.cost > 0 || missing.isEmpty
-        HStack(alignment: .firstTextBaseline, spacing: 5) {
-            if priced {
-                Text("\u{2248} \(Fmt.usd(usage.cost))").font(.system(size: UI.Size.body, weight: .semibold).monospacedDigit())
-                Text("at API prices").font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
-            }
-            Spacer(minLength: 4)
-            if !missing.isEmpty {
-                Text("no price for \(missing.joined(separator: ", "))")
-                    .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
-                    .lineLimit(1).truncationMode(.tail)
-            }
-        }
-        .help("An estimate of what these tokens would cost on the pay-as-you-go API, at list prices from \(Pricing.asOf). "
-              + "On a Claude, ChatGPT or Google AI plan you pay the plan's price, not this."
-              + (missing.isEmpty ? "" : " Usage on models without a known price is left out.")
-              + (note.map { " " + $0 } ?? ""))
-        .accessibilityElement(children: .combine)
+        Text(text).font(.system(size: UI.Size.micro, weight: .semibold))
+            .padding(.horizontal, 5).padding(.vertical, 1)
+            .background(Capsule().fill(Color.primary.opacity(0.08)))
+            .foregroundStyle(UI.textSecondary)
     }
 }
 
@@ -378,7 +549,7 @@ struct LimitList: View {
     }
 }
 
-/// The key to the mark on limit bars: a tick, then "even pace". Shown once per card, only when a bar draws the mark.
+/// The key to the mark on limit bars: a tick, then "even pace". Shown once, at the top of the Usage tab, only when a bar draws the mark.
 struct PaceKey: View {
     static let color = Color.primary.opacity(0.55)
     var body: some View {
@@ -392,43 +563,10 @@ struct PaceKey: View {
     }
 }
 
-// MARK: - Plan limits (Usage tab)
+// MARK: - Plan limits (inside each tool's card)
 
-struct PlanLimitsCard: View {
-    @EnvironmentObject var store: Store
-    @ObservedObject private var settings = AppSettings.shared
-    @ObservedObject private var antigravity = AntigravitySettings.shared
-
-    var body: some View {
-        Card(title: "Plan limits", icon: "gauge.with.needle", tint: .green, count: nil,
-             accessory: showsPaceMark ? AnyView(PaceKey()) : nil) {
-            VStack(alignment: .leading, spacing: 12) {
-                claude
-                ForEach(store.claudeAccountLimits) { ClaudeAccountLimitsView(account: $0) }
-                if !store.codexAccountLimits.isEmpty {
-                    ForEach(store.codexAccountLimits) { a in codexBlock(label: a.label, limits: a.limits) }
-                } else if store.codex.found {
-                    codex
-                }
-                // Only for someone with the Antigravity CLI's bridge added, or a reading it left.
-                if store.antigravityLimits != nil || antigravity.status.isInstalled {
-                    AntigravityLimitsBlock(limits: store.antigravityLimits, connected: antigravity.status.isInstalled)
-                }
-            }
-        }
-    }
-
-    /// Whether any bar in the card draws the even-pace mark, so the key appears only when there's a mark to explain.
-    private var showsPaceMark: Bool {
-        var limits: [RateLimit] = []
-        if settings.showsClaudeLimits, store.claudePlan?.problem == nil { limits += store.claudePlan?.limits ?? [] }
-        limits += store.claudeAccountLimits.filter { $0.problem == nil }.flatMap(\.limits)
-        limits += store.codexAccountLimits.isEmpty ? (store.codex.found ? store.codexLimits : []) : store.codexAccountLimits.flatMap(\.limits)
-        if store.antigravityLimits?.problem == nil { limits += store.antigravityLimits?.flattened ?? [] }
-        let now = Date()
-        return limits.contains { $0.paceMark(now: now) != nil }
-    }
-
+/// Wording shared by the Usage cards and the Overview's plan limits strip.
+enum PlanLimitsText {
     /// Under limits kept from an earlier reading: "Updated 2m ago · trying again in 3m".
     static func staleLine(fetched: Date, retryAt: Date?, now: Date) -> String {
         let updated = "Updated \(Fmt.ago(fetched, now: now)) ago"
@@ -440,109 +578,163 @@ struct PlanLimitsCard: View {
     static func countdown(_ seconds: TimeInterval) -> String {
         seconds < 60 ? "\(max(1, Int(seconds.rounded(.up))))s" : Fmt.duration(seconds)
     }
+}
 
-    @ViewBuilder private var claude: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                Image(systemName: "asterisk").font(.system(size: UI.Size.caption, weight: .bold)).foregroundStyle(UI.claude)
-                    .accessibilityHidden(true)
-                Text(["Claude", store.claudePlanLabel, store.claudePlan?.plan].compactMap { $0 }.joined(separator: " · "))
-                    .font(.system(size: UI.Size.body, weight: .medium)).accessibilityAddTraits(.isHeader)
-                if store.claudePlan.map({ $0.source == .endpoint }) ?? (!settings.claudeStatusLine && settings.claudeLimits) {
-                    Text("Experimental").font(.system(size: UI.Size.micro, weight: .semibold))
-                        .padding(.horizontal, 5).padding(.vertical, 1)
-                        .background(Capsule().fill(Color.primary.opacity(0.08)))
-                        .foregroundStyle(UI.textSecondary)
-                }
-                Spacer()
-                if settings.claudeLimits, store.claudePlanLoading { ProgressView().controlSize(.mini) }
+/// A tool's plan limit rows in its Usage card, with the notes that go with them: setup, problems, the reading's age.
+/// With more than one account, each account's rows sit under its name.
+struct ServiceLimits: View {
+    @EnvironmentObject var store: Store
+    @ObservedObject private var antigravity = AntigravitySettings.shared
+    let service: ServiceUsage
+
+    var body: some View {
+        switch service.service {
+        case .claude:
+            VStack(alignment: .leading, spacing: 16) {
+                ClaudeLimitsSection()
+                ForEach(store.claudeAccountLimits) { ClaudeAccountLimitsView(account: $0) }
             }
-            if !settings.showsClaudeLimits {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Claude doesn't save plan limits on your Mac. Dashbar can read them from Claude Code's status line.")
-                        .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    SettingsButton(tab: .claudeLimits) { Text("Settings…") }
-                        .help("Opens Settings at Integrations, where Claude plan limits are set up")
-                        .buttonStyle(.link).font(.system(size: UI.Size.caption, weight: .medium))
+        case .codex:
+            if !store.codexAccountLimits.isEmpty {
+                VStack(alignment: .leading, spacing: 16) {
+                    ForEach(store.codexAccountLimits) { CodexLimitsSection(label: $0.label, limits: $0.limits) }
                 }
-            } else if let problem = store.claudePlan?.problem {
-                // A temporary wait (rate limited, server trouble, offline) gets a quiet clock and a countdown under
-                // the message; a problem the user has to fix keeps the red triangle and its action on the right.
-                let waiting = store.claudePlan?.transient == true
-                HStack(alignment: .top, spacing: 6) {
-                    Image(systemName: waiting ? "clock" : "exclamationmark.triangle.fill")
-                        .foregroundStyle(waiting ? AnyShapeStyle(UI.textSecondary) : AnyShapeStyle(UI.textDanger))
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(problem).fixedSize(horizontal: false, vertical: true)
-                        if waiting, let retryAt = store.claudePlanRetryAt {
-                            TimelineView(.periodic(from: .now, by: 1)) { ctx in
-                                Text(retryAt > ctx.date ? "Trying again in \(Self.countdown(retryAt.timeIntervalSince(ctx.date)))"
-                                                        : "Trying again…")
-                                    .monospacedDigit().foregroundStyle(UI.textSecondary)
-                            }
-                        }
-                    }
-                    .font(.system(size: UI.Size.caption))
-                    Spacer(minLength: 4)
-                    if store.claudeSigningIn {
-                        HStack(spacing: 4) { ProgressView().controlSize(.mini); Text("Refreshing…").font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary) }
-                    } else if store.claudePlan?.needsSignIn == true {
-                        Button("Refresh") { store.refreshClaudeSignIn() }
-                            .buttonStyle(.link).font(.system(size: UI.Size.caption, weight: .medium))
-                            .help("Runs Claude Code once in the background, which refreshes its sign-in. Uses a few tokens.")
-                    } else if !waiting {
-                        Button("Retry") { store.refreshClaudePlan(force: true) }
-                            .buttonStyle(.link).font(.system(size: UI.Size.caption, weight: .medium))
-                    }
-                }
-            } else if let limits = store.claudePlan?.limits, !limits.isEmpty {
-                LimitList(limits: limits, tint: UI.claudeFill)
-                if let stale = store.claudePlan?.stale, let fetched = store.claudePlan?.fetchedAt {
-                    // Worked out live, so "2m ago" keeps counting and the countdown says when it will refresh.
-                    TimelineView(.periodic(from: .now, by: 1)) { ctx in
-                        HStack(spacing: 5) {
-                            Image(systemName: "clock").accessibilityHidden(true)
-                            Text(Self.staleLine(fetched: fetched, retryAt: store.claudePlanRetryAt, now: ctx.date))
-                                .monospacedDigit().lineLimit(1)
-                        }
-                    }
-                    .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
-                    .help(stale.explanation)
-                } else if store.claudePlan?.source == .statusLine, let fetched = store.claudePlan?.fetchedAt {
-                    TimelineView(.periodic(from: .now, by: 30)) { ctx in
-                        if let line = ClaudeStatusLine.ageLine(writtenAt: fetched, now: ctx.date) {
-                            HStack(spacing: 5) {
-                                Image(systemName: "clock").accessibilityHidden(true)
-                                Text(line).fixedSize(horizontal: false, vertical: true)
-                            }
-                            .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
-                        }
-                    }
-                }
-            } else if settings.claudeStatusLine && !store.claudePlanLoading {
-                Text("Limits appear after your next Claude Code reply.")
-                    .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else {
-                Text("Loading plan limits…").font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+            } else if store.codex.found {
+                CodexLimitsSection(label: nil, limits: store.codexLimits)
+            }
+        case .google:
+            // Only for someone with the Antigravity CLI's bridge added, or a reading it left.
+            if store.antigravityLimits != nil || antigravity.status.isInstalled {
+                // Under "Gemini CLI · Antigravity" the rows say whose limits they are; an Antigravity card already does.
+                AntigravityLimitsBlock(limits: store.antigravityLimits, connected: antigravity.status.isInstalled,
+                                       showsHeader: !service.title.hasPrefix("Antigravity"))
             }
         }
     }
+}
 
-    private var codex: some View { codexBlock(label: nil, limits: store.codexLimits) }
+/// An account's name over its limit rows, with more than one account: "Work · Max 5x".
+struct LimitsSubheader: View {
+    let text: String
+    var badge: String? = nil
+    var busy = false
 
-    private func codexBlock(label: String?, limits: [RateLimit]) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                Image(systemName: "chevron.left.forwardslash.chevron.right").font(.system(size: UI.Size.caption, weight: .bold))
-                    .foregroundStyle(UI.codex).accessibilityHidden(true)
-                Text(["Codex", label].compactMap { $0 }.joined(separator: " · ")).font(.system(size: UI.Size.body, weight: .medium)).accessibilityAddTraits(.isHeader)
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(text).font(.system(size: UI.Size.body, weight: .semibold)).lineLimit(1)
+                .accessibilityAddTraits(.isHeader)
+            if let badge { ExperimentalBadge(text: badge) }
+            Spacer(minLength: 4)
+            if busy { ProgressView().controlSize(.mini) }
+        }
+    }
+}
+
+/// Claude's limits (the default account's), or why there are none yet.
+struct ClaudeLimitsSection: View {
+    @EnvironmentObject var store: Store
+    @ObservedObject private var settings = AppSettings.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // With one account the card's title names the plan and carries the badge; with more, the account does.
+            if let label = store.claudePlanLabel {
+                let experimental = store.claudePlan.map { $0.source == .endpoint } ?? (!settings.claudeStatusLine && settings.claudeLimits)
+                LimitsSubheader(text: ([label, store.claudePlan?.plan] as [String?]).compactMap { $0 }.joined(separator: " · "),
+                                badge: settings.showsClaudeLimits && experimental ? "Experimental" : nil,
+                                busy: settings.claudeLimits && store.claudePlanLoading)
             }
+            content
+        }
+    }
+
+    @ViewBuilder private var content: some View {
+        if !settings.showsClaudeLimits {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Claude doesn't save plan limits on your Mac. Dashbar can read them from Claude Code's status line.")
+                    .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                SettingsButton(tab: .claudeLimits) { Text("Settings…") }
+                    .help("Opens Settings at Integrations, where Claude plan limits are set up")
+                    .buttonStyle(.link).font(.system(size: UI.Size.caption, weight: .medium))
+            }
+        } else if let problem = store.claudePlan?.problem {
+            // A temporary wait (rate limited, server trouble, offline) gets a quiet clock and a countdown under
+            // the message; a problem the user has to fix keeps the red triangle and its action on the right.
+            let waiting = store.claudePlan?.transient == true
+            HStack(alignment: .top, spacing: 6) {
+                Image(systemName: waiting ? "clock" : "exclamationmark.triangle.fill")
+                    .foregroundStyle(waiting ? AnyShapeStyle(UI.textSecondary) : AnyShapeStyle(UI.textDanger))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(problem).fixedSize(horizontal: false, vertical: true)
+                    if waiting, let retryAt = store.claudePlanRetryAt {
+                        TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                            Text(retryAt > ctx.date ? "Trying again in \(PlanLimitsText.countdown(retryAt.timeIntervalSince(ctx.date)))"
+                                                    : "Trying again…")
+                                .monospacedDigit().foregroundStyle(UI.textSecondary)
+                        }
+                    }
+                }
+                .font(.system(size: UI.Size.caption))
+                Spacer(minLength: 4)
+                if store.claudeSigningIn {
+                    HStack(spacing: 4) { ProgressView().controlSize(.mini); Text("Refreshing…").font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary) }
+                } else if store.claudePlan?.needsSignIn == true {
+                    Button("Refresh") { store.refreshClaudeSignIn() }
+                        .buttonStyle(.link).font(.system(size: UI.Size.caption, weight: .medium))
+                        .help("Runs Claude Code once in the background, which refreshes its sign-in. Uses a few tokens.")
+                } else if !waiting {
+                    Button("Retry") { store.refreshClaudePlan(force: true) }
+                        .buttonStyle(.link).font(.system(size: UI.Size.caption, weight: .medium))
+                }
+            }
+        } else if let limits = store.claudePlan?.limits, !limits.isEmpty {
+            LimitList(limits: limits, tint: UI.claudeFill)
+            if let stale = store.claudePlan?.stale, let fetched = store.claudePlan?.fetchedAt {
+                // Worked out live, so "2m ago" keeps counting and the countdown says when it will refresh.
+                TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                    HStack(spacing: 5) {
+                        Image(systemName: "clock").accessibilityHidden(true)
+                        Text(PlanLimitsText.staleLine(fetched: fetched, retryAt: store.claudePlanRetryAt, now: ctx.date))
+                            .monospacedDigit().lineLimit(1)
+                    }
+                }
+                .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+                .help(stale.explanation)
+            } else if store.claudePlan?.source == .statusLine, let fetched = store.claudePlan?.fetchedAt {
+                TimelineView(.periodic(from: .now, by: 30)) { ctx in
+                    if let line = ClaudeStatusLine.ageLine(writtenAt: fetched, now: ctx.date) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "clock").accessibilityHidden(true)
+                            Text(line).fixedSize(horizontal: false, vertical: true)
+                        }
+                        .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+                    }
+                }
+            }
+        } else if settings.claudeStatusLine && !store.claudePlanLoading {
+            Text("Limits appear after your next Claude Code reply.")
+                .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        } else {
+            Text("Loading plan limits…").font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+        }
+    }
+}
+
+/// One Codex account's limits; `label` names the account when there is more than one.
+struct CodexLimitsSection: View {
+    let label: String?
+    let limits: [RateLimit]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let label { LimitsSubheader(text: label) }
             if limits.isEmpty {
                 Text("Codex hasn't reported limits yet. They appear after your next Codex session.")
                     .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             } else {
                 LimitList(limits: limits, tint: UI.codex)
             }
@@ -555,12 +747,8 @@ struct ClaudeAccountLimitsView: View {
     let account: AccountLimits
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                Image(systemName: "asterisk").font(.system(size: UI.Size.caption, weight: .bold)).foregroundStyle(UI.claude)
-                    .accessibilityHidden(true)
-                Text(["Claude", account.label, account.plan].compactMap { $0 }.joined(separator: " · ")).font(.system(size: UI.Size.body, weight: .medium)).accessibilityAddTraits(.isHeader)
-            }
+        VStack(alignment: .leading, spacing: 8) {
+            LimitsSubheader(text: ([account.label, account.plan] as [String?]).compactMap { $0 }.joined(separator: " · "))
             if let problem = account.problem {
                 HStack(alignment: .top, spacing: 6) {
                     Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(UI.textDanger).accessibilityHidden(true)

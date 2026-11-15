@@ -66,15 +66,21 @@ struct Ranked: Identifiable, Equatable {
     var cost: Double? = nil
 }
 
-/// The span the usage card shows: one choice drives its totals, chart, projects and models.
+/// The span the Usage tab shows: one choice, at the top of the tab, drives every tool's totals and chart.
 enum UsagePeriod: Int, CaseIterable, Identifiable {
     case today, week, fortnight
+    /// Where the choice is kept between launches.
+    static let storageKey = "usagePeriod"
     var id: Int { rawValue }
     var short: String { ["Today", "7d", "14d"][rawValue] }
     var days: Int { [1, 7, 14][rawValue] }
+    /// "today", "in 7 days": after a figure, as in "153M tokens today".
+    var span: String { self == .today ? "today" : "in \(days) days" }
+    /// An idle tool's one line: "No usage today", "No usage in 7 days".
+    var noUsage: String { "No usage " + span }
     /// A usage card's headline, with its unit and span: "153M tokens today", "1.14B tokens in 7 days".
     func tokensLine(_ total: Int) -> String {
-        Fmt.tokens(total) + " tokens " + (self == .today ? "today" : "in \(days) days")
+        Fmt.tokens(total) + " tokens " + span
     }
 }
 

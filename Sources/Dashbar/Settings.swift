@@ -502,9 +502,9 @@ private struct GeneralSettings: View {
                 Toggle("Servers outside projects", isOn: $settings.showServers)
             }
             Section("Overview in the window") {
-                // The panel shows these on its Usage tab, always.
+                // The panel's Usage tab always shows each tool's totals.
                 Toggle("Today and this week", isOn: $settings.showWidgets)
-                    .help("The token totals at the foot of the Dashbar window's Overview. In the panel they're on the Usage tab.")
+                    .help("The token totals at the foot of the Dashbar window's Overview. In the panel, each tool's card on the Usage tab has them.")
             }
             Section("Usage") {
                 Toggle("Estimated cost at API prices", isOn: $showCost)

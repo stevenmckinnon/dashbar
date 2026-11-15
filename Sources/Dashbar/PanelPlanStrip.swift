@@ -282,7 +282,7 @@ struct PlanStripRow: View {
                     Text(message).fixedSize(horizontal: false, vertical: true)
                     if let retryAt {
                         TimelineView(.periodic(from: .now, by: 1)) { ctx in
-                            Text(retryAt > ctx.date ? "Trying again in \(PlanLimitsCard.countdown(retryAt.timeIntervalSince(ctx.date)))"
+                            Text(retryAt > ctx.date ? "Trying again in \(PlanLimitsText.countdown(retryAt.timeIntervalSince(ctx.date)))"
                                                     : "Trying again…")
                                 .monospacedDigit().foregroundStyle(UI.textSecondary)
                         }
@@ -302,7 +302,7 @@ struct PlanStripRow: View {
             TimelineView(.periodic(from: .now, by: 1)) { ctx in
                 HStack(spacing: 5) {
                     Image(systemName: "clock").accessibilityHidden(true)
-                    Text(PlanLimitsCard.staleLine(fetched: fetched, retryAt: retryAt, now: ctx.date)).monospacedDigit().lineLimit(1)
+                    Text(PlanLimitsText.staleLine(fetched: fetched, retryAt: retryAt, now: ctx.date)).monospacedDigit().lineLimit(1)
                 }
             }
             .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)

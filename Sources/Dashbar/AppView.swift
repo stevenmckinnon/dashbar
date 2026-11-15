@@ -417,32 +417,9 @@ private struct AgentsPage: View {
 
     var body: some View {
         if let warning = store.formatWarning { NoticeBanner(text: warning, dismiss: nil) }
-        // Two columns when there's room for the cards at their panel width or more, one otherwise.
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: UI.gap) {
-                VStack(spacing: UI.gap) { left }.frame(minWidth: 400)
-                VStack(spacing: UI.gap) { right }.frame(minWidth: 400)
-            }
-            VStack(spacing: UI.gap) { left; right }
-        }
-    }
-
-    @ViewBuilder private var left: some View {
-        PlanLimitsCard()
-        WorkspacesCard(query: query)
-    }
-
-    @ViewBuilder private var right: some View {
-        UsageCard(title: "Claude Code", icon: "asterisk", tint: UI.claude, summary: store.claude, loading: store.usageLoading,
-                  accounts: store.claudeAccountUsage)
-        if store.codex.found {
-            UsageCard(title: "Codex", icon: "chevron.left.forwardslash.chevron.right", tint: UI.codex, summary: store.codex, loading: false,
-                      accounts: store.codexAccountUsage)
-        }
-        if store.google.found {
-            UsageCard(title: GoogleUsage.title(store.googleSources), icon: UI.googleSymbol, tint: UI.google, summary: store.google,
-                      loading: false, costNote: GoogleUsage.costNote(store.googleSources))
-        }
+        // The panel's Usage tab with the window's room: two columns of tool cards, each with its workspaces and models.
+        // The workspaces themselves are in the sidebar and on Overview.
+        UsageTab(wide: true)
     }
 }
 

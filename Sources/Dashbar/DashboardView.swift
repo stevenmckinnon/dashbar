@@ -151,20 +151,9 @@ struct DashboardView: View {
                     }
                 }
             case .agents:
-                // Usage: plan limits, then the token totals, then each tool's usage. The workspaces live on Overview,
+                // Usage: one card per tool, the one closest to running out first. The workspaces live on Overview,
                 // which also shows every waiting permission prompt.
-                PlanLimitsCard()
-                if !store.claude.last24.isEmpty, store.claude.warning == nil { WidgetRow() }
-                UsageCard(title: "Claude Code", icon: "asterisk", tint: UI.claude, summary: store.claude, loading: store.usageLoading,
-                          accounts: store.claudeAccountUsage)
-                if store.codex.found {
-                    UsageCard(title: "Codex", icon: "chevron.left.forwardslash.chevron.right", tint: UI.codex, summary: store.codex, loading: false,
-                              accounts: store.codexAccountUsage)
-                }
-                if store.google.found {
-                    UsageCard(title: GoogleUsage.title(store.googleSources), icon: UI.googleSymbol, tint: UI.google, summary: store.google,
-                              loading: false, costNote: GoogleUsage.costNote(store.googleSources))
-                }
+                UsageTab()
             case .servers:
                 ServersCard(query: query, includeProjects: true)
             case .system:
