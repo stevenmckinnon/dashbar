@@ -37,3 +37,13 @@ body:
     attributes:
       label: Codex version
       description: Run `codex --version`. Leave blank if not relevant.
+  - type: input
+    id: gemini
+    attributes:
+      label: Gemini CLI version
+      description: Run `gemini --version`. Leave blank if not relevant.
+  - type: input
+    id: antigravity
+    attributes:
+      label: Antigravity version
+      description: The Antigravity app's version, or run `agy --version` for the Antigravity CLI. Leave blank if not relevant.

@@ -2,6 +2,7 @@
 
 Thanks for helping. Dashbar is a native macOS menu bar app (SwiftUI, SwiftPM, macOS 14+) under the MIT licence.
 Open an [issue](https://github.com/stevenmckinnon/dashbar/issues) before a large change so we can agree on it first.
+When you open a pull request, the template asks for a short summary, renders for UI changes and a few checks.
 
 ## Layout
 

@@ -3,3 +3,6 @@ contact_links:
   - name: Security issue
     url: https://github.com/stevenmckinnon/dashbar/security/advisories/new
     about: Report a vulnerability privately, not in a public issue.
+  - name: Question or anything else
+    url: mailto:hello@usedashbar.com
+    about: Email us with a question, an idea or anything that is not a bug.
