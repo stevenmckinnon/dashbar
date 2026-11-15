@@ -36,16 +36,22 @@ enum OverviewRules {
 /// The Overview's plan limits strip: one row per account, each with its tightest limit.
 enum PlanStrip {
     /// The limit most at risk: one on course to run out (or used up) before one that isn't, then the highest share
-    /// used. Ties keep the provider's own order, so "5-hour" comes before "Weekly".
+    /// used. Ties keep the provider's own order, so "5-hour" comes before "Weekly". Only limits that reset on a window
+    /// (5-hour, Weekly…) count, since they are what "how much plan is left" means; one with no window (Claude's extra
+    /// usage) headlines only when the provider reports nothing else.
     static func tightest(_ limits: [RateLimit], now: Date = Date()) -> RateLimit? {
+        let windowed = limits.filter(isWindowed)
         var best: (limit: RateLimit, risk: Bool)?
-        for l in limits {
+        for l in windowed.isEmpty ? limits : windowed {
             let risk = atRisk(l.pace(now: now))
             guard let b = best else { best = (l, risk); continue }
             if (risk && !b.risk) || (risk == b.risk && l.usedPercent > b.limit.usedPercent) { best = (l, risk) }
         }
         return best?.limit
     }
+
+    /// A limit that resets: it has a window length or a reset time.
+    static func isWindowed(_ l: RateLimit) -> Bool { l.window != nil || l.resetsAt != nil }
 
     static func atRisk(_ pace: RateLimit.Pace?) -> Bool {
         switch pace {

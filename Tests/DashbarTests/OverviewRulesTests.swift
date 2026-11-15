@@ -92,6 +92,21 @@ import Testing
         #expect(Fmt.usedPercent(usedUp.usedPercent) == "104% used")
     }
 
+    @Test func tightestLeavesOutLimitsWithNoWindowUnlessThereIsNothingElse() {
+        // The owner's real quiet day: 5-hour 7%, Weekly 0%, Extra usage 27%. The strip headlines the 5-hour limit.
+        let fiveHour = limit("5-hour", 7, hoursLeft: 4.6, windowHours: 5)
+        let weekly = limit("Weekly", 0, hoursLeft: 6.9 * 24, windowHours: 168)
+        let extra = limit("Extra usage", 27, hoursLeft: nil, windowHours: nil)
+        #expect(!PlanStrip.isWindowed(extra))
+        #expect(PlanStrip.tightest([fiveHour, weekly, extra], now: now)?.label == "5-hour")
+        #expect(PlanStrip.tightest([extra, weekly], now: now)?.label == "Weekly")
+        // A reset time alone (a status line reading with no window length) still counts as a window.
+        let resetOnly = limit("Weekly", 2, hoursLeft: 30, windowHours: nil)
+        #expect(PlanStrip.tightest([extra, resetOnly], now: now)?.label == "Weekly")
+        // Extra usage on its own is still shown rather than nothing.
+        #expect(PlanStrip.tightest([extra], now: now)?.label == "Extra usage")
+    }
+
     @Test func stripCaptionOnlyWhenRunningOutOrUsedUp() {
         #expect(PlanStrip.showsCaption(.runsOut(now)))
         #expect(PlanStrip.showsCaption(.usedUp))
