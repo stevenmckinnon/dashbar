@@ -87,13 +87,13 @@ struct AnnouncementClaims {
         return true
     }
 
-    /// Claims older than an hour are only clutter.
+    /// Claims older than any window (the longest, a plan limit's, is 6 hours) are only clutter.
     private func prune(now: Date) {
         let fm = FileManager.default
         guard let files = try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.contentModificationDateKey]) else { return }
         for url in files {
             if let modified = try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
-               now.timeIntervalSince(modified) > 3600 { try? fm.removeItem(at: url) }
+               now.timeIntervalSince(modified) > 86400 { try? fm.removeItem(at: url) }
         }
     }
 }

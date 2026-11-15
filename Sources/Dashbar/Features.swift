@@ -504,6 +504,17 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: alert.sentKey, content: content, trigger: nil))
     }
 
+    /// "Claude 5-hour: it has reset", for a limit that was used up. Same toggle as the limit alerts.
+    func limitReset(_ reset: LimitReset) {
+        guard available, UserDefaults.standard.bool(forKey: Self.limitsKey) else { return }
+        let content = UNMutableNotificationContent()
+        content.title = reset.title
+        content.body = reset.body
+        content.sound = .default
+        content.userInfo = ["limits": true]
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: reset.claimKey, content: content, trigger: nil))
+    }
+
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
                                 withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         completionHandler([.banner, .sound])

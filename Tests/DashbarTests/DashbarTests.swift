@@ -646,6 +646,112 @@ private func session(id: String, root: String = "/dev/app", busy: Bool = false, 
         #expect(Fmt.duration(2 * 3600 + 5 * 60) == "2h 5m")
         #expect(Fmt.duration(3 * 86400 + 4 * 3600) == "3d 4h")
     }
+
+    @Test func limitAlertClaimsHoldNoNames() {
+        let key = LimitAlerts.claimKey("Claude (Work)|5-hour|2000000#3")
+        #expect(key.hasPrefix("limit-") && !key.contains("Work") && key.count == "limit-".count + 8)
+        #expect(key == LimitAlerts.claimKey("Claude (Work)|5-hour|2000000#3"))   // the same in every copy
+    }
+}
+
+// MARK: - Plan limit resets
+
+@Suite struct LimitResetTests {
+    let start = Date(timeIntervalSince1970: 1_800_000_000)
+    var resetAt: Date { start.addingTimeInterval(3600) }
+    func fiveHour(_ used: Double, resetsAt: Date?) -> RateLimit {
+        RateLimit(label: "5-hour", usedPercent: used, resetsAt: resetsAt, window: 5 * 3600)
+    }
+
+    /// Follows a used-up window at `start`, then checks again at `later` with `reading`.
+    func usedUpThen(_ reading: [RateLimit], at later: Date, provider: String = "Claude") -> [LimitReset] {
+        let first = LimitResets.check(provider: provider, limits: [fiveHour(100, resetsAt: resetAt)], followed: [], now: start)
+        #expect(first.resets.isEmpty)
+        return LimitResets.check(provider: provider, limits: reading, followed: first.followed, now: later).resets
+    }
+
+    @Test func aUsedUpLimitThatResetsSaysSoOnce() {
+        let after = resetAt.addingTimeInterval(120)
+        let next = fiveHour(3, resetsAt: resetAt.addingTimeInterval(5 * 3600))
+        let first = LimitResets.check(provider: "Claude", limits: [fiveHour(100, resetsAt: resetAt)], followed: [], now: start)
+        let reset = LimitResets.check(provider: "Claude", limits: [next], followed: first.followed, now: after)
+        #expect(reset.resets.map(\.title) == ["Claude 5-hour"])
+        #expect(reset.resets.first?.body == "It has reset. You can pick up where you left off.")
+        #expect(reset.followed.isEmpty)
+        // Once per window: the next check has nothing to say.
+        #expect(LimitResets.check(provider: "Claude", limits: [next], followed: reset.followed, now: after).resets.isEmpty)
+    }
+
+    @Test func theResetTimeAloneIsEnoughEvenBeforeANewReading() {
+        // Codex only reports a new reading when it next runs; the old window still ended at its reset time.
+        #expect(usedUpThen([fiveHour(100, resetsAt: resetAt)], at: resetAt.addingTimeInterval(90)).count == 1)
+        #expect(usedUpThen([], at: resetAt.addingTimeInterval(90)).count == 1)
+    }
+
+    @Test func waitsForTheResetAndAMinuteMore() {
+        #expect(usedUpThen([fiveHour(100, resetsAt: resetAt)], at: resetAt.addingTimeInterval(-60)).isEmpty)
+        #expect(usedUpThen([fiveHour(100, resetsAt: resetAt)], at: resetAt.addingTimeInterval(30)).isEmpty)
+    }
+
+    @Test func aLimitThatWasNeverUsedUpNeverAnnouncesItsReset() {
+        let first = LimitResets.check(provider: "Claude", limits: [fiveHour(95, resetsAt: resetAt)], followed: [], now: start)
+        #expect(first.followed.isEmpty)
+        let later = LimitResets.check(provider: "Claude", limits: [fiveHour(0, resetsAt: resetAt.addingTimeInterval(5 * 3600))],
+                                      followed: first.followed, now: resetAt.addingTimeInterval(120))
+        #expect(later.resets.isEmpty)
+    }
+
+    @Test func aResetTimeThatMovesLaterIsStillTheSameWindow() {
+        // The reading drifts by seconds: one followed window, not two.
+        let first = LimitResets.check(provider: "Codex", limits: [fiveHour(100, resetsAt: resetAt)], followed: [], now: start)
+        let drifted = LimitResets.check(provider: "Codex", limits: [fiveHour(100, resetsAt: resetAt.addingTimeInterval(40))],
+                                        followed: first.followed, now: start.addingTimeInterval(60))
+        #expect(drifted.followed.count == 1)
+        // Past the first reset time but the window, now ending later, is still used up: not yet.
+        let moved = fiveHour(100, resetsAt: resetAt.addingTimeInterval(10 * 60))
+        #expect(usedUpThen([moved], at: resetAt.addingTimeInterval(120), provider: "Codex").isEmpty)
+    }
+
+    @Test func theNextWindowAlreadyUsedUpIsNotAReset() {
+        let next = fiveHour(100, resetsAt: resetAt.addingTimeInterval(5 * 3600))
+        #expect(usedUpThen([next], at: resetAt.addingTimeInterval(2 * 3600)).isEmpty)
+    }
+
+    @Test func aResetLongAgoIsOldNews() {
+        // Dashbar was quit when it reset, and opens again the next day.
+        let later = resetAt.addingTimeInterval(LimitResets.staleAfter + 60)
+        let result = LimitResets.check(provider: "Claude", limits: [], followed: ["Claude|5-hour@\(Int(resetAt.timeIntervalSince1970))"], now: later)
+        #expect(result.resets.isEmpty && result.followed.isEmpty)
+        // A few hours after is still worth saying: it was seen used up before Dashbar quit.
+        #expect(usedUpThen([], at: resetAt.addingTimeInterval(3 * 3600)).count == 1)
+    }
+
+    @Test func otherProvidersAndAccountsAreLeftAlone() {
+        let saved: Set<String> = ["Claude (Work)|5-hour@\(Int(resetAt.timeIntervalSince1970))", "Codex|Weekly@\(Int(resetAt.timeIntervalSince1970))"]
+        let result = LimitResets.check(provider: "Claude", limits: [], followed: saved, now: resetAt.addingTimeInterval(120))
+        #expect(result.resets.isEmpty)
+        #expect(result.followed == saved)
+        let work = LimitResets.check(provider: "Claude (Work)", limits: [], followed: saved, now: resetAt.addingTimeInterval(120))
+        #expect(work.resets.map(\.title) == ["Claude (Work) 5-hour"])
+        #expect(!work.resets[0].claimKey.contains("Work"))
+    }
+
+    @Test func pruneDropsOldNewsAndJunk() {
+        let fresh = "Codex|Weekly@\(Int(resetAt.timeIntervalSince1970))"
+        let old = "Codex|5-hour@\(Int(start.timeIntervalSince1970) - 86400)"
+        #expect(LimitResets.prune([fresh, old, "nonsense"], now: start) == [fresh])
+    }
+
+    @Test func onlyOneCopyPostsAReset() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("dashbar-claims-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let resets = usedUpThen([], at: resetAt.addingTimeInterval(120))
+        // The release and a local build each follow the same window and see it reset.
+        var posted: [String] = []
+        LimitResets.deliver(resets, claims: AnnouncementClaims(folder: folder)) { posted.append("release: " + $0.title) }
+        LimitResets.deliver(resets, claims: AnnouncementClaims(folder: folder)) { posted.append("local: " + $0.title) }
+        #expect(posted == ["release: Claude 5-hour"])
+    }
 }
 
 // MARK: - Window visibility

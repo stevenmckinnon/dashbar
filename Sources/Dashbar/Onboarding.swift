@@ -261,7 +261,7 @@ struct OnboardingView: View {
         OnboardingRow(symbol: "bell", title: "Notifications",
                       detail: permission.status == .denied
                         ? "Turned off for Dashbar in System Settings."
-                        : "When an agent finishes or needs you, and when a plan limit runs low.") {
+                        : "When an agent finishes or needs you, and when a plan limit runs low or resets.") {
             switch permission.status {
             case .authorized, .provisional, .ephemeral: Done(text: "Allowed")
             case .denied: Button("Open System Settings…") { permission.openSystemSettings() }

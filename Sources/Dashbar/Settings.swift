@@ -533,8 +533,8 @@ private struct NotificationSettings: View {
                 Toggle("When an agent finishes", isOn: $notify)
                 Toggle("When an agent needs you", isOn: $notifyWaiting)
                     .help("When Claude stops to ask for permission or an answer.")
-                Toggle("When a plan limit runs low", isOn: $notifyLimits)
-                    .help("At 80%, when it's on course to run out before it resets, and when it's used up. Once per window.")
+                Toggle("When a plan limit runs low or resets", isOn: $notifyLimits)
+                    .help("At 80%, when it's on course to run out before it resets, when it's used up, and when a used-up limit resets. Once per window.")
                 NotificationPermissionNote(wanted: notify || notifyWaiting || notifyLimits)
             } header: {
                 Text("Notify")

@@ -186,6 +186,8 @@ final class Store: ObservableObject {
     private var surfaces = SurfaceVisibility()
     /// Limit alerts already sent, so each fires once per window even across relaunches.
     private var sentLimitAlerts = LimitAlerts.prune(Set(UserDefaults.standard.stringArray(forKey: "limitAlertsSent") ?? []))
+    /// Used-up windows waiting for their reset, kept across relaunches ("Claude|5-hour@<reset time>", nothing else).
+    private var followedLimitResets = Set(UserDefaults.standard.stringArray(forKey: "limitResetsFollowed") ?? [])
     private var panelVisible: Bool { surfaces.anyVisible }
     /// Whether the menu bar panel itself is on screen (not the popout), as its view last reported.
     var menuBarPanelVisible: Bool { surfaces.isVisible("panel") }
@@ -369,30 +371,53 @@ final class Store: ObservableObject {
         if claudeAccounts.count > 1 { refreshAccountLimits() }
     }
 
-    /// Notifies when a plan limit is nearly used, on course to run out, or used up (once per window).
+    /// Notifies when a plan limit is nearly used, on course to run out, or used up (once per window), and when a limit
+    /// that was used up resets. Each notification is posted by one running copy of Dashbar only.
     private func checkLimits() {
         guard !isDemo, !paused else { return }
         recordPlanHistory()
-        var alerts = LimitAlerts.check(provider: "Codex", limits: codexLimits, sent: sentLimitAlerts)
+        var readings: [(provider: String, limits: [RateLimit])] = [("Codex", codexLimits)]
         for other in codexAccountLimits.dropFirst() {   // the first is the default account's, `codexLimits`
-            alerts += LimitAlerts.check(provider: "Codex (\(other.label))", limits: other.limits, sent: sentLimitAlerts)
+            readings.append(("Codex (\(other.label))", other.limits))
         }
         if settings.showsClaudeLimits, let plan = claudePlan, plan.problem == nil {
-            alerts += LimitAlerts.check(provider: "Claude", limits: plan.limits, sent: sentLimitAlerts)
+            readings.append(("Claude", plan.limits))
         }
         for other in claudeAccountLimits where other.problem == nil {
-            alerts += LimitAlerts.check(provider: "Claude (\(other.label))", limits: other.limits, sent: sentLimitAlerts)
+            readings.append(("Claude (\(other.label))", other.limits))
         }
         if let ag = antigravityLimits, ag.problem == nil {
-            alerts += LimitAlerts.check(provider: "Antigravity", limits: ag.flattened, sent: sentLimitAlerts)
+            readings.append(("Antigravity", ag.flattened))
         }
-        guard !alerts.isEmpty else { return }
-        for alert in alerts {
-            notifier.limit(alert)
-            sentLimitAlerts.insert(alert.sentKey)
+
+        // A copy with these notifications off doesn't claim them, so it never silences one that has them on.
+        let notifies = UserDefaults.standard.bool(forKey: Notifier.limitsKey)
+        let alerts = readings.flatMap { LimitAlerts.check(provider: $0.provider, limits: $0.limits, sent: sentLimitAlerts) }
+        if !alerts.isEmpty {
+            let claims = AnnouncementClaims.default
+            for alert in alerts {
+                if notifies, claims.claim(LimitAlerts.claimKey(alert.sentKey), window: LimitAlerts.claimWindow) {
+                    notifier.limit(alert)
+                }
+                sentLimitAlerts.insert(alert.sentKey)
+            }
+            sentLimitAlerts = LimitAlerts.prune(sentLimitAlerts)
+            UserDefaults.standard.set(Array(sentLimitAlerts), forKey: "limitAlertsSent")
         }
-        sentLimitAlerts = LimitAlerts.prune(sentLimitAlerts)
-        UserDefaults.standard.set(Array(sentLimitAlerts), forKey: "limitAlertsSent")
+
+        var resets: [LimitReset] = []
+        var followed = followedLimitResets
+        for reading in readings {
+            let result = LimitResets.check(provider: reading.provider, limits: reading.limits, followed: followed)
+            resets += result.resets
+            followed = result.followed
+        }
+        followed = LimitResets.prune(followed)   // a source that stopped reporting, or an account since removed
+        if notifies { LimitResets.deliver(resets, claims: .default) { notifier.limitReset($0) } }
+        if followed != followedLimitResets {
+            followedLimitResets = followed
+            UserDefaults.standard.set(followed.sorted(), forKey: "limitResetsFollowed")
+        }
     }
 
     /// Adds the latest readings to the plan history, as of when each source took them. Kept limits from an earlier

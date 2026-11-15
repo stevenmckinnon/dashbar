@@ -72,4 +72,94 @@ enum LimitAlerts {
             return bucketValue * bucket > now.timeIntervalSince1970 - bucket
         }
     }
+
+    /// How long a claim between copies of Dashbar holds: far longer than the gap between two copies seeing the same
+    /// reading, and shorter than a window, so the next window's alert is news again.
+    static let claimWindow: TimeInterval = 6 * 3600
+
+    /// The release and a local build read the same limits, so each alert is claimed before it is posted and only the
+    /// first copy posts it. The claim's file name is a hash: it holds no provider, account or limit name.
+    static func claimKey(_ sentKey: String) -> String { "limit-" + AgentAccounts.hash(sentKey) }
+}
+
+/// "Claude 5-hour: it has reset", the other side of "used up".
+///
+/// Only a limit Dashbar saw used up (100%) is followed, so the notification is rare and always means something: you
+/// were stopped, and now you can carry on. 90% wouldn't do: most windows pass 90% and reset without anyone waiting on
+/// them. (Claude's "rate limited" state is about reading the plan usage too often, not the plan limit, so it plays no
+/// part.) A followed window is remembered across relaunches, so a reset that happened while Dashbar was quit is still
+/// announced when it opens again, unless that was more than `staleAfter` ago. A reset nobody saw used up is never news.
+struct LimitReset: Equatable {
+    let title: String
+    let body: String
+    /// The same in every running copy of Dashbar (the release and a local build), so only the first posts it.
+    let claimKey: String
+}
+
+enum LimitResets {
+    /// Waits a minute past the reset time, so a reading taken right at the reset has caught up.
+    static let grace: TimeInterval = 60
+    /// A reset this long ago is old news: whoever was waiting has seen it by now.
+    static let staleAfter: TimeInterval = 12 * 3600
+    /// Readings whose reset time drifts by less than this are the same window.
+    static let drift = LimitAlerts.bucket
+
+    /// One followed window: "Claude|5-hour@1800018000", the limit and when that used-up window resets.
+    struct Followed: Hashable {
+        let limit: String
+        let resetsAt: Date
+
+        init(limit: String, resetsAt: Date) {
+            self.limit = limit
+            self.resetsAt = Date(timeIntervalSince1970: resetsAt.timeIntervalSince1970.rounded())
+        }
+
+        init?(_ saved: String) {
+            guard let at = saved.lastIndex(of: "@"), let seconds = Double(saved[saved.index(after: at)...]) else { return nil }
+            self.init(limit: String(saved[..<at]), resetsAt: Date(timeIntervalSince1970: seconds))
+        }
+
+        var saved: String { "\(limit)@\(Int(resetsAt.timeIntervalSince1970))" }
+    }
+
+    /// Follows `provider`'s used-up windows and returns the ones that have reset since, with what to remember next.
+    /// Windows saved for other providers pass through untouched.
+    static func check(provider: String, limits: [RateLimit], followed saved: Set<String>,
+                      now: Date = Date()) -> (resets: [LimitReset], followed: Set<String>) {
+        var followed = Set(saved.compactMap(Followed.init))
+        let prefix = provider + "|"
+
+        // Follow every window used up right now. A drifting reset time replaces its entry rather than adding one.
+        for limit in limits {
+            guard limit.usedPercent >= 100, let resetsAt = limit.resetsAt, resetsAt > now else { continue }
+            let name = prefix + limit.label
+            followed = followed.filter { $0.limit != name || abs($0.resetsAt.timeIntervalSince(resetsAt)) > drift }
+            followed.insert(Followed(limit: name, resetsAt: resetsAt))
+        }
+
+        var resets: [LimitReset] = []
+        for window in followed.sorted(by: { $0.saved < $1.saved }) {
+            guard window.limit.hasPrefix(prefix), now >= window.resetsAt.addingTimeInterval(grace) else { continue }
+            followed.remove(window)
+            guard now.timeIntervalSince(window.resetsAt) <= staleAfter else { continue }
+            let label = String(window.limit.dropFirst(prefix.count))
+            // Still used up with a reset ahead: the window moved, or the next one is used up already. Not news.
+            let stillUsedUp = limits.contains { $0.label == label && $0.usedPercent >= 100 && ($0.resetsAt ?? .distantPast) > now }
+            guard !stillUsedUp else { continue }
+            resets.append(LimitReset(title: "\(provider) \(label)",
+                                     body: "It has reset. You can pick up where you left off.",
+                                     claimKey: "limit-reset-" + AgentAccounts.hash(window.saved)))
+        }
+        return (resets, Set(followed.map(\.saved)))
+    }
+
+    /// Forgets windows whose reset is old news, whichever provider they belong to.
+    static func prune(_ saved: Set<String>, now: Date = Date()) -> Set<String> {
+        saved.filter { Followed($0).map { now.timeIntervalSince($0.resetsAt) <= staleAfter } ?? false }
+    }
+
+    /// Posts each reset once across every running copy of Dashbar.
+    static func deliver(_ resets: [LimitReset], claims: AnnouncementClaims, now: Date = Date(), post: (LimitReset) -> Void) {
+        for reset in resets where claims.claim(reset.claimKey, window: LimitAlerts.claimWindow, now: now) { post(reset) }
+    }
 }
