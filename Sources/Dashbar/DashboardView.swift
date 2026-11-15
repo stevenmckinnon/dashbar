@@ -38,6 +38,9 @@ enum PanelTab: String, CaseIterable, Identifiable {
         case .cleanup: return "Filter folders…"
         }
     }
+
+    /// Usage has nothing the filter narrows (its workspace list lives on Overview), so the field isn't offered there.
+    var hasFilter: Bool { self != .agents }
 }
 
 struct DashboardView: View {
@@ -79,7 +82,8 @@ struct DashboardView: View {
             } else {
                 cards
             }
-            BottomBar(query: $query, prompt: tab.filterPrompt, focused: $searchFocused)
+            BottomBar(query: $query, prompt: (forcedTab ?? tab).filterPrompt, focused: $searchFocused,
+                      showsFilter: (forcedTab ?? tab).hasFilter)
         }
         .frame(width: UI.panelWidth)
         // With Keyboard navigation on, a waiting prompt on Overview is where focus starts (see `PermissionPrompt`).
@@ -89,7 +93,11 @@ struct DashboardView: View {
             // Invisible carriers for the shortcuts: kept out of the Tab order and away from VoiceOver, which would
             // otherwise land on six empty buttons. The tabs and the filter field say their shortcut themselves.
             Group {
-                Button("") { searchFocused = true }.keyboardShortcut("k").opacity(0)
+                // On Usage, which has no filter, ⌘K goes to Overview's workspaces filter.
+                Button("") {
+                    if !tab.hasFilter { tab = .overview }
+                    searchFocused = true
+                }.keyboardShortcut("k").opacity(0)
                 // ⌘1…⌘5 switch tabs.
                 ForEach(Array(PanelTab.allCases.enumerated()), id: \.offset) { i, t in
                     Button("") { tab = t }.keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command).opacity(0)
@@ -357,6 +365,7 @@ struct BottomBar: View {
     @Binding var query: String
     var prompt: String
     var focused: FocusState<Bool>.Binding
+    var showsFilter = true
     @AppStorage(Notifier.defaultsKey) private var notify = true
     @ObservedObject private var updater = Updater.shared
 
@@ -382,6 +391,11 @@ struct BottomBar: View {
             }
             .padding(.horizontal, 10).padding(.vertical, 7)
             .modifier(SearchFieldSurface())
+            // On a tab with nothing to filter the field steps aside but keeps its room, so the bar (and the panel) stay
+            // the same height on every tab.
+            .opacity(showsFilter ? 1 : 0)
+            .disabled(!showsFilter)
+            .accessibilityHidden(!showsFilter)
 
             Menu {
                 SettingsButton { Text("Settings…") }
