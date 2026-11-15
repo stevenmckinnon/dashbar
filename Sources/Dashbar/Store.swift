@@ -159,14 +159,11 @@ final class Store: ObservableObject {
     }
     var cleanupTotal: UInt64 { cleanup.reduce(0) { $0 + $1.size } }
 
-    /// The workspace worth featuring: one whose agent is waiting for you, then one with a working agent, else the one
-    /// whose agent changed state most recently.
-    var featured: Workspace? {
-        let ws = workspaces
-        if let waiting = ws.first(where: \.isWaiting) { return waiting }
-        if let busy = ws.first(where: \.isBusy) { return busy }
-        return ws.filter { !$0.sessions.isEmpty }.max {
-            ($0.sessions.map(\.since).max() ?? .distantPast) < ($1.sessions.map(\.since).max() ?? .distantPast)
+    /// The workspace the Now card features (`OverviewRules.nowWorkspace`): waiting, then working (its agent, or its
+    /// subagents while the agent waits for them), then one whose agent went idle in the last 10 minutes. Nil otherwise.
+    var nowWorkspace: Workspace? {
+        OverviewRules.nowWorkspace(workspaces, now: Date()) { [subagents] w in
+            w.isBusy || w.sessions.contains { s in !(subagents[s.id] ?? []).running.isEmpty }
         }
     }
 

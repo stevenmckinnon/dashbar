@@ -12,7 +12,8 @@ enum PanelTab: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .overview: return "Overview"
-        case .agents: return "Agents"
+        // Plan limits and usage. Still `.agents` underneath, so saved tabs, DASHBAR_TAB=agents and ⌘2 keep working.
+        case .agents: return "Usage"
         case .servers: return "Servers"
         case .system: return "System"
         case .cleanup: return "Clean-up"
@@ -118,23 +119,29 @@ struct DashboardView: View {
             }
             switch forcedTab ?? tab {
             case .overview:
-                TileRow { tab = $0 }
-                // Prompts the Now card won't show, so every one waiting is in view without opening a row.
-                let nowCard = settings.showNow && query.isEmpty ? store.featured : nil
+                // In order: does anything need me, what is working, will I run out. No summary tiles: the header's pills
+                // already say what is working or waiting, and the tabs above lead to the rest.
+                // Every prompt the Now card won't show, so each one waiting is in view without opening a row.
+                let nowCard = settings.showNow && query.isEmpty ? store.nowWorkspace : nil
                 PermissionPromptList(requests: store.permissionRequests.filter { r in
                     !(nowCard?.sessions.contains { $0.id == r.sessionId } ?? false)
                 })
-                if let featured = nowCard { NowCard(workspace: featured) }
-                WorkspacesCard(query: query, clearQuery: { query = "" },
-                               excluding: settings.showNow && query.isEmpty ? store.featured?.id : nil)
-                if settings.showServers || !query.isEmpty { ServersCard(query: query) }
-                // Live state first, history last: usage can't be acted on, so it sits below what can.
-                if settings.showWidgets, query.isEmpty, !store.claude.last24.isEmpty, store.claude.warning == nil { WidgetRow() }
+                if let nowCard { NowCard(workspace: nowCard) }
+                WorkspacesCard(query: query, clearQuery: { query = "" }, excluding: nowCard?.id)
+                if (settings.showServers && OverviewRules.showsServersCard(looseServers: store.looseServers)) || !query.isEmpty {
+                    ServersCard(query: query)
+                }
+                if query.isEmpty {
+                    PlanStripCard { tab = .agents }
+                    if OverviewRules.showsCleanupLine(scanned: store.cleanupScanned, total: store.cleanupTotal) {
+                        CleanupLine(total: store.cleanupTotal) { tab = .cleanup }
+                    }
+                }
             case .agents:
+                // Usage: plan limits, then the token totals, then each tool's usage. The workspaces live on Overview,
+                // which also shows every waiting permission prompt.
                 PlanLimitsCard()
-                // Every waiting prompt answerable here too: under its workspace, or on its own if its session isn't listed.
-                PermissionPromptList(requests: store.unmatchedPermissionRequests)
-                WorkspacesCard(query: query, clearQuery: { query = "" }, showsPrompts: true)
+                if !store.claude.last24.isEmpty, store.claude.warning == nil { WidgetRow() }
                 UsageCard(title: "Claude Code", icon: "asterisk", tint: UI.claude, summary: store.claude, loading: store.usageLoading,
                           accounts: store.claudeAccountUsage)
                 if store.codex.found {

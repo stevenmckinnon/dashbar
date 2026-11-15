@@ -392,7 +392,7 @@ struct PaceKey: View {
     }
 }
 
-// MARK: - Plan limits (Agents tab)
+// MARK: - Plan limits (Usage tab)
 
 struct PlanLimitsCard: View {
     @EnvironmentObject var store: Store

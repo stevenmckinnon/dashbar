@@ -24,7 +24,7 @@ struct TileRow: View {
                 }
             }
             .buttonStyle(PressStyle())
-            .help("Show agents (⌘2)")
+            .help("Show usage (⌘2)")
             .accessibilityLabel(agentsLabel)
             Button { open(.servers) } label: {
                 let count = Set(store.devListeners.map(\.pid)).count

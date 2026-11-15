@@ -86,13 +86,14 @@ private struct AppSidebar: View {
 
     private func badge(_ t: PanelTab) -> Text? {
         switch t {
-        case .overview: return nil
-        case .agents:
+        case .overview:
+            // Beside Overview, where the waiting prompts and the sessions are, now that the second page is Usage.
             // An agent waiting for you outranks the count, in amber like everywhere else.
             if store.waitingCount > 0 {
                 return Text("\(store.waitingCount) \(store.waitingCount == 1 ? "needs" : "need") you").foregroundStyle(UI.textAttention)
             }
             return store.sessions.isEmpty ? nil : Text("\(store.sessions.count)")
+        case .agents: return nil
         case .servers:
             let n = Set(store.devListeners.map(\.pid)).count
             return n == 0 ? nil : Text("\(n)")
