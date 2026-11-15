@@ -3,6 +3,35 @@
     <channel>
         <title>Dashbar</title>
         <item>
+            <title>0.7.0</title>
+            <pubDate>Sun, 15 Nov 2026 11:58:18 +0000</pubDate>
+            <sparkle:version>161</sparkle:version>
+            <sparkle:shortVersionString>0.7.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[- **Answer permission prompts from Dashbar**: turn it on in Settings → Integrations, and when Claude Code asks for permission, the panel, the window, the island and the notification show the whole request with Allow once and Deny. Dashbar never answers by itself, and the prompt in your terminal still works
+- **Dashbar Island**: on a Mac with a notch, a banner grows out of it when an agent finishes, needs you or asks for permission, then folds away. On other screens it sits below the menu bar. A small status beside the notch is optional
+- **A new Overview**: agents that need you come first, then the ones working. The Now card has labelled buttons for your editor, terminal, Finder and localhost, other workspaces follow, a strip shows the plan left on each account, and one line tells you how much rebuildable cache Clean-up can clear
+- **The Usage tab** (was Agents): one card per tool, the most urgent first, with its limits, tokens, estimated cost and chart. One period picker sets every card and is remembered, and with more than one tool a line gives the total
+- **History**: each past plan window and how much of it you used, plus 30 days of tokens and estimated cost by agent, project and model
+- **Gemini CLI and Antigravity**: Gemini CLI sessions and their tokens, the Antigravity app's conversations, and Antigravity CLI sessions. Add Dashbar to the Antigravity CLI's status line to see Antigravity's plan limits. All of it stays hidden if you don't use them
+- **Claude plan limits from Claude Code's status line**: Add to Status Line in Settings → Integrations reads your limits with no Keychain access and no network request. Remove puts your status line back as it was
+- **More than one account**: add other Claude Code and Codex accounts in Settings → Accounts
+- **Estimated cost** at API list prices, per day, model and project. You can hide it in Settings
+- Each Claude Code session shows its running subagents and their share of usage
+- The menu bar icon shows what's happening: it moves while agents work, turns amber with a count when one needs you, and says Done when one finishes. It can also show the plan left for the 5-hour window, the weekly one or both, for Claude, Codex and Antigravity
+- Clicking a session or its notification brings back the app it runs in, such as your terminal or editor
+- Limits read the same everywhere: 5-hour and Weekly for every tool, resets as "in 2h 10m" or "Thu 09:00", and a caption that says what's left ("At this rate, lasts until it resets"). A limit on course to run out turns amber
+- VoiceOver announces when an agent needs you, asks for permission or finishes, and reads names, headings and figures with their meaning. Keyboard focus is now visible
+- The panel fits what's in it instead of a fixed height
+- A welcome window on first run. Dashbar asks for notifications only when you choose to turn them on
+- Settings has shorter tabs in a resizable window, and it opens on the desktop you're looking at
+- Your Claude plan updates after an upgrade, instead of showing the old one
+- Fixed: on macOS 27, Open Dashbar in the welcome window did nothing
+- Fixed: the plan history file could grow until Dashbar hung at launch
+]]></description>
+            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.7.0/Dashbar-0.7.0.dmg" length="8068108" type="application/octet-stream" sparkle:edSignature="gH5kRedcxH/9N+tItJjd+mrmpD1TRiuFewxspDnXVbgQQ4DsQ8lBkx3R3FvPG84AmyadQ5GRYdsv/kaM7tYrCg=="/>
+        </item>
+        <item>
             <title>0.6.2</title>
             <pubDate>Wed, 11 Nov 2026 17:55:58 +0000</pubDate>
             <sparkle:version>54</sparkle:version>
@@ -21,20 +50,6 @@
             <description sparkle:format="markdown"><![CDATA[- Fixed: the Dashbar window could be dragged down to almost nothing. It now stops at a size that fits its pages, and a window left tiny opens at that size again
 ]]></description>
             <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.6.1/Dashbar-0.6.1.dmg" length="5181127" type="application/octet-stream" sparkle:edSignature="YV6pn3PgEHMGHKnNmaw2sKT21HZdnXIbgKC0dkJo+2BBIATW4mJTlVf74ryM1bglSdkxtpia7njfK/sDqCBFDA=="/>
-        </item>
-        <item>
-            <title>0.6.0</title>
-            <pubDate>Sat, 07 Nov 2026 17:09:23 +0000</pubDate>
-            <sparkle:version>49</sparkle:version>
-            <sparkle:shortVersionString>0.6.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[- **The Dashbar window**: the pop-out button or ⌃⌥D now opens Dashbar as a full window, with Overview, Agents, Servers, System, Clean-up and every running workspace in a sidebar. The menu bar panel stays the quick glance
-- **A page for each workspace**: its uptime, CPU, memory and energy, adding up its dev servers, its agents and everything they started, with its dev servers, agents and the processes behind the numbers. Open it from the sidebar, a workspace card, or the name or chart button in the panel
-- A filter at the top of the sidebar (⌘K) narrows the workspaces and the page you're on
-- On macOS 26 and later, the filter fields and the window's buttons use Liquid Glass
-- The window shows the checked-out git branch for each workspace
-]]></description>
-            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.6.0/Dashbar-0.6.0.dmg" length="5180957" type="application/octet-stream" sparkle:edSignature="RTmQ9dU16X1BT+CF/6AIg4De+w2u924oipP+rNh51ve2rYL91ywjQZwrh+p/bsJcLbTqsmKo8nyHxrNEBmwmAQ=="/>
         </item>
     </channel>
 </rss>
