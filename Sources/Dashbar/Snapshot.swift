@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import DashbarStatus
 
 /// `Dashbar --snapshot out.png [--dark]` renders the dashboard with live data to a PNG and exits.
 /// Handy for README screenshots and visual checks without clicking the menu bar.
@@ -23,6 +24,13 @@ enum Snapshot {
         let dark = CommandLine.arguments.contains("--dark")
         let delay = Double(ProcessInfo.processInfo.environment["DASHBAR_SNAPSHOT_DELAY"] ?? "") ?? 10
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            if CommandLine.arguments.contains("--cli") {
+                // The `dashbar` command's status file, written to `path` instead of the app's own (`CLIStatus`).
+                let snapshot = CLIStatus.snapshot(of: store, showsClaudeLimits: demo || AppSettings.shared.showsClaudeLimits)
+                let data = (try? StatusSnapshot.encoder().encode(snapshot)) ?? Data()
+                try? data.write(to: URL(fileURLWithPath: path))
+                exit(0)
+            }
             if CommandLine.arguments.contains("--glyphs") {
                 // Menu bar glyph at its real size on light and dark menu bars, idle and working, at 4x for inspection.
                 let scale: CGFloat = 4, w: CGFloat = 220, h: CGFloat = 24

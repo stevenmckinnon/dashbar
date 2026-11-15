@@ -227,6 +227,8 @@ final class Store: ObservableObject {
         refresh(usage: true, servers: true, panel: true)
         scanCleanup()
         startTimer()
+        // The `dashbar` command's status file. A snapshot run never writes it: it would replace the running app's.
+        if !CommandLine.arguments.contains("--snapshot") { CLIStatus.follow(self).store(in: &subscriptions) }
         settings.$accounts.dropFirst().removeDuplicates()
             .debounce(for: .seconds(0.3), scheduler: RunLoop.main)
             .sink { [weak self] _ in
