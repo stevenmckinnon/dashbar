@@ -4,9 +4,9 @@ import './dashbar-demo.css'
 
 // Dashbar's panel, hung from the menu bar. It opens on Overview (the working
 // workspace, the others, the tightest plan limits and the caches), looks at
-// the servers (two are barely used), then at the Usage tab, where the limits
-// fill, the pace marks land and the story ends. That last frame is also the
-// poster.
+// the servers (two are barely used), then at the Usage tab, one card per
+// tool, where the limits fill, the hours rise, the pace marks land and the
+// story ends. That last frame is also the poster.
 
 type S = {
   /** 0 Overview, 1 Usage, 2 Servers */
@@ -258,16 +258,18 @@ export function WorkspaceRow({ tone, letter, name, sub, port, note, working, att
   )
 }
 
-/* ---------- Usage: the plan limits ---------- */
+/* ---------- Usage: one card per tool ---------- */
 
-/** The key to the tick on the limit bars, once per card */
+/** The key to the tick on the limit bars, once at the top of the tab */
 export function PaceKey() {
   return <span className="dd-pace-key"><i />even pace</span>
 }
 
+type Tone = 'claude' | 'codex'
+
 /** One limit as the Usage tab draws it. The fill is the agent's colour, amber while it is on course to run out,
  *  red from 90% used; the track is neutral. */
-export function Limit({ label, resets, used, mark, verdict, tone, attention, s }: { label: string; resets: string; used: number; mark: number; verdict: string; tone: 'claude' | 'codex'; attention?: boolean; s: { limits: boolean; marks: boolean } }) {
+export function Limit({ label, resets, used, mark, verdict, tone, attention, s }: { label: string; resets: string; used: number; mark: number; verdict: string; tone: Tone; attention?: boolean; s: { limits: boolean; marks: boolean } }) {
   const state = used >= 90 ? 'problem' : attention ? 'attention' : undefined
   return (
     <div className="dd-limit" data-tone={tone} data-state={state}>
@@ -287,58 +289,102 @@ export function Limit({ label, resets, used, mark, verdict, tone, attention, s }
   )
 }
 
-/** Both agents' limits, as the Usage tab's first card shows them */
-export function LimitsCard({ s, weekly = { used: 38, mark: 50, verdict: 'At this rate, plenty left when it resets' } }: { s: { limits: boolean; marks: boolean }; weekly?: { used: number; mark: number; verdict: string; attention?: boolean } }) {
+export type LimitSpec = { label: string; resets: string; used: number; mark: number; verdict: string; attention?: boolean }
+
+export const CLAUDE_LIMITS: LimitSpec[] = [
+  { label: '5-hour', resets: 'resets in 2h 11m', used: 55, mark: 56, verdict: 'At this rate, lasts until it resets' },
+  { label: 'Weekly', resets: 'resets Wed 23:33', used: 38, mark: 50, verdict: 'At this rate, plenty left when it resets' },
+]
+export const CODEX_LIMITS: LimitSpec[] = [
+  { label: '5-hour', resets: 'resets in 3h 23m', used: 21, mark: 32, verdict: 'At this rate, plenty left when it resets' },
+  { label: 'Weekly', resets: 'resets Thu 13:57', used: 34, mark: 41, verdict: 'At this rate, lasts until it resets' },
+]
+
+/** The tab's top: one period for every card, the key to the pace tick (when a card shows a meter), and with two
+ *  tools in use, their total */
+export function UsageTop({ period = 0, pace = true, total }: { period?: number; pace?: boolean; total?: { tokens: string; span: string; cost: string } }) {
   return (
-    <div className="dd-card" data-target="limits">
-      <CardHead icon={<Gauge size={14} strokeWidth={1.75} />} tone="green" title="Plan limits"><PaceKey /></CardHead>
-      <div className="dd-who"><Asterisk size={14} strokeWidth={2} className="dd-claude-ink" /><b>Claude</b></div>
-      <Limit s={s} tone="claude" label="5-hour" resets="resets in 2h 11m" used={55} mark={56} verdict="At this rate, lasts until it resets" />
-      <Limit s={s} tone="claude" label="Weekly" resets="resets Wed 21:22" used={weekly.used} mark={weekly.mark} verdict={weekly.verdict} attention={weekly.attention} />
-      <div className="dd-who"><CodeXml size={14} strokeWidth={2} className="dd-codex-ink" /><b>Codex</b></div>
-      <Limit s={s} tone="codex" label="5-hour" resets="resets in 3h 23m" used={21} mark={32} verdict="At this rate, plenty left when it resets" />
-      <Limit s={s} tone="codex" label="Weekly" resets="resets Thu 11:46" used={34} mark={41} verdict="At this rate, lasts until it resets" />
+    <div className="dd-usage-top">
+      <div className="dd-usage-controls">
+        <span className="dd-period">{['Today', '7d', '14d'].map((p, i) => <span key={p} data-on={i === period || undefined}>{p}</span>)}</span>
+        {pace && <PaceKey />}
+      </div>
+      {total && (
+        <div className="dd-total">
+          <b>{total.tokens}</b><span>tokens {total.span} across 2 tools</span>
+          <span className="dd-total-cost"><b>≈ {total.cost}</b><span>at API prices</span></span>
+        </div>
+      )}
     </div>
   )
 }
 
-const DAYS = [{ d: 'M', v: 62 }, { d: 'T', v: 88 }, { d: 'W', v: 54 }, { d: 'T', v: 100 }, { d: 'F', v: 70 }, { d: 'S', v: 84 }, { d: 'S', v: 92 }]
+/** A tool's card: the header (it opens History), its plan limits, then what the period's tokens add up to */
+export function ToolCard({ tone, title, limits, s, target, children }: { tone: Tone; title: string; limits: LimitSpec[]; s: { limits: boolean; marks: boolean }; target?: string; children?: React.ReactNode }) {
+  return (
+    <div className="dd-card dd-tool" data-target={target}>
+      <div className="dd-head dd-tool-head">
+        <span className={`dd-chip dd-${tone}-ink`}>{tone === 'claude' ? <Asterisk size={15} strokeWidth={2} /> : <CodeXml size={15} strokeWidth={2} />}</span>
+        <b>{title}</b>
+        <ChevronRight size={14} strokeWidth={2} className="dd-chevron" />
+      </div>
+      {limits.length > 0 && <div className="dd-tool-limits">{limits.map((l) => <Limit key={l.label} s={s} tone={tone} {...l} />)}</div>}
+      {children && <div className="dd-tool-tokens" data-tone={tone}>{children}</div>}
+    </div>
+  )
+}
+
+/** Tokens by hour over the last 24 hours: the current hour in the tool's colour, earlier hours neutral */
+export const HOURS = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 45, 32, 80, 25, 42, 75]
+
+export function HourBars({ on, values = HOURS }: { on: boolean; values?: number[] }) {
+  return (
+    <div className="dd-hours">
+      <div className="dd-hours-bars">
+        {values.map((v, i) => (
+          <i key={i} data-zero={v === 0 || undefined} data-now={i === values.length - 1 || undefined}
+            style={{ height: v === 0 || !on ? 2 : `${v}%`, transitionDelay: `${Math.max(0, i - 16) * 60}ms` }} />
+        ))}
+      </div>
+      <div className="dd-hours-axis"><span>12</span><span>18</span><span>00</span><span>06</span></div>
+    </div>
+  )
+}
+
+/** The total's parts, each kept on one line when the line wraps: "In 1.2M · Out 640K · Cache read 148M · …" */
+export function SplitLine({ text }: { text: string }) {
+  return <small className="dd-split">{text.split(' · ').map((p) => p.replaceAll(' ', '\u00a0')).join(' · ')}</small>
+}
+
+/** "153M tokens today" with the estimate on the right, the chart, the total's parts and the subagents' share */
+export function ToolTokens({ tokens, span = 'today', cost, sessions, on, split, sub }: { tokens: string; span?: string; cost: React.ReactNode; sessions: string; on: boolean; split: string; sub?: string }) {
+  return (
+    <>
+      <div className="dd-headline">
+        <strong>{tokens}</strong><small>tokens {span}</small>
+        <span className="dd-cost"><b>≈ {cost}</b><small>at API prices</small></span>
+      </div>
+      <small className="dd-caption">By hour, last 24 hours · {sessions}</small>
+      <HourBars on={on} />
+      <SplitLine text={split} />
+      {sub && <small className="dd-split dd-sub"><Split size={13} strokeWidth={2} />{sub}</small>}
+    </>
+  )
+}
 
 function Usage({ s }: { s: S }) {
   return (
     <>
-      <LimitsCard s={s} />
-      <div className="dd-widgets">
-        <div className="dd-card dd-widget">
-          <span className="dd-widget-title"><Asterisk size={12} strokeWidth={2.5} className="dd-claude-ink" />Claude · today</span>
-          <strong>153M<small>tokens</small></strong>
-          <span className="dd-days">{DAYS.map((x, i) => <span key={i} data-today={i === 6 || undefined}><i style={{ height: `${x.v * 0.2}px` }} />{x.d}</span>)}</span>
-          <small className="dd-widget-foot">6 sessions today</small>
-        </div>
-        <div className="dd-card dd-widget">
-          <span className="dd-widget-title"><Asterisk size={12} strokeWidth={2.5} className="dd-claude-ink" />Claude · last 7 days</span>
-          <strong>891M<small>tokens</small></strong>
-          <span className="dd-compare">
-            <span><small>Last 7</small><i style={{ width: '100%' }} /><small>891M</small></span>
-            <span data-past><small>Prior 7</small><i style={{ width: '47%' }} /><small>421M</small></span>
-          </span>
-          <small className="dd-widget-foot">Up 112% on the 7 days before</small>
-        </div>
-      </div>
-      {/* The usage card runs off the bottom of the panel */}
-      <div className="dd-card">
-        <div className="dd-head dd-usage-head">
-          <span className="dd-chip dd-claude-ink"><Asterisk size={15} strokeWidth={2} /></span>
-          <b>Claude Code</b>
-          <span className="dd-faint">153M tokens today</span>
-        </div>
-        <div className="fd-range"><span data-on>Today</span><span>7d</span><span>14d</span></div>
-        <div className="fd-tokens">
-          {[['In', '1.2M'], ['Out', '640K'], ['Cache read', '148M'], ['Cache write', '2.9M']].map(([k, v]) => (
-            <div key={k}><small>{k}</small><b>{v}</b></div>
-          ))}
-        </div>
-      </div>
+      <UsageTop total={{ tokens: '162M', span: 'today', cost: '$59.09' }} />
+      <ToolCard tone="claude" title="Claude Code" limits={CLAUDE_LIMITS} s={s} target="limits">
+        <ToolTokens tokens="153M" cost="$56.49" sessions="6 sessions" on={s.limits}
+          split="In 1.2M · Out 640K · Cache read 148M · Cache write 2.9M" sub="Of which subagents 41M · ≈ $13.56 · 27%" />
+      </ToolCard>
+      {/* Codex's card runs off the bottom of the panel */}
+      <ToolCard tone="codex" title="Codex" limits={CODEX_LIMITS} s={s}>
+        <ToolTokens tokens="9.5M" cost="$2.60" sessions="2 sessions" on={s.limits}
+          split="In 410K · Out 96K · Cache read 9.0M · Cache write 0" />
+      </ToolCard>
     </>
   )
 }

@@ -66,3 +66,16 @@ Updated for the app as of the permission prompts, cost and History work: the age
   sparkline. The workspace page's Agents card still shows one session without the subagent rows the app lists.
 - Checked in headless Chrome at 390, 905, 1100 and 1280, light and dark: no horizontal overflow, no console errors, the
   hero plays to its poster and Replay restarts it, reduced motion shows the poster. The film gate was not re-run.
+
+## Updated for the Usage tab's one card per tool
+
+- **Hero:** the Usage tab now matches the app: the Today · 7d · 14d picker with the even pace key, the line across tools
+  ("162M tokens today across 2 tools · ≈ $59.09 at API prices"), then Claude Code's card (header with chevron, two
+  limits, "153M tokens today", the estimate, the hourly chart with only the current hour in Claude's colour, the in / out /
+  cache line and the subagents line) and Codex's card running off the bottom. The limits fill, the hours rise and the marks
+  land (poster). Titles carry no plan name or Experimental badge: the site recommends the status line, which gives neither.
+  Compact drops the total's "at API prices" and lets the token parts wrap to two lines, each part kept whole.
+- **Feature demos:** limits shows the two tool cards (Claude's weekly limit amber, so Claude comes first); usage shows the
+  period picker over Claude Code's card as the window draws it, with Workspaces and Models.
+- Checked in headless Chrome at 390, 905, 1100 and 1280, light and dark: no horizontal overflow, no console errors, the
+  hero plays to its poster and Replay restarts it, reduced motion shows the poster. The film gate was not re-run.

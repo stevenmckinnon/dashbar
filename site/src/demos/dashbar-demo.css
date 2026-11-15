@@ -9,6 +9,8 @@
     --dd-track: #dde4e6;
     --dd-claude: #cf6a4c;
     --dd-codex: #159fb4;
+    /* Earlier bars in a chart, as the app's UI.dataPast */
+    --dd-past: rgba(0, 0, 0, 0.36);
     --dd-bar: #1f2427;
     --dd-bar-ink: rgba(255, 255, 255, 0.3);
   }
@@ -18,6 +20,7 @@
     --dd-bar: #0d1011;
     --dd-claude: #e08566;
     --dd-codex: #3fc2d6;
+    --dd-past: rgba(255, 255, 255, 0.34);
   }
 
   /* ---------- The menu bar ---------- */
@@ -458,17 +461,6 @@
   }
 
   /* ---------- Agents: plan limits ---------- */
-  .dd-who {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 0 2px;
-  }
-  .dd-who b {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--ss-text-strong);
-  }
   .dd-claude-ink { color: var(--dd-claude); flex: none; }
   .dd-codex-ink { color: var(--dd-codex); flex: none; }
 
@@ -720,71 +712,79 @@
   }
   .dd-pace-key i { width: 2px; height: 9px; border-radius: 1px; background: var(--ss-text-strong); opacity: 0.7; }
 
-  .dd-widgets { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .dd-widget { display: flex; flex-direction: column; height: 130px; padding: 12px 14px; }
-  .dd-widget-title { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; color: var(--ss-text); white-space: nowrap; }
-  .dd-widget strong {
-    margin-top: 8px;
-    font-size: 22px;
-    line-height: 1.1;
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    color: var(--ss-text-strong);
-    font-variant-numeric: tabular-nums;
-  }
-  .dd-widget strong small { margin-left: 4px; font-size: 12px; font-weight: 600; letter-spacing: 0; color: var(--ss-text); }
-  .dd-widget-foot { margin-top: auto; font-size: 12px; color: var(--ss-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .dd-days { display: flex; gap: 4px; margin-top: 6px; }
-  .dd-days > span { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; width: 12px; height: 32px; font-size: 9px; color: var(--ss-text); }
-  .dd-days i { width: 10px; border-radius: 2px; background: var(--ss-ink-5); }
-  .dd-days [data-today] { font-weight: 600; color: var(--ss-text-strong); }
-  .dd-days [data-today] i { background: var(--dd-claude); }
-  .dd-compare { display: grid; gap: 4px; margin-top: 8px; }
-  .dd-compare > span { display: grid; grid-template-columns: 38px 1fr 34px; align-items: center; gap: 6px; font-size: 10px; color: var(--ss-text); }
-  .dd-compare small:last-child { text-align: right; font-variant-numeric: tabular-nums; }
-  .dd-compare i { height: 5px; border-radius: 3px; background: var(--dd-claude); }
-  .dd-compare [data-past] i { background: var(--ss-ink-5); }
-  .dd-panel[data-layout="compact"] .dd-widget { padding: 10px 12px; }
-  .dd-panel[data-layout="compact"] .dd-compare > span { grid-template-columns: 34px 1fr; }
-  .dd-panel[data-layout="compact"] .dd-compare small:last-child { display: none; }
 }
 
-/* The usage card's range and token figures, shared by the hero's Usage tab and the usage feature demo */
+/* The Usage tab: the period picker and total, then one card per tool. Shared by the hero and the feature demos. */
 .dd {
-  .fd-tokens {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 6px;
-    margin-top: 6px;
-  }
-  .fd-tokens div {
-    display: grid;
-    gap: 1px;
-    padding: 6px 9px;
-    border-radius: 9px;
-    background: var(--ss-ink-2);
-  }
-  .fd-tokens small { font-size: 11px; color: var(--ss-text); white-space: nowrap; }
-  .fd-tokens b { font-size: 13px; font-weight: 600; color: var(--ss-text-strong); font-variant-numeric: tabular-nums; }
-  .fd-range {
+  .dd-usage-top { display: grid; gap: 8px; padding: 0 2px 2px; }
+  .dd-usage-controls { display: flex; align-items: center; gap: 10px; }
+  .dd-period {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    margin-top: 8px;
-    padding: 2px;
-    border-radius: 8px;
+    width: 168px;
+    padding: 1px;
+    border-radius: 7px;
     background: var(--ss-ink-2);
+    box-shadow: inset 0 0 0 0.5px var(--ss-line);
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
     text-align: center;
     color: var(--ss-text-strong);
   }
-  .fd-range span { padding: 3px 0; border-radius: 6px; }
-  .fd-range span[data-on] { background: var(--ss-surface); box-shadow: 0 0 0 0.5px var(--ss-line); }
-  .fd-box[data-layout="compact"] .fd-tokens,
-  .dd-panel[data-layout="compact"] .fd-tokens { grid-template-columns: 1fr 1fr; }
-  .dd-usage-head .dd-faint { margin-left: auto; }
+  .dd-period span { padding: 2px 0; border-radius: 6px; }
+  .dd-period span[data-on] { background: var(--ss-surface); box-shadow: 0 0 0 0.5px var(--ss-line), 0 1px 1px rgba(0, 0, 0, 0.06); }
+  .dd-total { display: flex; align-items: baseline; gap: 4px; font-size: 12px; color: var(--ss-text); white-space: nowrap; }
+  .dd-total b,
+  .dd-cost b { font-size: 13px; font-weight: 600; color: var(--ss-text-strong); font-variant-numeric: tabular-nums; }
+  .dd-total-cost,
+  .dd-cost { margin-left: auto; display: inline-flex; align-items: baseline; gap: 4px; white-space: nowrap; }
+
+  .dd-tool { display: grid; gap: 6px; }
+  .dd-tool-head { padding-bottom: 0; }
+  .dd-tool-head .dd-chevron { margin-left: auto; }
+  .dd-tool-tokens { display: grid; gap: 4px; margin-top: 10px; --c: var(--dd-claude); }
+  .dd-tool-tokens[data-tone="codex"] { --c: var(--dd-codex); }
+  .dd-headline { display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+  .dd-headline strong {
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+    color: var(--ss-text-strong);
+    font-variant-numeric: tabular-nums;
+  }
+  .dd-headline small,
+  .dd-cost small { font-size: 12px; color: var(--ss-text); }
+  .dd-headline > small { font-weight: 600; }
+  .dd-caption,
+  .dd-split { font-size: 12px; line-height: 1.3; color: var(--ss-text); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dd-caption { margin-top: 4px; }
+  .dd-split { margin-top: 2px; }
+  .dd-sub { display: flex; align-items: center; gap: 6px; }
+  .dd-sub svg { flex: none; }
+
+  .dd-hours { display: grid; gap: 4px; margin-top: 4px; }
+  .dd-hours-bars { display: flex; align-items: flex-end; gap: 3px; height: 50px; }
+  .dd-hours-bars i {
+    flex: 1;
+    border-radius: 2px;
+    background: var(--dd-past);
+    transition: height 0.7s cubic-bezier(0.25, 0.8, 0.25, 1);
+  }
+  .dd-hours-bars i[data-now] { background: var(--c); }
+  .dd-hours-bars i[data-zero] { background: var(--ss-ink-3); }
+  .dd-hours-axis { display: grid; grid-template-columns: repeat(4, 1fr); font-size: 10px; color: var(--ss-text); font-variant-numeric: tabular-nums; }
+
+  /* Columns may shrink below their content, so a long line is cut rather than widening its card */
+  .dd-pane,
+  .dd-tool,
+  .dd-tool-tokens,
+  .dd-usage-top { grid-template-columns: minmax(0, 1fr); }
+  /* At the phone width the total's four parts take two lines, as they would rather than shrink unreadably */
+  .dd-panel[data-layout="compact"] .dd-split:not(.dd-sub),
+  .fd-box[data-layout="compact"] .dd-split:not(.dd-sub) { white-space: normal; }
+  /* The compact design keeps the total's figure and drops its unit, so the line fits */
+  .dd-panel[data-layout="compact"] .dd-total-cost > span { display: none; }
 }
 
-.dd .dd-widgets { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-.dd .dd-widget { min-width: 0; overflow: hidden; }
 .dd .dd-now-name small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

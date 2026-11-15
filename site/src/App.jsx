@@ -118,7 +118,7 @@ function Hero() {
         <p className="note">{LATEST_VERSION ? <>Version {LATEST_VERSION}. </> : null}Needs macOS 14 or later. Notarised by Apple. MIT licence.</p>
       </div>
       <div className="demo" data-ss-fill="">
-        <div role="img" aria-label="A short animation of Dashbar's panel, opened from the menu bar. Overview shows the workspace where Claude is working, the other workspaces, the tightest plan limits and 7 GB of rebuildable caches. Then the dev servers, two of them marked barely used, and the Usage tab, where the plan limits fill and the 5-hour limit lasts until it resets at this rate.">
+        <div role="img" aria-label="A short animation of Dashbar's panel, opened from the menu bar. Overview shows the workspace where Claude is working, the other workspaces, the tightest plan limits and 7 GB of rebuildable caches. Then the dev servers, two of them marked barely used, and the Usage tab, with a card for Claude Code and one for Codex, where the plan limits fill, today’s hours rise and Claude’s 5-hour limit lasts until it resets at this rate.">
           <div aria-hidden="true"><DashbarDemo key={run} dark={dark} /></div>
         </div>
         <div className="caption-row">
@@ -136,9 +136,9 @@ const ITEMS = [
   { name: "Agents, and when they need you", Demo: AgentsDemo,
     body: <>Each Claude Code session by project: working, idle or waiting for you, for how long, and how full its context window is. Click one to go back to the app it runs in. Turn on permission prompts in Settings and a request shows up under its session with Allow once and Deny. The terminal still asks too, and Dashbar never answers by itself.</> },
   { name: "Plan limits, with pace", Demo: LimitsDemo,
-    body: <>Your 5-hour and weekly limits, with a mark for where an even pace would be and a projection of when you would run out at the current rate. Codex’s limits come from its own logs. Claude’s come from Claude Code’s status line: add Dashbar to it in Settings and your usage updates after each Claude Code reply, with no network request.</> },
+    body: <>Your 5-hour and weekly limits, with a mark for where an even pace would be and a projection of when you would run out at the current rate. Each tool has its own card, and the one closest to running out comes first. Codex’s limits come from its own logs. Claude’s come from Claude Code’s status line: add Dashbar to it in Settings and your usage updates after each Claude Code reply, with no network request.</> },
   { name: "Usage and estimated cost", Demo: UsageDemo,
-    body: <>Tokens by hour, project and model for Claude Code and Codex, and what they would cost at public API list prices. It is a guide, not your bill, and Settings can hide it. History, in the Dashbar window, keeps 30 days of usage and how full each plan window got.</> },
+    body: <>Tokens for Claude Code and Codex today, or over the last 7 or 14 days, by hour or by day, and what they would cost at public API list prices. One choice at the top sets the span for every card, and in the Dashbar window each card also lists its projects and models. The cost is a guide, not your bill, and Settings can hide it. History, in the Dashbar window, keeps 30 days of usage and how full each plan window got.</> },
   { name: "Idle servers", Demo: ServersDemo,
     body: <>Dev servers grouped under the project that owns them. One that has been up for over an hour and is barely using the CPU is marked, and so is one an agent started.</> },
   { name: "System", Demo: SystemDemo,

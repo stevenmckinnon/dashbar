@@ -194,57 +194,11 @@
   }
 
   /* ---------- Usage and the cost estimate ---------- */
-  .fd-usage-head .dd-faint { margin-left: auto; }
-  .fd-cost {
-    display: flex;
-    align-items: baseline;
-    gap: 6px;
-    margin-top: 12px;
-    font-size: 12px;
-    color: var(--ss-text);
-  }
-  .fd-cost strong {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--ss-text-strong);
-    font-variant-numeric: tabular-nums;
-  }
-  .fd-hours-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    margin-top: 12px;
-    font-size: 12px;
-    color: var(--ss-text);
-  }
-  .fd-hours-head i { font-style: normal; }
-  .fd-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    font-weight: 600;
-    color: var(--ss-accent-text);
-  }
-  .fd-hours {
-    display: flex;
-    align-items: flex-end;
-    gap: 3px;
-    height: 54px;
-    margin-top: 8px;
-  }
-  .fd-hours i {
-    flex: 1;
-    border-radius: 2px;
-    background: color-mix(in srgb, var(--dd-claude) 75%, transparent);
-    transition: height 0.7s cubic-bezier(0.25, 0.8, 0.25, 1);
-  }
-  .fd-hours i:last-child { background: var(--dd-claude); }
-  .fd-hours i[data-zero] { background: var(--ss-ink-3); }
   .fd-ranks {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 18px;
-    margin-top: 12px;
+    margin-top: 10px;
   }
   .fd-box[data-layout="compact"] .fd-ranks { grid-template-columns: 1fr; }
   .fd-rank { display: grid; gap: 6px; align-content: start; }
@@ -267,7 +221,7 @@
     display: block;
     height: 100%;
     border-radius: 2px;
-    background: color-mix(in srgb, var(--dd-claude) 80%, transparent);
+    background: color-mix(in srgb, var(--dd-claude) 60%, transparent);
     transition: width 0.8s cubic-bezier(0.25, 0.8, 0.25, 1);
   }
 }
@@ -281,8 +235,6 @@
   .fd-head-end { margin-left: auto; font-size: 12px; color: var(--ss-text); font-variant-numeric: tabular-nums; }
   .fd-app b { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  /* Usage: the range the card shows, and the subagents' share */
-  .fd-sub { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; color: var(--ss-text); }
 
   /* Clean-up: a row's Trash button shows on hover, then asks once */
   .fd-folder { padding: 0 4px; border-radius: 8px; transition: background 0.2s ease; }

@@ -1,6 +1,6 @@
 import { Archive, Asterisk, ChevronRight, Flame, Hammer, Hand, Layers, Package, Split, Trash2, X } from 'lucide-react'
 import { Badge, Bar, Chart, Collapse, Count, Stage, type Act } from '../stageshow/kit'
-import { CardHead, FillerRow, LimitsCard, NowSession, NowTitle, QuickActions, Servers, WorkspaceRow } from './DashbarDemo'
+import { CardHead, CLAUDE_LIMITS, CODEX_LIMITS, FillerRow, HourBars, NowSession, NowTitle, QuickActions, Servers, SplitLine, ToolCard, UsageTop, WorkspaceRow } from './DashbarDemo'
 import './dashbar-demo.css'
 import './feature-demos.css'
 
@@ -99,9 +99,14 @@ async function limitsScript(a: Act<L>) {
 
 export function LimitsDemo({ dark = false }: Props) {
   return (
-    <Frame height={380} compactHeight={390} initial={{ limits: false, marks: false } as L} poster={{ limits: true, marks: true } as L} script={limitsScript} theme={dark ? 'dark' : 'light'}>
+    <Frame height={374} compactHeight={390} initial={{ limits: false, marks: false } as L} poster={{ limits: true, marks: true } as L} script={limitsScript} theme={dark ? 'dark' : 'light'}>
       {(s: L) => (
-        <LimitsCard s={s} weekly={{ used: 71, mark: 50, verdict: 'At this rate, runs out Mon 19:40', attention: true }} />
+        <>
+          {/* Claude first: its weekly limit is the one on course to run out */}
+          <ToolCard tone="claude" title="Claude Code" s={s}
+            limits={[CLAUDE_LIMITS[0], { ...CLAUDE_LIMITS[1], used: 71, verdict: 'At this rate, runs out Mon 19:40', attention: true }]} />
+          <ToolCard tone="codex" title="Codex" s={s} limits={CODEX_LIMITS} />
+        </>
       )}
     </Frame>
   )
@@ -109,11 +114,11 @@ export function LimitsDemo({ dark = false }: Props) {
 
 /* ---------- 3. Usage, and what it would cost ---------- */
 
-// Today's Claude Code usage card: the hours rise, the estimate rolls up and
-// the projects fill in with their share of it.
+// Claude Code's card as the Dashbar window shows it, under the period
+// picker: the hours rise, the estimate rolls up and the workspaces and
+// models fill in with their share of it.
 type U = { on: boolean; lists: boolean }
 
-const HOURS = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 45, 32, 80, 25, 42, 75]
 const PROJECTS = [
   { name: 'storefront-web', value: '92M · $35.11', share: 100 },
   { name: 'billing-api', value: '38M · $14.50', share: 41 },
@@ -147,37 +152,25 @@ function Rank({ title, items, on }: { title: string; items: { name: string; valu
 
 export function UsageDemo({ dark = false }: Props) {
   return (
-    <Frame height={360} compactHeight={408} initial={{ on: false, lists: false } as U} poster={{ on: true, lists: true } as U} script={usageScript} theme={dark ? 'dark' : 'light'}>
+    <Frame height={392} compactHeight={416} initial={{ on: false, lists: false } as U} poster={{ on: true, lists: true } as U} script={usageScript} theme={dark ? 'dark' : 'light'}>
       {(s: U, _r: any, layout: string) => (
-        <div className="dd-card fd-fill fd-usage">
-          <div className="dd-head fd-usage-head">
-            <span className="dd-chip dd-claude-ink"><Asterisk size={15} strokeWidth={2} /></span>
-            <b>Claude Code</b>
-            <span className="dd-faint">153M tokens today</span>
-          </div>
-          <div className="fd-range"><span data-on>Today</span><span>7d</span><span>14d</span></div>
-          <div className="fd-tokens">
-            {[['In', '1.2M'], ['Out', '640K'], ['Cache read', '148M'], ['Cache write', '2.9M']].map(([k, v]) => (
-              <div key={k}><small>{k}</small><b>{v}</b></div>
-            ))}
-          </div>
-          <div className="fd-cost">
-            <strong>≈ <Count value={s.on ? 5649 : 0} format={(n) => `$${(n / 100).toFixed(2)}`} /></strong>
-            <span>at API prices</span>
-          </div>
-          <div className="fd-sub"><Split size={13} strokeWidth={2} />Of which subagents 41M · ≈ $13.56 · 27%</div>
-          <div className="fd-hours-head">
-            <span>By hour, last 24 hours <i>· 6 sessions</i></span>
-            <span className="fd-link">History<ChevronRight size={13} strokeWidth={2} /></span>
-          </div>
-          <div className="fd-hours" data-on={s.on || undefined}>
-            {HOURS.map((v, i) => <i key={i} data-zero={v === 0 || undefined} style={{ height: v === 0 || !s.on ? 2 : `${v}%`, transitionDelay: `${Math.max(0, i - 16) * 60}ms` }} />)}
-          </div>
-          <div className="fd-ranks">
-            <Rank title="Workspaces" items={PROJECTS} on={s.lists} />
-            {layout !== 'compact' && <Rank title="Models" items={MODELS} on={s.lists} />}
-          </div>
-        </div>
+        <>
+          <UsageTop pace={false} />
+          <ToolCard tone="claude" title="Claude Code" limits={[]} s={{ limits: true, marks: true }}>
+            <div className="dd-headline">
+              <strong>153M</strong><small>tokens today</small>
+              <span className="dd-cost"><b>≈ <Count value={s.on ? 5649 : 0} format={(n) => `$${(n / 100).toFixed(2)}`} /></b><small>at API prices</small></span>
+            </div>
+            <small className="dd-caption">By hour, last 24 hours · 6 sessions</small>
+            <HourBars on={s.on} />
+            <SplitLine text="In 1.2M · Out 640K · Cache read 148M · Cache write 2.9M" />
+            <small className="dd-split dd-sub"><Split size={13} strokeWidth={2} />Of which subagents 41M · ≈ $13.56 · 27%</small>
+            <div className="fd-ranks">
+              <Rank title="Workspaces" items={PROJECTS} on={s.lists} />
+              {layout !== 'compact' && <Rank title="Models" items={MODELS} on={s.lists} />}
+            </div>
+          </ToolCard>
+        </>
       )}
     </Frame>
   )
