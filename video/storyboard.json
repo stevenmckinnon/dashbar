@@ -1,0 +1,133 @@
+{
+  "meta": {
+    "title": "Dashbar launch film: Signal",
+    "durationSec": 30,
+    "fps": 30,
+    "width": 1920,
+    "height": 1080,
+    "narrativeStructure": "problem-solution",
+    "publishingContext": "X and usedashbar.com, 16:9, autoplays muted: every claim is on screen. Headlines 72px or more so they hold up at phone-feed size.",
+    "fonts": {
+      "display": { "family": "Instrument Sans", "weights": ["600"] },
+      "body": { "family": "Instrument Sans", "weights": ["400", "500"] },
+      "code": { "family": "JetBrains Mono", "weights": ["500"] }
+    },
+    "colors": {
+      "background": "#081114 — ink ground, every scene",
+      "surface": "#121C20 — the brew command plate; app crops bring their own surfaces",
+      "primary": "#EEF3F5 — headlines",
+      "muted": "#93A3A9 — sub lines, labels",
+      "accent": "#4FD1E3 — Dashbar's arc: the window climax and the close only",
+      "highlight": "#F5B83D — amber, 'needs you': the hook and the notch scene only",
+      "meaning": "green #3DD16B working (sessions scene), orange #D97757 Claude and teal #22C3D6 Codex (limits scene). Light sources take the colour of what the scene is about, never decoration."
+    }
+  },
+  "voice": { "enabled": false },
+  "scenes": [
+    {
+      "id": "hook",
+      "act": "hook",
+      "startSec": 0,
+      "durationSec": 3.2,
+      "purpose": "Show the product in the first second (Dashbar's real menu bar item) and pose the problem: several agents, one of them blocked on you.",
+      "emotionalBeat": "A small jolt: something needs me.",
+      "voiceover": null,
+      "layout": "A macOS menu bar strip blown up 4x (128px tall, full width) on the upper third line (y 300). Dashbar's item sits at x 1100 inside it, clock at the right. Headline left-aligned at x 160, y 520, two lines.",
+      "elements": "Menu bar strip rgb(38,38,38) with the real item crop ('2 · 4m', then the amber hand '1') from menubar.png at 0.89 scale, wifi, battery and '9:41' in white. Headline line 1 'Your agents are busy.' 104px primary; line 2 'One needs you.' 104px amber.",
+      "animation": "0.0s strip enters: opacity 0→1, scale 1.12→1, blur 14→0 over 0.6s snappy. 0.25s line 1 words spring up (y 46→0, blur 10→0, opacity) 70ms apart. 1.5s the item flips: '2 · 4m' scale 1→0.7, blur 0→8, opacity 1→0 over 0.2s; the hand springs in from scale 0.4 with gentle overshoot (damping 12, stiffness 220). 1.5s an amber ring expands from the item: radius 20→260, stroke 3, opacity 0.7→0 over 0.9s. 1.75s line 2 words slam: scale 1.35→1 and blur 12→0, stiff spring (damping 15, stiffness 300), 60ms apart.",
+      "camera": "Continuous push: whole stage scale 1→1.04 across the scene, origin at the item.",
+      "lighting": "Dark until 1.5s, then an amber radial glow (720px, opacity 0→0.55) blooms behind the item and pulses ±8% at 1.2 Hz. Brightest point: the hand.",
+      "transitionOut": "Zoom through at 2.9s: scale 1.04→1.25, blur 0→14, opacity 1→0 over 0.3s, origin at the item. The camera dives toward the top of the screen, where the notch opens."
+    },
+    {
+      "id": "notch",
+      "act": "reveal",
+      "startSec": 3.0,
+      "durationSec": 4.6,
+      "purpose": "The reveal: the prompt arrives where you are looking and you answer it in one click.",
+      "emotionalBeat": "Relief: handled without switching apps.",
+      "voiceover": null,
+      "layout": "The island grows from a notch at top centre to 952×645. Headline centred at y 730, sub below it.",
+      "elements": "Black island (bottom radius 24→40) holding the real permission prompt crop from island-perm.png at 1.3 scale. Headline 'Answer it from the notch.' 76px. Sub 'Allow once or deny. Dashbar never answers by itself.' 34px muted.",
+      "animation": "0.0s notch 220×40 springs open to full size (damping 20, stiffness 120, mass 1). 0.35s the prompt content: opacity 0→1, blur 10→0, y -20→0. 0.6s headline words rise 60ms apart (y 36→0, blur 8→0). 0.9s sub fades, rises and sharpens. 2.5s Allow once presses: the button darkens 28% for 0.2s, a white ring expands from its centre (radius 10→120, opacity 0.6→0, 0.6s). 3.2s the island springs shut to the notch while its content blurs out.",
+      "camera": "Slow drift down 0→12px across the scene: the island hangs from the top edge.",
+      "lighting": "An amber glow sits under the prompt's lower edge (1000×300 ellipse, opacity 0.35) and breathes ±10%. It falls to 0 when Allow once is pressed: the light means 'needs you', so it goes when that is answered.",
+      "transitionOut": "4.2s compound exit: headline and sub y 0→30, blur 0→10, opacity 1→0 over 0.4s. The closed notch stays dark, which hands the next scene a clean frame."
+    },
+    {
+      "id": "sessions",
+      "act": "showcase",
+      "startSec": 7.4,
+      "durationSec": 4.8,
+      "purpose": "Feature 1: every agent session, grouped by project, with its state.",
+      "emotionalBeat": "Overview and calm: everything at a glance.",
+      "voiceover": null,
+      "layout": "Text on the left third (x 150, y 380). The real Overview panel on the right (x 1040, 756 px wide), tilted in 3D (rotateY -16°, rotateX 6°, perspective 1800), bleeding off the bottom.",
+      "elements": "overview.png at 0.9 scale in a 22px-radius frame with a 1px white 10% hairline. Headline 'Every session, by project.' 80px. Sub 'Working, idle or waiting for you, and how full each context window is.' 34px muted.",
+      "animation": "0.0s the panel rises: y 320→0, rotateX 30°→6°, blur 16→0, opacity 0→1, heavy spring (damping 200, stiffness 80, mass 2). The panel content scrolls up 0→-240px across the scene with gentle-drift easing (Ken Burns). 0.3s headline words rise 70ms apart. 0.7s sub.",
+      "camera": "The panel's rotateY eases -16°→-11° across the scene, a slow orbit.",
+      "lighting": "A green glow (520px) sits behind the 'Working' pill of the Now card and pulses at 0.9 Hz. Green means working, so it is the scene's only colour.",
+      "transitionOut": "4.4s exit left: panel x 0→-260, rotateY to -30°, blur 0→12, opacity 1→0; text x 0→-80 with the same blur and opacity, 0.4s. The momentum points left, so the next scene enters from the right."
+    },
+    {
+      "id": "limits",
+      "act": "showcase",
+      "startSec": 12.0,
+      "durationSec": 5.4,
+      "purpose": "Feature 2, and the most useful one: plan limits with pace, so you know whether you will run out before the reset.",
+      "emotionalBeat": "Control: I can see the future.",
+      "voiceover": null,
+      "layout": "Headline top left (x 160, y 150). Two limit rows drawn natively at 1600px wide (x 160 to 1760): Claude at y 430, Codex at y 700. Different from the tilted panel before it: flat, full width and typographic.",
+      "elements": "Each row: an icon (orange asterisk or teal </>), 'Claude · 5-hour' 44px primary + 'resets in 2h 11m' 32px muted; on the right '55% used' 44px tabular. Bar 22px tall, radius 11, track #2A3438, fill orange (Claude) or teal (Codex). Pace mark 5×44 white at 56% (Claude) or 32% (Codex). Under the bar: 'At this rate, lasts until it resets' or 'At this rate, plenty left when it resets', 30px muted. All values are the demo's.",
+      "animation": "0.0s headline words 'See if you'll run out.' rise 70ms apart. 0.25s and 0.4s the rows slide in from the right (x 140→0, blur 10→0, opacity). 0.7s the Claude fill grows 0→55% over 1.1s (smooth glide) while its counter rolls 0→55. 1.0s Codex the same to 21%. Each pace mark drops (y -36→0, spring with a little overshoot) when its fill passes it; the Codex fill stops short of its mark. The verdict lines rise and sharpen 0.2s after each mark lands. 3.0s a sheen (a 140px white gradient at 45%) runs along the Claude fill only, left to right in 0.75s; the Codex fill gets its own 0.18s later.",
+      "camera": "Static frame, the scene's breath before the second half. The background glows drift.",
+      "lighting": "An orange glow drifts behind the Claude row on the left and a teal one behind Codex on the right, each at opacity 0.25.",
+      "transitionOut": "5.0s scale dissolve: everything scales 1→0.94 with blur 0→12 and opacity 1→0 over 0.4s."
+    },
+    {
+      "id": "servers-cleanup",
+      "act": "showcase",
+      "startSec": 17.2,
+      "durationSec": 5.4,
+      "purpose": "Features 3 and 4 in quick succession: idle dev servers, then rebuildable caches.",
+      "emotionalBeat": "Tidy: the Mac gets lighter.",
+      "voiceover": null,
+      "layout": "Beat A (0 to 2.7s): the servers card on the left (x 140, y 300, 1.25 scale), text on the right (x 1200, y 400). Beat B (2.7s to 5.4s): a giant '7 GB' on the left (x 150, y 300), the clean-up rows on the right (x 1010, y 250, 1.15 scale).",
+      "elements": "A: servers.png sliced into header plus four row strips, which together form the card. Headline 'Idle servers, spotted.' 72px; sub 'Up for hours, barely used. Marked under the project that owns them.' 32px muted. B: '7 GB' 240px display primary (sized so the widest counting value, '6.8 GB', clears the list) with 'of caches you can rebuild' 40px muted; cleanup.png sliced into six rows; foot 'Moved to the Trash, only after you confirm.' 30px muted.",
+      "animation": "A: the strips cascade top to bottom 90ms apart (y 28→0, blur 8→0, opacity). 1.2s the two busy rows dim to 30%, so the two 'Barely used' rows stand out (each scales 1→1.02). Text words rise 60ms apart from 0.2s. 2.6s a vertical wipe: beat B is revealed by a clip-path rising from the bottom over 0.35s (dramatic easing) while beat A drifts up 40px and blurs. B: the number counts 0→7 over 0.9s (snappy), scale 0.9→1, blur 12→0. The rows enter from the right 80ms apart (x 60→0, blur 8→0, opacity). The foot line follows at 1.3s.",
+      "camera": "Beat A pushes in 1→1.03. Beat B is static.",
+      "lighting": "A neutral cool glow follows the focus: on the idle rows in A, behind the number in B.",
+      "transitionOut": "5.1s, the breath: content blurs and fades over 0.3s, leaving 0.2s of nearly empty ink before the climax."
+    },
+    {
+      "id": "window",
+      "act": "climax",
+      "startSec": 22.4,
+      "durationSec": 4.0,
+      "purpose": "The climax: the whole Dashbar window, with every workspace and 30 days of history.",
+      "emotionalBeat": "Scale: there's a whole app behind that icon.",
+      "voiceover": null,
+      "layout": "Headline top left (x 150, y 70). The window 1500px wide, centred from y 190 and bleeding off the bottom edge.",
+      "elements": "history.png (on-screen capture, correct sidebar icons) in a 26px-radius frame with a hairline. Headline 'Or open the whole window.' 72px. A small key cap '⌃⌥D' 34px next to it.",
+      "animation": "0.15s the window flies up from depth: rotateX 34°→0, scale 0.72→1, y 260→0, blur 20→0, opacity 0→1, spring (damping 200, stiffness 90, mass 1.6). 0.4s headline words rise; 0.8s the key cap pops (scale 0.6→1, spring). 1.6s a diagonal light sweep crosses the window over 0.9s. A slow push 1→1.05 across the scene.",
+      "camera": "A push in toward the History charts.",
+      "lighting": "An accent cyan glow (1400×600) under the window rises 0→0.35 as it lands, the climax crescendo. The sweep is the brightest moment.",
+      "transitionOut": "Converge to hero at 3.6s: the window scales 1→0.1 toward centre with blur 0→16 and opacity 1→0 over 0.45s, collapsing into the point where the icon is born."
+    },
+    {
+      "id": "close",
+      "act": "close",
+      "startSec": 26.2,
+      "durationSec": 3.8,
+      "purpose": "Brand, tagline and the two ways in: brew and the site.",
+      "emotionalBeat": "Resolved, and wanting it.",
+      "voiceover": null,
+      "layout": "A centred stack: icon (180px) at y 220, title, sub, brew plate, URL.",
+      "elements": "App icon. 'Your agents, in the menu bar' 96px. 'Free and open source. For macOS.' 34px muted. Plate #121C20 with a hairline holding 'brew install --cask stevenmckinnon/tap/dashbar' in JetBrains Mono 30px. 'usedashbar.com' 42px accent.",
+      "animation": "0.0s the icon springs from scale 0.25 with a gentle overshoot plus a blur clear, and an accent ring expands from it (radius 60→320, opacity 0.5→0). 0.3s title words rise 60ms apart. 0.7s sub. 0.95s the plate rises, then the command types at 45 cps. 1.9s the URL rises and sharpens. Held to the end.",
+      "camera": "Static. The glow breathes.",
+      "lighting": "An accent glow behind the icon pulses ±6%.",
+      "transitionOut": "Hold on the final frame."
+    }
+  ]
+}

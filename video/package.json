@@ -1,0 +1,24 @@
+{
+  "name": "dashbar-launch-video",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Dashbar's launch video, built with Remotion from the app's demo snapshots",
+  "scripts": {
+    "shots": "./scripts/shots.sh",
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts Launch out/dashbar-launch.mp4 --codec h264 --crf 16",
+    "still": "remotion still src/index.ts Launch out/still.png"
+  },
+  "dependencies": {
+    "@fontsource-variable/instrument-sans": "5.3.0",
+    "@fontsource-variable/jetbrains-mono": "5.3.0",
+    "@remotion/cli": "4.0.539",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "remotion": "4.0.539"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.2",
+    "typescript": "5.9.3"
+  }
+}

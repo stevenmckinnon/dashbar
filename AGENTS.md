@@ -18,6 +18,7 @@ the app does; this file is how to work on it.
 | `scripts/make-dmg.sh`, `packaging/dmg/` | The styled installer window (arrow, caption, icon positions), built with `dmgbuild` (`pip3 install dmgbuild`). `make-background.sh` redraws `background.png`; it is 1x only because macOS 27's Finder mis-sized every Retina variant |
 | `packaging/homebrew/dashbar.rb` | The cask. The live copy is in the separate `stevenmckinnon/homebrew-tap` repo |
 | `site/` | Vite and React product site. `src/demos/` holds the Stageshow demos, `src/stageshow/` the vendored kit (MIT, see its `NOTICE.md`), `src/faq.js` the FAQ (also written into `index.html` as structured data at build time), `src/content.js` the rest of the page's words. `agent-files.js` turns those, `release-notes/` and `appcast.xml` into `/index.md`, `/llms.txt`, `/llms-full.txt`, `sitemap.xml`, the install skill under `/.well-known/agent-skills/` and `/.well-known/ai-catalog.json` at build time, so edit the copy in `content.js` or `faq.js`, never in those outputs |
+| `video/` | The 30-second launch film (Remotion; dev-only, its own `package.json`). `storyboard.json` is the plan, `src/scenes/` one file per scene, `scripts/shots.sh` renders the app pictures from a local build (4x, invented demo data). `npm run render` writes `out/dashbar-launch.mp4`; the site serves a web encode as `docs/images/launch.mp4` |
 | `release-notes/` | One `X.Y.Z.md` per release (bullets of user-facing changes). Feeds Sparkle's update dialog, the GitHub release and the site's "What's new" (`site/src/releases.js`, which only shows versions that are in `appcast.xml`) |
 | `docs/images/` | README pictures, the site's `og.png` and `robots.txt` (Content Signals: search, AI input and AI training all allowed); the site serves this folder as its public root. `og.png` is built from `scripts/og/og.html` by `scripts/render-og.sh` (headless Chrome); rerun it after re-rendering `overview-dark.png` |
 | `appcast.xml` | The update feed. Served from `raw.githubusercontent.com/.../main/appcast.xml` |
@@ -56,6 +57,7 @@ DASHBAR_DEMO_ACCOUNTS=2 Dashbar --snapshot out.png --demo   # two Claude Code ac
 DASHBAR_DEMO_STATUSLINE=1 Dashbar --snapshot out.png --demo # Claude plan limits read from the status line
 DASHBAR_DEMO_WORST=1 DASHBAR_DEMO_PERMISSION=1 Dashbar --snapshot out.png --demo --hosted  # worst case: 10 sessions, a server on 12 ports, a long command, 4 prompts
 DASHBAR_ISLAND_HEIGHT=1000 DASHBAR_DEMO_WORST=1 DASHBAR_DEMO_PERMISSION=1 Dashbar --snapshot out.png --demo --island list  # a tall island, uncropped
+DASHBAR_SNAPSHOT_SCALE=4 Dashbar --snapshot out.png --demo --dark   # offline panel (and --island) at 4x, sharp enough to scale up in video; not --hosted
 Dashbar --snapshot x --demo --app --onscreen   # the window on screen for 8s (prints its number) for `screencapture -o -l`, which draws Liquid Glass
 Dashbar --snapshot out.png --demo --hosted                    # real scrolling panel, so native controls draw
 Dashbar --snapshot out.png --demo --island finished --dark    # the island over a made-up menu bar and notch: collapsed,
