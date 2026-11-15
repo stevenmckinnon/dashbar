@@ -5,7 +5,7 @@ cask "dashbar" do
   url "https://github.com/stevenmckinnon/dashbar/releases/download/v#{version}/Dashbar-#{version}.dmg"
   name "Dashbar"
   desc "Menu bar dashboard for AI agent usage, dev servers and system stats"
-  homepage "https://github.com/stevenmckinnon/dashbar"
+  homepage "https://usedashbar.com/"
 
   livecheck do
     url :url

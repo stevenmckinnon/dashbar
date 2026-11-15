@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://stevenmckinnon.github.io/dashbar/sitemap.xml
+Sitemap: https://usedashbar.com/sitemap.xml

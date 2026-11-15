@@ -3,7 +3,8 @@
 Dashbar is a native macOS menu bar app (SwiftUI, SwiftPM, macOS 14+) that shows Claude Code and Codex
 sessions, token usage, plan limits, local dev servers, system stats and a clean-up of rebuildable caches.
 It is open source (MIT) at `stevenmckinnon/dashbar`. The product site lives in `site/` and is deployed to
-GitHub Pages. Read `README.md` for what the app does; this file is how to work on it.
+GitHub Pages at https://usedashbar.com/ (domain at Cloudflare; `docs/images/CNAME`). Read `README.md` for what
+the app does; this file is how to work on it.
 
 ## Layout
 

@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { FAQ } from "./src/faq.js";
 import { HERO, FEATURES } from "./src/seo.js";
 
-const SITE = "https://stevenmckinnon.github.io/dashbar/";
+const SITE = "https://usedashbar.com/";
 const REPO = "https://github.com/stevenmckinnon/dashbar";
 const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -77,7 +77,7 @@ const seo = {
 
 // Pictures live in docs/images (the README uses them too); Vite copies them to the site root.
 export default defineConfig({
-  base: "./",
+  base: "/",
   plugins: [react(), faqSchema, seo],
   publicDir: "../docs/images",
   // "What's new" reads release-notes/ and appcast.xml from the repository root.
