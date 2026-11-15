@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import SwiftUI
 @testable import Dashbar
 
 /// What the panel's Overview shows, and when: the Now card, the Servers card, the clean-up line and the plan strip.
@@ -126,5 +127,57 @@ import Testing
         #expect(PanelTab.agents.title == "Usage")
         #expect(PanelTab.agents.rawValue == "agents")
         #expect(PanelTab.allCases.firstIndex(of: .agents) == 1)   // still ⌘2
+    }
+
+    @Test func stripShortLabelUsesTheWindowName() {
+        let argon = RateLimit(label: "Gemini Argon · Weekly", usedPercent: 5, resetsAt: nil, window: 7 * 86400)
+        #expect(PlanStrip.shortLabel(argon) == "Weekly")
+        let noWindow = RateLimit(label: "Claude and GPT · Daily", usedPercent: 5, resetsAt: nil)
+        #expect(PlanStrip.shortLabel(noWindow) == "Daily")
+        let plain = RateLimit(label: "Extra usage", usedPercent: 27, resetsAt: nil)
+        #expect(PlanStrip.shortLabel(plain) == "Extra usage")
+    }
+
+    /// The owner's panel: a labelled Claude account beside Antigravity's longest limit name pushed the card (and with it
+    /// the whole Overview) wider than the panel. Every row must fit the card, however long the names.
+    @MainActor @Test(arguments: [
+        ["Claude", "Codex"],
+        ["Claude · Personal", "Antigravity"],
+        ["Claude · A very long account name indeed", "Codex · Another long account name", "Antigravity"],
+    ])
+    func stripRowsFitTheCard(names: [String]) {
+        let now = Date()
+        let limits = [
+            RateLimit(label: "5-hour", usedPercent: 11, resetsAt: now.addingTimeInterval(3.8 * 3600), window: 5 * 3600),
+            RateLimit(label: "Gemini Argon · Weekly", usedPercent: 5, resetsAt: now.addingTimeInterval(5 * 86400), window: 7 * 86400),
+        ]
+        let rows = names.enumerated().map { i, name in
+            PlanStripRow.Model(id: name, name: name, symbol: "asterisk", tint: .orange, fill: .orange,
+                               limit: limits[i % limits.count], note: nil)
+        }
+        let columns = PlanStripRow.Columns(rows, now: now)
+        #expect(columns.lineWidth <= PlanStripRow.Columns.contentWidth)
+        #expect(columns.name > 0 && columns.label > 0)
+        // A one-line row never shows a limit name cut in the middle: a long one gives way to its window's name.
+        if !columns.stacked {
+            #expect(columns.labels.values.allSatisfy { !$0.contains("Argon") })
+        }
+    }
+
+    @MainActor @Test func stripStacksForALabelledAccountAndKeepsTheFullLimitName() {
+        let now = Date()
+        let rows = [
+            PlanStripRow.Model(id: "claude", name: "Claude · Personal", symbol: "asterisk", tint: .orange, fill: .orange,
+                               limit: RateLimit(label: "5-hour", usedPercent: 11, resetsAt: now.addingTimeInterval(3.8 * 3600), window: 5 * 3600),
+                               note: nil),
+            PlanStripRow.Model(id: "antigravity", name: "Antigravity", symbol: "sparkle", tint: .indigo, fill: .indigo,
+                               limit: RateLimit(label: "Gemini Argon · Weekly", usedPercent: 5, resetsAt: now.addingTimeInterval(5 * 86400), window: 7 * 86400),
+                               note: nil),
+        ]
+        let columns = PlanStripRow.Columns(rows, now: now)
+        #expect(columns.stacked)
+        #expect(columns.labels["antigravity"] == "Gemini Argon · Weekly")
+        #expect(columns.labels["claude"] == "5-hour")
+        #expect(columns.lineWidth <= PlanStripRow.Columns.contentWidth)
     }
 }

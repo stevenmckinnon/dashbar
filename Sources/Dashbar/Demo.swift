@@ -292,6 +292,7 @@ enum DemoData {
         if ProcessInfo.processInfo.environment["DASHBAR_DEMO_GOOGLE"] != nil { applyGoogle(to: store, now: now) }
         if ProcessInfo.processInfo.environment["DASHBAR_DEMO_WORST"] != nil { applyWorstCase(to: store, now: now, home: home) }
         if let quiet = ProcessInfo.processInfo.environment["DASHBAR_DEMO_QUIET"] { applyQuiet(to: store, now: now, long: quiet == "long") }
+        if ProcessInfo.processInfo.environment["DASHBAR_DEMO_LONG_NAMES"] != nil { applyLongNames(to: store, now: now, home: home) }
         // DASHBAR_DEMO_LOOSE_SERVER=1 adds a dev server outside every workspace (a Docker container), which Overview lists.
         if ProcessInfo.processInfo.environment["DASHBAR_DEMO_LOOSE_SERVER"] != nil {
             var l = Listener(pid: 9400, port: 5432, command: "com.docker.backend", address: "127.0.0.1")
@@ -337,6 +338,47 @@ enum DemoData {
             RateLimit(label: "5-hour", usedPercent: 0, resetsAt: now.addingTimeInterval(4.95 * 3600), window: 5 * 3600),
             RateLimit(label: "Weekly", usedPercent: 3, resetsAt: now.addingTimeInterval(5 * 86400), window: 7 * 86400),
         ]
+    }
+
+
+    /// DASHBAR_DEMO_LONG_NAMES=1: an everyday mix whose names are long enough to strain the Overview's width. One Claude
+    /// session went idle 2 minutes ago in a workspace with no dev servers (so its subtitle is a path), run from T3 Code
+    /// under a labelled account; an Antigravity CLI agent has been idle for hours in another; and the plan limits strip
+    /// has a labelled Claude account beside Antigravity's longest limit name, as its status line names it.
+    @MainActor static func applyLongNames(to store: Store, now: Date, home: String) {
+        func minutes(_ m: Double) -> Date { now.addingTimeInterval(-m * 60) }
+        var claude = LiveSession(id: "n1", pid: 9501, name: "Should we start thinking about creating a popout dashboard window",
+                                 cwd: "\(home)/dashboard-kit", status: "idle", since: minutes(2), entrypoint: "T3 Code",
+                                 root: "\(home)/dashboard-kit")
+        claude.account = "Personal"
+        var agy = LiveSession(id: "n2", pid: 9502, name: "Development", cwd: home, status: "idle",
+                              since: minutes(10 * 60 + 47), entrypoint: "cli", root: home)
+        agy.agent = .antigravityCLI
+        store.sessions = [claude, agy]
+        store.contexts = ["n1": ContextInfo(used: 80_000, window: 1_000_000)]
+        store.permissionRequests = []
+        store.subagents = [:]
+        store.listeners = []
+        store.spawned = [:]
+        store.otherAgents = []
+        store.claudeDefaultLabel = "Personal"
+        store.claudeAccountLimits = []
+        store.claudePlan = ClaudePlanLimits.Result(limits: [
+            RateLimit(label: "5-hour", usedPercent: 11, resetsAt: now.addingTimeInterval(3.8 * 3600), window: 5 * 3600),
+            RateLimit(label: "Weekly", usedPercent: 4, resetsAt: now.addingTimeInterval(6.1 * 86400), window: 7 * 86400),
+        ], plan: "Max 5x")
+        store.codex.found = false
+        store.codexLimits = []
+        store.codexAccountLimits = []
+        let resetW = 5.2 * 86400
+        let json = """
+        {"written_at":\(now.addingTimeInterval(-60).timeIntervalSince1970),"plan_tier":"Google AI Pro","quota":{
+         "gemini-weekly":{"remaining_fraction":1,"reset_in_seconds":\(resetW)},
+         "gemini-argon-weekly":{"remaining_fraction":0.95,"reset_in_seconds":\(resetW)},
+         "3p-weekly":{"remaining_fraction":1,"reset_in_seconds":\(resetW)}}}
+        """
+        store.googleSources = [.antigravityCLI]
+        store.antigravityLimits = AntigravityStatusLine.parseLimits(Data(json.utf8), now: now)
     }
 
     /// DASHBAR_DEMO_WORST=1: data that strains the layout. Ten sessions (the island lists five), a dev server on twelve

@@ -60,6 +60,14 @@ enum PlanStrip {
         }
     }
 
+    /// A limit's name when its own is too long for the strip: its window's name, the way every tool names its rows
+    /// ("Gemini Argon · Weekly" → "Weekly"), or else the part after its group's name, or else its own name.
+    static func shortLabel(_ l: RateLimit) -> String {
+        if let window = l.window { return RateLimit.name(window: window) }
+        if let last = l.label.components(separatedBy: " · ").last, !last.isEmpty { return last }
+        return l.label
+    }
+
     /// The strip keeps a row to one line unless its limit is on course to run out (or used up): only then does it
     /// carry the pace caption the full row has.
     static func showsCaption(_ pace: RateLimit.Pace?) -> Bool { atRisk(pace) }

@@ -102,15 +102,19 @@ struct PlanStripRow: View {
     }
 
 
-    /// Widths every row shares: the agent's name, the limit's name, the figure and the reset, each as wide as the widest.
-    /// The meter takes what is left.
+    /// Widths every row shares: the agent's name, the limit's name, the figure and the reset, each as wide as the widest,
+    /// worked out so a row is never wider than the card. Each row's limit name as shown is in `labels`.
     struct Columns {
         var name: CGFloat = 0
         var label: CGFloat = 0
         var figure: CGFloat = 0
         var reset: CGFloat = 0
+        /// The meters sit on their own line, under each row's agent name, with the limit's name before them.
+        var stacked = false
+        /// Each row's limit name as shown, by row id: its own, or its window's ("Weekly") when its own doesn't fit.
+        var labels: [String: String] = [:]
 
-        init(_ rows: [Model], now: Date) {
+        init(_ rows: [Model], now: Date, contentWidth: CGFloat = Self.contentWidth) {
             func width(_ s: String, _ font: NSFont) -> CGFloat {
                 ceil((s as NSString).size(withAttributes: [.font: font]).width) + 1
             }
@@ -118,33 +122,57 @@ struct PlanStripRow: View {
             let caption = NSFont.systemFont(ofSize: UI.Size.caption)
             let figure = NSFont.monospacedDigitSystemFont(ofSize: UI.Size.caption, weight: .semibold)
             let digits = NSFont.monospacedDigitSystemFont(ofSize: UI.Size.caption, weight: .regular)
-            for r in rows {
-                name = max(name, width(r.name, body))
-                guard let l = r.limit else { continue }
-                label = max(label, width(l.label, caption))
+            let limited = rows.compactMap { r in r.limit.map { (id: r.id, limit: $0) } }
+            for r in rows { name = max(name, width(r.name, body)) }
+            for (_, l) in limited {
                 self.figure = max(self.figure, width(Fmt.usedPercent(l.usedPercent), figure))
                 if let at = l.resetsAt { reset = max(reset, width(Fmt.resets(at, now: now), digits)) }
             }
-            // A long limit name ("Claude and GPT · Weekly") gives way before the meter does.
-            let full = label
-            label = min(label, 110)
-            let gaps = 6 + PlanStripRow.spacing * CGFloat(reset > 0 ? 4 : 3)
-            let meter = Self.contentWidth - (PlanStripRow.glyph + name + label + self.figure + reset + gaps)
-            // Too little room left for a meter worth reading (Antigravity's "Gemini · Weekly", a second account's
-            // name): every row puts its meter on a line of its own instead, under the limit's name, and the limit's
-            // name may then take the room the meter left.
-            stacked = meter < Self.minimumMeter
-            if stacked { label = max(label, min(full, label + meter)) }
+            let gap = PlanStripRow.spacing
+            let lead = PlanStripRow.glyph + 6
+            let figures = gap + self.figure + (reset > 0 ? gap + reset : 0)
+            /// Each row's own limit name where it fits in `room`, else its short one; the column as wide as the widest.
+            func fit(_ room: CGFloat) -> ([String: String], CGFloat) {
+                var shown: [String: String] = [:], widest: CGFloat = 0
+                for (id, l) in limited {
+                    let text = width(l.label, caption) <= room ? l.label : PlanStrip.shortLabel(l)
+                    shown[id] = text
+                    widest = max(widest, width(text, caption))
+                }
+                return (shown, min(widest, room))
+            }
+
+            // One line: name, limit, meter, figure, reset. A long limit name ("Gemini Argon · Weekly") gives way to its
+            // window's name ("Weekly") before the meter does.
+            (labels, label) = fit(Self.labelLimit)
+            let meter = contentWidth - (lead + name + gap + label + gap + figures)
+            guard meter < Self.minimumMeter else { return }
+
+            // Too little room for a meter worth reading (a second account's name, a long limit name): every row takes two
+            // lines. The agent's name with the figures at the trailing edge, then under the name the limit's name and the
+            // meter. The name truncates at its end before the figures are squeezed; the limit's name may use the room
+            // the meter leaves.
+            stacked = true
+            name = min(name, max(0, contentWidth - lead - figures))
+            (labels, label) = fit(max(0, contentWidth - lead - gap - Self.minimumMeter))
         }
 
         /// The card's inner width in the panel.
         static let contentWidth = UI.panelWidth - 2 * UI.gutter - 2 * UI.cardPadding
         static let minimumMeter: CGFloat = 64
-        /// The meters sit on their own line under each row's text.
-        var stacked = false
+        /// The widest a limit's name may be while a row is one line.
+        static let labelLimit: CGFloat = 110
 
-        /// Where the limit's name starts: past the glyph, the agent's name and the gap after it.
-        var captionInset: CGFloat { PlanStripRow.glyph + 6 + name + PlanStripRow.spacing }
+        /// Where the limit's name starts: past the glyph, then on a one-line row past the agent's name too.
+        var captionInset: CGFloat { PlanStripRow.glyph + 6 + (stacked ? 0 : name + PlanStripRow.spacing) }
+
+        /// How wide a row's widest line is, for checking it fits the card.
+        var lineWidth: CGFloat {
+            let lead = PlanStripRow.glyph + 6, gap = PlanStripRow.spacing
+            let figures = gap + figure + (reset > 0 ? gap + reset : 0)
+            return stacked ? max(lead + name + figures, lead + label + gap + Self.minimumMeter)
+                           : lead + name + gap + label + gap + Self.minimumMeter + figures
+        }
     }
 
     let row: Model
@@ -153,33 +181,32 @@ struct PlanStripRow: View {
     static let glyph: CGFloat = 14
     static let spacing: CGFloat = 8
 
-    /// The limit on one line (name, limit, meter, figure, reset), then a caption under the limit's name only when it is
-    /// running out, used up or kept through a wait. VoiceOver hears the line and its caption as one sentence.
+    /// The limit on one line (name, limit, meter, figure, reset), or on two when the card is too narrow for that (see
+    /// `Columns`), then a caption under the limit's name only when it is running out, used up or kept through a wait. VoiceOver hears the line and its caption as one sentence.
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             if let limit = row.limit {
                 let pace = limit.pace(now: now)
+                let label = columns.labels[row.id] ?? limit.label
                 VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: Self.spacing) {
-                        name
-                        Text(limit.label).font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
-                            .lineLimit(1).truncationMode(.middle)
-                            .frame(width: columns.label, alignment: .leading)
-                        if columns.stacked { Spacer(minLength: 0) } else { meter(limit, pace: pace).frame(maxWidth: .infinity) }
-                        Text(Fmt.usedPercent(limit.usedPercent))
-                            .font(.system(size: UI.Size.caption, weight: .semibold).monospacedDigit())
-                            .foregroundStyle(min(max(limit.usedPercent, 0), 100) >= 90 ? UI.textDanger : Color.primary)
-                            .lineLimit(1)
-                            .frame(width: columns.figure, alignment: .trailing)
-                        if columns.reset > 0 {
-                            Text(limit.resetsAt.map { Fmt.resets($0, now: now) } ?? "")
-                                .font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
-                                .lineLimit(1)
-                                .frame(width: columns.reset, alignment: .leading)
-                        }
-                    }
                     if columns.stacked {
-                        meter(limit, pace: pace).padding(.leading, columns.captionInset).padding(.vertical, 2)
+                        HStack(spacing: Self.spacing) {
+                            name
+                            Spacer(minLength: 0)
+                            figures(limit)
+                        }
+                        HStack(spacing: Self.spacing) {
+                            limitName(label)
+                            meter(limit, pace: pace).frame(maxWidth: .infinity)
+                        }
+                        .padding(.leading, columns.captionInset)
+                    } else {
+                        HStack(spacing: Self.spacing) {
+                            name
+                            limitName(label)
+                            meter(limit, pace: pace).frame(maxWidth: .infinity)
+                            figures(limit)
+                        }
                     }
                     if let pace, PlanStrip.showsCaption(pace) {
                         Text(LimitBar.text(pace)).font(.system(size: UI.Size.caption)).foregroundStyle(LimitBar.color(pace))
@@ -187,7 +214,7 @@ struct PlanStripRow: View {
                             .padding(.leading, columns.captionInset)
                     }
                 }
-                .help(LimitBar.sourceNote(limit) ?? "")
+                .help([label == limit.label ? nil : limit.label, LimitBar.sourceNote(limit)].compactMap { $0 }.joined(separator: "\n"))
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(PlanStrip.spoken(provider: row.name, limit: limit, now: now))
                 if let note = row.note { noteView(note).padding(.leading, columns.captionInset) }
@@ -205,8 +232,29 @@ struct PlanStripRow: View {
         HStack(spacing: 6) {
             Image(systemName: row.symbol).font(.system(size: UI.Size.caption, weight: .bold)).foregroundStyle(row.tint)
                 .frame(width: Self.glyph).accessibilityHidden(true)
-            Text(row.name).font(.system(size: UI.Size.body, weight: .medium)).lineLimit(1)
+            Text(row.name).font(.system(size: UI.Size.body, weight: .medium)).lineLimit(1).truncationMode(.tail)
                 .frame(width: columns.name, alignment: .leading)
+        }
+    }
+
+    private func limitName(_ text: String) -> some View {
+        Text(text).font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+            .lineLimit(1).truncationMode(.tail)
+            .frame(width: columns.label, alignment: .leading)
+    }
+
+    /// "11% used" and "resets in 3h 47m", each in its shared column.
+    @ViewBuilder private func figures(_ limit: RateLimit) -> some View {
+        Text(Fmt.usedPercent(limit.usedPercent))
+            .font(.system(size: UI.Size.caption, weight: .semibold).monospacedDigit())
+            .foregroundStyle(min(max(limit.usedPercent, 0), 100) >= 90 ? UI.textDanger : Color.primary)
+            .lineLimit(1)
+            .frame(width: columns.figure, alignment: .trailing)
+        if columns.reset > 0 {
+            Text(limit.resetsAt.map { Fmt.resets($0, now: now) } ?? "")
+                .font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
+                .lineLimit(1)
+                .frame(width: columns.reset, alignment: .leading)
         }
     }
 
