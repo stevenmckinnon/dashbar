@@ -96,8 +96,11 @@ images stay clean.
 ## Rules
 
 **Privacy and safety (the product's promise: it sends nothing)**
-- Never add analytics, accounts or network calls. The only allowed requests are Sparkle update checks to
+- Never add analytics, accounts or network calls to the app. The only allowed requests are Sparkle update checks to
   GitHub and the opt-in, experimental Claude plan limits request to `api.anthropic.com`.
+- The website (`site/`) counts visits with Cloudflare Web Analytics, which uses no cookies. Its snippet is in
+  `site/index.html` (the dev server drops it). Add nothing else: no other trackers, no cookies. If that changes,
+  update the line about it in the site's Privacy section, so the site never claims more than is true.
 - Claude plan limits come first from Claude Code's status line (`StatusLineBridge.swift`). Dashbar edits
   Claude Code's settings only when the user presses Add (or Remove), only the `statusLine` key, after a backup,
   re-reading the file just before writing, and refuses invalid JSON. The bridge script saves only `rate_limits`

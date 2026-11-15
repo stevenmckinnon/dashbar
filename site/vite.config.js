@@ -75,10 +75,19 @@ const seo = {
   },
 };
 
+// The site's visit counter (Cloudflare Web Analytics, no cookies) sits in index.html so built pages carry it
+// as written. The dev server drops it, so working on the site never counts as a visit.
+const noAnalyticsInDev = {
+  name: "no-analytics-in-dev",
+  apply: "serve",
+  transformIndexHtml: (html) =>
+    html.replace(/\s*<!-- Cloudflare Web Analytics -->[\s\S]*?<!-- End Cloudflare Web Analytics -->/, ""),
+};
+
 // Pictures live in docs/images (the README uses them too); Vite copies them to the site root.
 export default defineConfig({
   base: "/",
-  plugins: [react(), faqSchema, seo],
+  plugins: [react(), faqSchema, seo, noAnalyticsInDev],
   publicDir: "../docs/images",
   // "What's new" reads release-notes/ and appcast.xml from the repository root.
   server: { fs: { allow: [".."] } },

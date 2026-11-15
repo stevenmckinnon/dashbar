@@ -334,12 +334,13 @@ function Privacy() {
         </div>
         <div className="sends">
           <h3>Sends</h3>
-          <p>Nothing, with two exceptions. There is no account and no analytics.</p>
+          <p>Nothing, with two exceptions. The app has no account and no analytics.</p>
           <ul>
             <li>If you turn on the experimental way of reading Claude plan limits: one request to <code>api.anthropic.com</code> with Claude Code’s own sign-in. Dashbar never refreshes or stores that sign-in. The status line way sends nothing.</li>
             <li>Update checks, from version 0.3.0: a small feed fetched from GitHub to see whether a newer version exists.</li>
           </ul>
           <p className="check">The code is <a href={REPO}>on GitHub</a> if you want to check.</p>
+          <p className="site-note">This website, not the app, counts visits with Cloudflare Web Analytics, which uses no cookies.</p>
         </div>
       </div>
     </section>
@@ -354,7 +355,7 @@ function Install() {
       <div className="install-inner">
         <Mark size={56} />
         <h2 id="install-h">Put your agents in the menu bar</h2>
-        <p className="install-lede">Free and open source. There is no account and no analytics.</p>
+        <p className="install-lede">Free and open source. The app has no account and no analytics.</p>
         <div className="ways">
           <div className="how">
             <h3>Download</h3>
