@@ -358,6 +358,8 @@ struct QuickActions: View {
     let workspace: Workspace
     /// The detail page itself leaves out the button that opens it.
     var showDetails = true
+    /// The Now card names each action under its icon, in the words the window's workspace page uses.
+    var labelled = false
     @Environment(\.openWorkspace) private var openWorkspace
     var body: some View {
         HStack(spacing: 6) {
@@ -365,18 +367,24 @@ struct QuickActions: View {
                 ActionTile(symbol: "chart.bar.xaxis", help: "Show in the Dashbar window") { openWorkspace(workspace.root) }
             }
             if let editor = Launcher.editor {
-                ActionTile(symbol: "curlybraces", help: "Open in \(editor.name)") {
+                // "Open in VS Code" is the window's label, but it doesn't fit a quarter of the card; the editor's name
+                // does, beside the terminal's, and the tooltip and VoiceOver still say "Open in VS Code".
+                ActionTile(symbol: "curlybraces", help: "Open in \(editor.name)", title: labelled ? editor.name : nil) {
                     Launcher.open(workspace.root, in: editor)
                 }
             }
             if let term = Launcher.terminal {
-                ActionTile(symbol: "terminal", help: "Open in \(term.name)") { Launcher.open(workspace.root, in: term) }
+                ActionTile(symbol: "terminal", help: "Open in \(term.name)", title: labelled ? term.name : nil) {
+                    Launcher.open(workspace.root, in: term)
+                }
             }
-            ActionTile(symbol: "folder", help: "Reveal in Finder") { Launcher.reveal(workspace.root) }
+            ActionTile(symbol: "folder", help: "Reveal in Finder", title: labelled ? "Finder" : nil) { Launcher.reveal(workspace.root) }
             if let port = workspace.ports.first {
-                ActionTile(symbol: "safari", help: "Open localhost:" + String(port)) { Launcher.browse(port: port) }
+                ActionTile(symbol: "safari", help: "Open localhost:" + String(port), title: labelled ? "localhost:" + String(port) : nil) {
+                    Launcher.browse(port: port)
+                }
             } else {
-                ActionTile(symbol: "doc.on.doc", help: "Copy path") {
+                ActionTile(symbol: "doc.on.doc", help: "Copy path", title: labelled ? "Copy path" : nil) {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(workspace.root, forType: .string)
                 }
@@ -388,15 +396,25 @@ struct QuickActions: View {
 struct ActionTile: View {
     let symbol: String
     let help: String
+    /// A short visible name under the icon; without one the tile is the icon alone, named by its tooltip.
+    var title: String? = nil
     let action: () -> Void
     @State private var hover = false
     var body: some View {
         Button(action: action) {
-            Image(systemName: symbol).font(.system(size: UI.Size.body, weight: .medium))
-                .frame(maxWidth: .infinity, minHeight: 28)
-                .background(RoundedRectangle(cornerRadius: UI.innerRadius, style: .continuous)
-                    .fill(Color.primary.opacity(hover ? UI.buttonHover : UI.rowHover)))
-                .contentShape(Rectangle())
+            VStack(spacing: 3) {
+                Image(systemName: symbol).font(.system(size: UI.Size.body, weight: .medium))
+                    .frame(height: title == nil ? nil : 16)   // labelled tiles stay one height whatever the symbol
+                if let title {
+                    Text(title).font(.system(size: UI.Size.micro, weight: .medium)).lineLimit(1).truncationMode(.middle)
+                }
+            }
+            .padding(.horizontal, title == nil ? 0 : 4)
+            .padding(.vertical, title == nil ? 0 : 6)
+            .frame(maxWidth: .infinity, minHeight: 28)
+            .background(RoundedRectangle(cornerRadius: UI.innerRadius, style: .continuous)
+                .fill(Color.primary.opacity(hover ? UI.buttonHover : UI.rowHover)))
+            .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
         .foregroundStyle(hover ? AnyShapeStyle(.primary) : AnyShapeStyle(UI.textSecondary))

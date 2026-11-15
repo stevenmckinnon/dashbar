@@ -30,7 +30,8 @@ struct NowCard: View {
                 }
             }
             ForEach(workspace.sessions.compactMap(store.permissionRequest(for:))) { PermissionPrompt(request: $0) }
-            QuickActions(workspace: workspace)
+            // Labelled, and without the window button: tapping the title does that.
+            QuickActions(workspace: workspace, showDetails: false, labelled: true)
         }
         .padding(UI.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -46,7 +47,8 @@ struct NowCard: View {
                     Text(subtitle).font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary).lineLimit(1)
                         .help(workspace.memory > 0 ? "Its dev servers and the memory they use. The Dashbar window shows the whole workspace's." : "")
                 }
-                Image(systemName: "chevron.right").font(.system(size: UI.Size.micro, weight: .semibold)).foregroundStyle(UI.textSecondary)
+                // Not a chevron: a row's chevron opens it in place, this opens the Dashbar window (the header's glyph for it).
+                Image(systemName: "arrow.up.forward").font(.system(size: UI.Size.micro, weight: .semibold)).foregroundStyle(UI.textSecondary)
                     .accessibilityHidden(true)
             }
             .contentShape(Rectangle())
