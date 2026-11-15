@@ -3,6 +3,17 @@
     <channel>
         <title>Dashbar</title>
         <item>
+            <title>0.7.2</title>
+            <pubDate>Sun, 15 Nov 2026 19:49:16 +0000</pubDate>
+            <sparkle:version>186</sparkle:version>
+            <sparkle:shortVersionString>0.7.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[- An account whose folder doesn't exist no longer counts as a second account, so Dashbar stops naming everything "Claude · Personal" when you only use one. Settings → Accounts marks it "Folder not found" and keeps it, and Dashbar starts reading it within a minute of the folder appearing
+- A permission prompt that was settled some other way, by the app you run Claude Code in or by Claude Code denying it on its own, now leaves Dashbar's notch and panel straight away instead of staying until its timer runs out
+]]></description>
+            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.7.2/Dashbar-0.7.2.dmg" length="8791720" type="application/octet-stream" sparkle:edSignature="yxHzWWonpVElM9JNpd0byCsG2ddzYeSQtKzxlZdHA0dcxo9IkZ5YWCPwuWK54k5Kcjxo3NDALIwebD+17qoACg=="/>
+        </item>
+        <item>
             <title>0.7.1</title>
             <pubDate>Sun, 15 Nov 2026 18:26:34 +0000</pubDate>
             <sparkle:version>179</sparkle:version>
@@ -43,16 +54,6 @@
 - Fixed: the plan history file could grow until Dashbar hung at launch
 ]]></description>
             <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.7.0/Dashbar-0.7.0.dmg" length="8068108" type="application/octet-stream" sparkle:edSignature="gH5kRedcxH/9N+tItJjd+mrmpD1TRiuFewxspDnXVbgQQ4DsQ8lBkx3R3FvPG84AmyadQ5GRYdsv/kaM7tYrCg=="/>
-        </item>
-        <item>
-            <title>0.6.2</title>
-            <pubDate>Wed, 11 Nov 2026 17:55:58 +0000</pubDate>
-            <sparkle:version>54</sparkle:version>
-            <sparkle:shortVersionString>0.6.2</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[- Claude plan limits no longer ask for your Keychain password every day. Claude Code rewrites its sign-in each time it renews it, which undid "Always Allow"; Dashbar now reads the sign-in the same way Claude Code does, so macOS doesn't ask. Turning the setting on is the only permission it needs
-]]></description>
-            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.6.2/Dashbar-0.6.2.dmg" length="5188127" type="application/octet-stream" sparkle:edSignature="EnsQPcSnF7nTBfbMFfV9DZeGNgezdAveJ2jtmLY/nrCMKucsaQ5swnz0lmMtzUk/qLM1NmMe0SiqJk0O3O0JBQ=="/>
         </item>
     </channel>
 </rss>
