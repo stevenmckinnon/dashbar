@@ -3,6 +3,17 @@
     <channel>
         <title>Dashbar</title>
         <item>
+            <title>0.9.0</title>
+            <pubDate>Mon, 16 Nov 2026 19:36:16 +0000</pubDate>
+            <sparkle:version>215</sparkle:version>
+            <sparkle:shortVersionString>0.9.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[- OpenCode support: its sessions show in your workspaces as working or idle, with a Usage card for its tokens, models and estimated cost. Add Dashbar's plugin in Settings → Integrations to also see when a session is waiting for you.
+- Settings → Integrations is shorter: one section per tool, each with its Add or Remove button, and the details of what Dashbar changes folded underneath.
+]]></description>
+            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.9.0/Dashbar-0.9.0.dmg" length="9816593" type="application/octet-stream" sparkle:edSignature="tB2ogp37TrTahyNJSQqhK6TcOiHPN1UwyFfTGKHvfU3r8w9GnQPMzhiRo5LDNaBDDfRh3QpmZtZSa1FcFGWgCQ=="/>
+        </item>
+        <item>
             <title>0.8.0</title>
             <pubDate>Mon, 16 Nov 2026 13:41:16 +0000</pubDate>
             <sparkle:version>199</sparkle:version>
@@ -22,19 +33,6 @@
 - A permission prompt that was settled some other way, by the app you run Claude Code in or by Claude Code denying it on its own, now leaves Dashbar's notch and panel straight away instead of staying until its timer runs out
 ]]></description>
             <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.7.2/Dashbar-0.7.2.dmg" length="8791720" type="application/octet-stream" sparkle:edSignature="yxHzWWonpVElM9JNpd0byCsG2ddzYeSQtKzxlZdHA0dcxo9IkZ5YWCPwuWK54k5Kcjxo3NDALIwebD+17qoACg=="/>
-        </item>
-        <item>
-            <title>0.7.1</title>
-            <pubDate>Sun, 15 Nov 2026 18:26:34 +0000</pubDate>
-            <sparkle:version>179</sparkle:version>
-            <sparkle:shortVersionString>0.7.1</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[- **The dashbar command**: type `dashbar` in Terminal to see which agents need you, which are working and how much of each plan limit is left, or put `dashbar line` in your tmux status bar or shell prompt. It reads what Dashbar already shows, so Dashbar has to be running. Homebrew adds it to your PATH; with the DMG, copy the command from Settings → Integrations
-- **A notification when a used-up limit resets**: once a 5-hour or Weekly limit has been used up, Dashbar tells you when it resets so you can pick up where you left off. It's covered by the same setting, now "When a plan limit runs low or resets"
-- The Claude Code status line script no longer writes session ids to disk. Dashbar updates the script by itself the next time it opens
-- `brew uninstall --cask --zap dashbar` now also removes Dashbar's caches
-]]></description>
-            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.7.1/Dashbar-0.7.1.dmg" length="8760060" type="application/octet-stream" sparkle:edSignature="NIO7phln4kA89RSzlDLF29ZNlsvYLhpj4CFmuzItrdsJrsM+DRjqTwga2fVD/655Wqzxfk8qz5/yg5hokEf1Dw=="/>
         </item>
     </channel>
 </rss>
