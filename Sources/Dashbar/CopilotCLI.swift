@@ -93,6 +93,14 @@ enum CopilotCLI {
         return v.isEmpty || v.count > 4096 ? nil : v
     }
 
+    /// A VS Code Agents session started with no folder is filed under `<copilot home>/chats/<id>` (the format write-up).
+    /// Like OpenCode's sessions without a folder, it isn't listed as a workspace (that would be named after its id); its
+    /// usage is still counted, under `chatProject`.
+    static func isChatFolder(_ cwd: String, home: URL) -> Bool {
+        cwd.hasPrefix(home.appendingPathComponent("chats").path + "/") || cwd.contains("/.copilot/chats/")
+    }
+    static let chatProject = "Copilot chat"
+
     static func readWorkspace(_ folder: URL) -> Workspace? {
         let url = folder.appendingPathComponent("workspace.yaml")
         guard let data = try? Data(contentsOf: url, options: .uncached), data.count < 256 * 1024 else { return nil }
@@ -207,7 +215,7 @@ enum CopilotCLI {
                      processes: [(pid: Int32, cwd: String, started: Date?)], aliases: [Int32: Int32] = [:],
                      alive: (Int32) -> Bool = ClaudeSessions.isAlive,
                      now: Date = Date(), root: (String) -> String = Fmt.root(fromCwd:)) -> [LiveSession] {
-        let usable = folders.filter(\.hasWorkspace)
+        let usable = folders.filter { f in f.hasWorkspace && !(f.cwd.map { isChatFolder($0, home: homeURL()) } ?? false) }
             .sorted { ($0.eventsModified ?? .distantPast) > ($1.eventsModified ?? .distantPast) }
         let byPID = Dictionary(processes.map { ($0.pid, $0) }, uniquingKeysWith: { a, _ in a })
         /// The process holding a folder's lock: a known Copilot process, or any live pid.
@@ -441,44 +449,68 @@ struct CopilotModelMetric: Equatable, Codable {
     var premium: Double = 0
 }
 
-/// Reads `session.shutdown` lines incrementally from every CLI session's `events.jsonl`, adding what each model's
-/// cumulative totals grew by since the session's last shutdown. Other lines are skipped by a cheap byte match before
-/// any parsing (as `JSONLTail` does); a line that contains the needle but isn't a shutdown event (a prompt quoting it,
-/// say) is passed over.
+/// Reads each session's usage incrementally from its `events.jsonl`, from two kinds of line, picked out by a cheap byte
+/// match before any parsing (as `JSONLTail` does); a line that contains a needle but isn't that event (a prompt quoting
+/// it, say) is passed over:
+///
+/// - `session.usage_record`, written once per model call (seen on a real VS Code session; the format write-up says "once per
+///   model call just before the `assistant.message`"). Of its `data.usage` only `model`, `inputTokens`, `outputTokens`,
+///   `cacheReadTokens` and `cacheWriteTokens` are read; everything else in it is treated as absent. These make usage appear
+///   while a session runs, which matters for VS Code, whose sessions rarely end.
+/// - `session.shutdown`, whose totals are authoritative and cumulative across resumes. When one arrives, the records booked
+///   since the session's previous shutdown are replaced by what its totals grew by, so a session is never counted twice:
+///   kept where they add up to exactly the same per model (their hours stay right), else replaced by the growth, dated at
+///   the shutdown.
+///
+/// The ledger is kept per session and the day ledger rebuilt from it, so a replacement never leaves an old figure behind.
 final class CopilotUsageScanner {
+    /// Tokens for one session, model and hour.
+    struct Entry: Codable, Equatable {
+        var hour: Date
+        var model: String
+        var tokens: TokenTotals
+    }
+
+    /// One session's figures.
+    struct Ledger: Codable, Equatable {
+        var project: String
+        /// Confirmed by shutdown records.
+        var confirmed: [Entry] = []
+        /// From usage records since the last shutdown.
+        var running: [Entry] = []
+        /// The last shutdown's cumulative totals per model, and its premium requests.
+        var cumulative: [String: CopilotModelMetric] = [:]
+        var premium: Double = 0
+    }
+
     struct State: Codable {
         var root: String
         var offsets: [String: UInt64]
-        /// Per session, per model: the cumulative figures already booked.
-        var booked: [String: [String: CopilotModelMetric]]
-        var bookedPremium: [String: Double]
-        var book: UsageBook
+        var sessions: [String: Ledger]
         var premiumByDay: [String: Double]
     }
 
     let root: URL
     private var tail: JSONLTail
-    private var booked: [String: [String: CopilotModelMetric]] = [:]
-    private var bookedPremium: [String: Double] = [:]
-    private var book = UsageBook()
+    private var sessions: [String: Ledger] = [:]
     private var premiumByDay: [String: Double] = [:]
+    private var book = UsageBook()
     private var projects: [String: String] = [:]
     private var workspaces: [String: CopilotCLI.Workspace] = [:]
-    /// Recent shutdown lines that couldn't be read, in a row.
-    private var unreadableRun = 0
+    /// Recent usage lines read and failed, since launch: the format warns only when every one has failed.
+    private var readable = 0, unreadable = 0
     private let cache: ScanCache<State>?
     private var dirty = false
+    private var stale = true
     private var found = false
 
     init(root: URL = CopilotCLI.sessionStateURL(), cache: URL? = nil) {
         self.root = root
-        tail = JSONLTail(root: root, needles: ["\"session.shutdown\""])
+        tail = JSONLTail(root: root, needles: ["\"session.shutdown\"", "\"session.usage_record\""])
         self.cache = cache.map { ScanCache(url: $0) }
         if let saved = self.cache?.load(), saved.root == root.path {
             tail.offsets = saved.offsets
-            booked = saved.booked
-            bookedPremium = saved.bookedPremium
-            book = saved.book
+            sessions = saved.sessions
             premiumByDay = saved.premiumByDay
         }
     }
@@ -497,95 +529,156 @@ final class CopilotUsageScanner {
             guard let v = try? events.resourceValues(forKeys: Set(keys)), let mtime = v.contentModificationDate,
                   let size = v.fileSize.map(UInt64.init) else {
                 // No event log: usage unknown, for a real session (one with its metadata) used lately. An empty scaffold
-                // left by an aborted start (github/copilot-cli#2836) isn't a session.
+                // left by an aborted start (github/copilot-cli#2836), or a folder of locks being set up, isn't a session.
                 let yaml = dir.appendingPathComponent("workspace.yaml")
                 if let m = (try? yaml.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate, m >= cutoff {
                     unknown += 1
                 }
                 continue
             }
-            let ws = workspace(dir)
             anyLog = true
             guard mtime >= cutoff else { continue }
             var offset = tail.offsets[events.path] ?? 0
-            if size < offset { offset = 0 }   // rewritten: totals are cumulative, so reading again books only growth
+            if size < offset {   // rewritten: read it again from the top, as a new ledger for the session
+                offset = 0
+                sessions[session] = nil
+            }
             if size > offset {
                 let recent = mtime >= recentCutoff
+                let project = project(of: dir)
                 offset = tail.read(events, from: offset) { json in
-                    self.ingest(json, session: session, cwd: ws.cwd, recent: recent)
+                    self.ingest(json, session: session, project: project, recent: recent)
                 }
                 dirty = true
+                stale = true
             }
             live[events.path] = offset
         }
         tail.offsets = live
         found = anyLog
-        book.prune(now: now)
+        if stale { rebuild(now: now) }
         let oldest = UsageBook.dayKey.string(from: cutoff)
         premiumByDay = premiumByDay.filter { $0.key >= oldest }
         var out = CopilotUsage(unknownSessions: unknown)
         guard found else { return out }
         out.summary = book.summary(found: true)
-        out.summary.warning = unreadableRun >= 2 ? CopilotCLI.formatWarning : nil
+        out.summary.warning = unreadable > 0 && readable == 0 ? CopilotCLI.formatWarning : nil
         out.premiumByDay = premiumByDay
         return out
     }
 
     func save() {
         guard dirty, let cache else { return }
-        cache.save(State(root: root.path, offsets: tail.offsets, booked: booked, bookedPremium: bookedPremium, book: book,
-                         premiumByDay: premiumByDay))
+        cache.save(State(root: root.path, offsets: tail.offsets, sessions: sessions, premiumByDay: premiumByDay))
         dirty = false
     }
 
-    private func workspace(_ dir: URL) -> CopilotCLI.Workspace {
+    /// The day ledger from every session's entries, dropping what's older than the panel shows.
+    private func rebuild(now: Date) {
+        let cutoff = now.addingTimeInterval(-31 * 86400)
+        var b = UsageBook()
+        for (id, ledger) in sessions {
+            var l = ledger
+            l.confirmed.removeAll { $0.hour < cutoff }
+            l.running.removeAll { $0.hour < cutoff }
+            sessions[id] = l
+            for e in l.confirmed + l.running {
+                // Billed by the Copilot plan, not by token: no cost is set, and the card explains why.
+                b.add(e.tokens, at: e.hour, model: e.model, project: l.project, session: id, cost: nil)
+            }
+        }
+        b.prune(now: now)
+        book = b
+        stale = false
+    }
+
+    private func project(of dir: URL) -> String {
         let id = dir.lastPathComponent
-        if let w = workspaces[id] { return w }
-        let w = CopilotCLI.readWorkspace(dir) ?? CopilotCLI.Workspace()
-        workspaces[id] = w
-        return w
-    }
-
-    /// One line containing the needle. Only a `session.shutdown` envelope counts, for or against the format.
-    private func ingest(_ json: [String: Any]?, session: String, cwd: String?, recent: Bool) {
-        guard let json else { record(false, recent: recent); return }
-        guard json["type"] as? String == "session.shutdown" else { return }
-        guard let data = json["data"] as? [String: Any], let metrics = CopilotUsageScanner.metrics(data) else {
-            record(false, recent: recent)
-            return
+        let ws = workspaces[id] ?? CopilotCLI.readWorkspace(dir) ?? CopilotCLI.Workspace()
+        workspaces[id] = ws
+        guard let cwd = ws.cwd, !CopilotCLI.isChatFolder(cwd, home: root.deletingLastPathComponent()) else {
+            return CopilotCLI.chatProject
         }
-        record(true, recent: recent)
-        let date = (json["timestamp"] as? String).flatMap(Date.fromISO) ?? Date()
-        let project = cwd.map(project(for:)) ?? CopilotCLI.shortName
-        let delta = CopilotUsageScanner.growth(from: booked[session] ?? [:], to: metrics.models)
-        booked[session] = metrics.models
-        for (model, d) in delta.sorted(by: { $0.key < $1.key }) {
-            // Billed by the Copilot plan, not by token: no cost is set, and the card explains why.
-            book.add(d.tokens, at: date, model: model, project: project, session: session, cost: nil)
-        }
-        let premium = metrics.premium
-        let old = bookedPremium[session] ?? 0
-        let added = premium >= old ? premium - old : premium
-        bookedPremium[session] = premium
-        if added > 0 { premiumByDay[UsageBook.dayKey.string(from: date), default: 0] += added }
-    }
-
-    private func record(_ readable: Bool, recent: Bool) {
-        guard recent else { return }
-        unreadableRun = readable ? 0 : unreadableRun + 1
-    }
-
-    private func project(for cwd: String) -> String {
         if let p = projects[cwd] { return p }
         let p = Fmt.project(fromCwd: Fmt.root(fromCwd: cwd))
         projects[cwd] = p
         return p
     }
 
+    /// One line containing a needle. Only the two events count, for or against the format.
+    private func ingest(_ json: [String: Any]?, session: String, project: String, recent: Bool) {
+        guard let json else { record(false, recent: recent); return }
+        let type = json["type"] as? String
+        guard type == "session.shutdown" || type == "session.usage_record" else { return }
+        let date = (json["timestamp"] as? String).flatMap(Date.fromISO) ?? Date()
+        var ledger = sessions[session] ?? Ledger(project: project)
+        ledger.project = project
+        if type == "session.usage_record" {
+            guard let r = Self.record((json["data"] as? [String: Any])?["usage"] as? [String: Any]) else {
+                record(false, recent: recent)
+                return
+            }
+            record(true, recent: recent)
+            Self.add(Entry(hour: Self.hour(date), model: r.model, tokens: r.tokens), to: &ledger.running)
+        } else {
+            guard let data = json["data"] as? [String: Any], let metrics = Self.metrics(data) else {
+                record(false, recent: recent)
+                return
+            }
+            record(true, recent: recent)
+            Self.confirm(&ledger, with: metrics, at: date)
+            let added = metrics.premium >= ledger.premium ? metrics.premium - ledger.premium : metrics.premium
+            ledger.premium = metrics.premium
+            if added > 0 { premiumByDay[UsageBook.dayKey.string(from: date), default: 0] += added }
+        }
+        sessions[session] = ledger
+    }
+
+    private func record(_ ok: Bool, recent: Bool) {
+        guard recent else { return }
+        if ok { readable += 1 } else { unreadable += 1 }
+    }
+
+    static func hour(_ d: Date) -> Date { Calendar.current.dateInterval(of: .hour, for: d)?.start ?? d }
+
+    static func add(_ e: Entry, to list: inout [Entry]) {
+        if let i = list.firstIndex(where: { $0.hour == e.hour && $0.model == e.model }) { list[i].tokens.add(e.tokens) }
+        else { list.append(e) }
+    }
+
+    /// A shutdown: the records since the previous one give way to what its totals grew by, per model.
+    static func confirm(_ ledger: inout Ledger, with metrics: (models: [String: CopilotModelMetric], premium: Double), at date: Date) {
+        let growth = Self.growth(from: ledger.cumulative, to: metrics.models)
+        for (model, g) in growth.sorted(by: { $0.key < $1.key }) {
+            let running = ledger.running.filter { $0.model == model }
+            var sum = TokenTotals()
+            for e in running { sum.add(e.tokens) }
+            if sum.input == g.tokens.input && sum.output == g.tokens.output && sum.cacheRead == g.tokens.cacheRead
+                && sum.cacheWrite == g.tokens.cacheWrite {
+                for e in running { add(e, to: &ledger.confirmed) }   // the same figures: keep their hours
+            } else {
+                add(Entry(hour: hour(date), model: model, tokens: g.tokens), to: &ledger.confirmed)
+            }
+        }
+        ledger.running = []   // a model with records but no growth had nothing the shutdown confirms
+        ledger.cumulative = metrics.models
+    }
+
+    /// The token and model fields of a usage record's `data.usage`; nil without a model or any token count.
+    /// `inputTokens` includes cached tokens (the format write-up: "`inputTokens` (which includes cached tokens)").
+    static func record(_ usage: [String: Any]?) -> (model: String, tokens: TokenTotals)? {
+        guard let usage, usage["inputTokens"] is NSNumber || usage["outputTokens"] is NSNumber else { return nil }
+        func int(_ k: String) -> Int { max(0, (usage[k] as? NSNumber)?.intValue ?? 0) }
+        let model = (usage["model"] as? String).flatMap { $0.isEmpty || $0.count > 200 ? nil : $0 } ?? CopilotCLI.shortName
+        let read = int("cacheReadTokens")
+        return (model, TokenTotals(input: max(0, int("inputTokens") - read), output: int("outputTokens"), cacheRead: read,
+                                   cacheWrite: int("cacheWriteTokens"), messages: 1))
+    }
+
     /// The figures from a shutdown event's `data`. Nil when `modelMetrics` is missing or isn't shaped as documented.
     ///
-    /// `inputTokens` includes the prompt tokens read from cache (Copilot's exit summary prints "453.0k in, 405.7k cached"
-    /// and every observed reading has cache reads below input), so only the rest counts as fresh input here.
+    /// `inputTokens` includes the prompt tokens read from cache (Copilot's exit summary prints "453.0k in, 405.7k cached";
+    /// the format write-up says the same of usage records), so only the rest counts as fresh input here.
     /// `outputTokens` is taken to include reasoning, as OpenAI's API counts it; `reasoningTokens` isn't added again.
     static func metrics(_ data: [String: Any]) -> (models: [String: CopilotModelMetric], premium: Double)? {
         guard let raw = data["modelMetrics"] as? [String: Any] else { return nil }

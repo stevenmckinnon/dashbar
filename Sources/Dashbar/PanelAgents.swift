@@ -827,9 +827,9 @@ struct ClaudeAccountLimitsView: View {
 
 /// Wording for GitHub Copilot CLI's Usage card.
 enum CopilotUsageText {
-    static let caption = "Updated when a session ends, in the terminal or VS Code: Copilot saves token counts only then."
+    static let caption = "Updated as Copilot works; totals are confirmed when a session ends."
     static let costNote = "GitHub Copilot is billed by your plan's premium requests, not by token, so Dashbar shows no cost "
-        + "for it. Premium requests are Copilot's own count, saved when each session ends. Your plan's allowance is only on GitHub."
+        + "for it. Tokens come from each model call as Copilot logs it, replaced by the session's own totals when it ends. Premium requests are Copilot's own count, saved when each session ends. Your plan's allowance is only on GitHub."
 
     /// "12 premium requests today", "1 premium request in 7 days", "2.5 premium requests …".
     static func premiumLine(_ n: Double, period: UsagePeriod) -> String {

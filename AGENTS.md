@@ -191,10 +191,14 @@ images stay clean.
   folder with only lock files is ignored. Copilot's hooks run in VS Code as well (seen on a real session). Its folder is `$COPILOT_HOME` else `~/.copilot`.
   From `session-state/<id>/` Dashbar reads only: folder names, file dates and sizes, `inuse.<pid>.lock` names, the top-level
   `cwd:` and `client_name:` lines of `workspace.yaml` (never `summary` or `name`), each event's `type` in the last 64 KB of
-  `events.jsonl` (for working, waiting or idle), and from `session.shutdown` lines only `modelMetrics` (requests and token
-  counts per model), `totalPremiumRequests` and `currentModel`, found by a byte match before any parsing. Never message
+  `events.jsonl` (for working, waiting or idle), from `session.usage_record` lines only `data.usage.model`, `inputTokens`,
+  `outputTokens`, `cacheReadTokens` and `cacheWriteTokens` (usage while a session runs), and from `session.shutdown` lines
+  only `modelMetrics` (requests and token counts per model), `totalPremiumRequests` and `currentModel`, both found by a
+  byte match before any parsing. A shutdown's totals replace that session's records since its previous shutdown (never
+  both). Sessions filed under `~/.copilot/chats/` (VS Code with no folder) aren't workspaces, as OpenCode's folderless
+  sessions aren't; their usage counts under "Copilot chat". Never message
   text, prompts, tool arguments or results, `codeChanges` file paths or any sign-in. Shutdown totals are cumulative across
-  resumes, so only their growth is booked. A session with metadata but no `events.jsonl` is "usage unknown", never zero; an empty
+  resumes, so only their growth is booked; a format warning shows only when every recent usage line failed. A session with metadata but no `events.jsonl` is "usage unknown", never zero; an empty
   scaffold folder is ignored; unreadable shutdown records show a format warning. No cost (plan-billed) and no plan limits:
   premium-request quotas need GitHub's API, and Dashbar adds no network calls. The hook is `dashbar.json` in
   `~/.copilot/hooks/` (Dashbar's own file, never anyone else's): added only on Add; Remove deletes it only if every

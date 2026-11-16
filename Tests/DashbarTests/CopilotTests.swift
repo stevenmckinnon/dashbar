@@ -40,6 +40,15 @@ enum CopilotFixture {
         return event("session.shutdown", data, at: at)
     }
 
+    /// A `session.usage_record` shaped like the real one (`data.usage`), with fields Dashbar must ignore.
+    static func usage(_ model: String, input: Int, output: Int, read: Int = 0, at: Date = Date()) -> [String: Any] {
+        event("session.usage_record", ["usage": [
+            "model": model, "inputTokens": input, "outputTokens": output, "cacheReadTokens": read, "cacheWriteTokens": 0,
+            "reasoningTokens": 0, "cost": 1.0, "apiCallId": "PRIVATE-CALL", "serviceRequestId": "PRIVATE-REQ",
+            "toolCounts": ["view": 2], "finishReason": "stop",
+        ] as [String: Any]], at: at)
+    }
+
     static func workspace(cwd: String, client: String? = "github/cli") -> String {
         var s = "id: abc\ncwd: \(cwd)\nsummary: \(secret)\nname: \(secret)\ncreated_at: 2026-11-16T10:00:00.000Z\n"
         if let client { s += "client_name: \(client)\n" }
@@ -511,5 +520,111 @@ enum CopilotFixture {
         let c = CopilotCollector(sessionState: fx.root.appendingPathComponent("session-state"),
                                  bridgeDir: fx.root.appendingPathComponent("states"))
         #expect(c.read().filter { $0.id == "copilot-gone" }.isEmpty)
+    }
+}
+
+/// Usage while a session runs (`session.usage_record`), replaced by its shutdown totals when it ends.
+@Suite struct CopilotRunningUsageTests {
+    func scan(_ fx: Fixture) -> CopilotUsage {
+        CopilotUsageScanner(root: fx.root.appendingPathComponent("session-state")).scan()
+    }
+
+    @Test func recordsAloneShowUsageWhileItRuns() throws {
+        let fx = try Fixture(); defer { fx.remove() }
+        try CopilotFixture.session(fx, "vs", client: "vscode-agent-host", events: [
+            CopilotFixture.event("session.start"),
+            CopilotFixture.usage("claude-sonnet-4.5", input: 1000, output: 50, read: 800),
+            CopilotFixture.event("assistant.message", ["content": CopilotFixture.secret]),
+            CopilotFixture.usage("claude-sonnet-4.5", input: 1200, output: 70, read: 1000),
+        ])
+        let u = scan(fx)
+        #expect(u.summary.today == TokenTotals(input: 400, output: 120, cacheRead: 1800, cacheWrite: 0, messages: 2))
+        #expect(u.summary.period(.today).models.map(\.name) == ["claude-sonnet-4.5"])
+        #expect(u.summary.warning == nil)
+        #expect(u.premium(.today) == 0)   // premium requests come only with the shutdown
+    }
+
+    @Test func aShutdownReplacesTheRecordsNeverAddingToThem() throws {
+        let fx = try Fixture(); defer { fx.remove() }
+        let url = try CopilotFixture.session(fx, "s1", events: [
+            CopilotFixture.usage("gpt-5.4", input: 600, output: 40, read: 300),
+            CopilotFixture.usage("gpt-5.4", input: 400, output: 60, read: 300),
+        ]).appendingPathComponent("events.jsonl")
+        let scanner = CopilotUsageScanner(root: fx.root.appendingPathComponent("session-state"))
+        #expect(scanner.scan().summary.today.total == 400 + 100 + 600)
+        // The same figures in the shutdown: still counted once.
+        try fx.append(url, lines: [CopilotFixture.shutdown(["gpt-5.4": (1000, 100, 600, 2, 1)], premium: 1)])
+        var u = scanner.scan()
+        #expect(u.summary.today.total == 1100)
+        #expect(u.premium(.today) == 1)
+        #expect(scanner.scan().summary.today.total == 1100)   // and on every later refresh
+        // Resumed: records add while it runs again, then the next shutdown's growth replaces them.
+        try fx.append(url, lines: [CopilotFixture.event("session.resume"), CopilotFixture.usage("gpt-5.4", input: 500, output: 10)])
+        #expect(scanner.scan().summary.today.total == 1100 + 510)
+        try fx.append(url, lines: [CopilotFixture.shutdown(["gpt-5.4": (1600, 120, 600, 3, 2)], premium: 2)])
+        u = scanner.scan()
+        #expect(u.summary.today.total == 1600 + 120)   // the shutdown's own totals, not records plus shutdown
+        #expect(u.premium(.today) == 2)
+    }
+
+    @Test func aShutdownThatDisagreesWins() throws {
+        let fx = try Fixture(); defer { fx.remove() }
+        try CopilotFixture.session(fx, "s1", events: [
+            CopilotFixture.usage("gpt-5.4", input: 100, output: 10),
+            CopilotFixture.shutdown(["gpt-5.4": (900, 90, 0, 3, 1), "claude-haiku-4.5": (50, 5, 0, 1, 0)]),
+        ])
+        #expect(scan(fx).summary.today.total == 990 + 55)
+    }
+
+    @Test func savedRunningUsageIsNotCountedAgain() throws {
+        let fx = try Fixture(); defer { fx.remove() }
+        let url = try CopilotFixture.session(fx, "s1", events: [CopilotFixture.usage("gpt-5.4", input: 100, output: 10)])
+            .appendingPathComponent("events.jsonl")
+        let cache = fx.root.appendingPathComponent("copilot-usage")
+        let first = CopilotUsageScanner(root: fx.root.appendingPathComponent("session-state"), cache: cache)
+        #expect(first.scan().summary.today.total == 110)
+        first.save()
+        try fx.append(url, lines: [CopilotFixture.shutdown(["gpt-5.4": (100, 10, 0, 1, 1)])])
+        let second = CopilotUsageScanner(root: fx.root.appendingPathComponent("session-state"), cache: cache)
+        #expect(second.scan().summary.today.total == 110)
+    }
+
+    @Test func aMalformedRecordIsSkippedAndWarnsOnlyWhenEveryLineFails() throws {
+        let fx = try Fixture(); defer { fx.remove() }
+        try CopilotFixture.session(fx, "mixed", events: [
+            CopilotFixture.event("session.usage_record", ["usage": ["tokens": 5]]),
+            CopilotFixture.usage("gpt-5.4", input: 100, output: 10),
+        ])
+        var u = scan(fx)
+        #expect(u.summary.today.total == 110)
+        #expect(u.summary.warning == nil)
+        let bad = try Fixture(); defer { bad.remove() }
+        try CopilotFixture.session(bad, "bad", events: [
+            CopilotFixture.event("session.usage_record", ["usage": ["tokens": 5]]),
+            CopilotFixture.event("session.usage_record", ["calls": 1]),
+        ])
+        u = scan(bad)
+        #expect(u.summary.found)
+        #expect(u.summary.warning == CopilotCLI.formatWarning)
+    }
+
+    @Test func onlyTheTokenAndModelFieldsAreRead() throws {
+        let r = try #require(CopilotUsageScanner.record(CopilotFixture.usage("gpt-5.4", input: 100, output: 10, read: 40)["data"]
+            .flatMap { ($0 as? [String: Any])?["usage"] as? [String: Any] }))
+        #expect(r.model == "gpt-5.4")
+        #expect(r.tokens == TokenTotals(input: 60, output: 10, cacheRead: 40, cacheWrite: 0, messages: 1))
+        #expect(CopilotUsageScanner.record(["model": "x"]) == nil)
+    }
+
+    @Test func chatFolderSessionsCountButAreNotWorkspaces() throws {
+        let fx = try Fixture(); defer { fx.remove() }
+        let chat = homeDir.appendingPathComponent(".copilot/chats/0f9e").path
+        try CopilotFixture.session(fx, "chat", cwd: chat, client: "vscode-agent-host",
+                                   events: [CopilotFixture.usage("gpt-5.4", input: 100, output: 10)])
+        let u = scan(fx)
+        #expect(u.summary.period(.today).projects.map(\.name) == [CopilotCLI.chatProject])
+        let f = CopilotCLI.SessionFolder(id: "chat", cwd: chat, client: "vscode-agent-host", eventsModified: Date(), lockPIDs: [7],
+                                         activity: .working)
+        #expect(CopilotCLI.live(folders: [f], bridged: [], processes: [], alive: { _ in true }).isEmpty)
     }
 }

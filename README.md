@@ -65,11 +65,11 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
 - **GitHub Copilot (CLI and VS Code agent)** (shown only if you use it): [Copilot CLI](https://github.com/github/copilot-cli)
   sessions, and Copilot's agent sessions in VS Code (which keep the same session folders), as agents in their workspaces,
   working, idle or asking permission, while the process holding each session runs, and a Usage card with
-  its tokens, models and premium requests. Copilot writes token counts only when a session ends, so the card is updated
-  then; it shows no cost (Copilot is billed by your plan) and no plan limits (those are only on GitHub, which Dashbar never
+  its tokens, models and premium requests, updated as Copilot works and confirmed by each session's own totals when it
+  ends; it shows no cost (Copilot is billed by your plan) and no plan limits (those are only on GitHub, which Dashbar never
   asks). Read from `~/.copilot/session-state/` (`$COPILOT_HOME` if set): the folder and host from each session's
-  `workspace.yaml`, each event's type near the end of `events.jsonl`, and only the metric fields of its `session.shutdown`
-  records; never prompts, replies, tool input or results, or session titles. A session with no event log is shown as
+  `workspace.yaml`, each event's type near the end of `events.jsonl`, and only the model and token fields of its
+  `session.usage_record` and `session.shutdown` records; never prompts, replies, tool input or results, or session titles. A session with no event log is shown as
   usage unknown, never zero. To see a session that needs you the moment it asks (in the terminal or VS Code), Settings →
   Integrations → GitHub Copilot → Add to Copilot puts one file, `dashbar.json`, in `~/.copilot/hooks/`, using Copilot's own hooks; its script saves
   only each session's id, folder, state and time to `~/Library/Caches/Dashbar/copilot-sessions/`, never answers a
