@@ -144,5 +144,7 @@ import Testing
         #expect(AgentChips.items(agents, hosts: ["T3 Code", "Terminal"]) == ["Codex ×2", "Cursor"])
         #expect(AgentChips.items([AgentProcess(name: "Codex app", count: 1)], hosts: ["Codex"]).isEmpty)
         #expect(AgentChips.items(agents, hosts: []).count == 3)
+        // opencode's sessions are listed by workspace, so its process is never an "other AI tool" chip.
+        #expect(AgentProcesses.read(executables: ["/opt/homebrew/bin/opencode", "/usr/local/bin/aider"]).map(\.name) == ["Aider"])
     }
 }

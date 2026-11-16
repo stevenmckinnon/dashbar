@@ -135,11 +135,12 @@ struct AgentProcess: Identifiable, Equatable {
 }
 
 enum AgentProcesses {
-    /// Executable basename -> display name.
+    /// Executable basename -> display name. Tools whose sessions Dashbar lists by workspace (opencode, via
+    /// `OpenCodeCollector`) stay out of this list, so they never show twice.
     static let known: [String: String] = [
         "codex": "Codex", "Codex": "Codex app",
         "cursor-agent": "Cursor Agent", "Cursor": "Cursor",
-        "aider": "Aider", "opencode": "opencode",
+        "aider": "Aider",
         "amp": "Amp", "goose": "Goose", "copilot": "Copilot CLI",
         "ollama": "Ollama", "LM Studio": "LM Studio",
         "T3 Code": "T3 Code", "T3 Code (Beta)": "T3 Code", "T3 Code (Alpha)": "T3 Code",

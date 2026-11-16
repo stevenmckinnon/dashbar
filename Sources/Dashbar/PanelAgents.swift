@@ -37,8 +37,8 @@ struct ServiceUsage: Identifiable {
 }
 
 extension Store {
-    /// The tools the Usage tab has a card for, in Claude Code, Codex, Google order (`UsageRules.order` sorts them).
-    /// Claude Code always has one; Codex and Google's tools only for someone who uses them.
+    /// The tools the Usage tab has a card for, in Claude Code, Codex, Google, opencode order (`UsageRules.order` sorts
+    /// them). Claude Code always has one; the others only for someone who uses them.
     func usageServices(settings: AppSettings, antigravityInstalled: Bool) -> [ServiceUsage] {
         let oneAccount = claudePlanLabel == nil && claudeAccountLimits.isEmpty
         let experimental = claudePlan.map { $0.source == .endpoint } ?? (!settings.claudeStatusLine && settings.claudeLimits)
@@ -71,6 +71,12 @@ extension Store {
                 costNote: GoogleUsage.costNote(googleSources),
                 limits: antigravityLimits?.problem == nil ? antigravityLimits?.flattened ?? [] : [],
                 hasNotice: google.warning != nil || antigravityLimits?.problem != nil))
+        }
+        // Only for someone with opencode's database. No limits: it runs on the user's own providers.
+        if opencode.found {
+            out.append(ServiceUsage(
+                service: .opencode, title: "OpenCode", icon: UI.openCodeSymbol, tint: UI.neutralTool, fill: UI.neutralTool,
+                summary: opencode, costNote: OpenCodeUsageText.costNote, hasNotice: opencode.warning != nil))
         }
         return out
     }
@@ -609,6 +615,8 @@ struct ServiceLimits: View {
                 AntigravityLimitsBlock(limits: store.antigravityLimits, connected: antigravity.status.isInstalled,
                                        showsHeader: !service.title.hasPrefix("Antigravity"))
             }
+        case .opencode:
+            EmptyView()   // no plan limits: opencode runs on the user's own providers
         }
     }
 }
@@ -783,4 +791,9 @@ struct ClaudeAccountLimitsView: View {
             }
         }
     }
+}
+
+/// Wording for opencode's Usage card.
+enum OpenCodeUsageText {
+    static let costNote = "OpenCode's own cost is used where it recorded one; otherwise list prices, and models without a known price are left out."
 }
