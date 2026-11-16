@@ -51,7 +51,7 @@ export const POLICY = {
         { list: [
           "Your settings, in `~/Library/Preferences/fun.dashbar.app.plist`.",
           "Its own data, in `~/Library/Application Support/Dashbar`: scan progress, the usage and plan history behind the History page and, for features you turn on, the status line and permission scripts and backups of the settings files they changed.",
-          "Caches, in `~/Library/Caches/Dashbar`: the latest plan reading (usage percentages, reset times and the plan name) and what a status line you added Dashbar to passed it.",
+          "Caches, in `~/Library/Caches/Dashbar`: the latest plan reading (usage percentages, reset times and the plan name), what a status line you added Dashbar to passed it and, if you added Dashbar to OpenCode, each session’s state from its plugin.",
           "If you turn on answering permission prompts, requests and your answers pass through files in `~/Library/Application Support/Dashbar/Permissions` that only your user account can read.",
         ] },
         { text: "To remove everything, delete those folders and that file after you uninstall. `brew uninstall --cask --zap dashbar` removes all of them for you, along with the caches macOS keeps for the app." },

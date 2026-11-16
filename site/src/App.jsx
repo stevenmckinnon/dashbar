@@ -101,6 +101,28 @@ function NavBar() {
   );
 }
 
+/** Opens the FAQ entry with this id, so following a link to it shows the answer, not just the question. */
+function openFaq(id) {
+  const item = document.getElementById(id);
+  if (item instanceof HTMLDetailsElement) item.open = true;
+}
+
+/** "Works with Claude Code, Codex, … and OpenCode", each name a link to the FAQ answer that says what it gets. */
+function WorksWith() {
+  const { lead, tools, faq } = HERO.worksWith;
+  return (
+    <p className="note works-with">
+      {lead}{" "}
+      {tools.map((tool, i) => (
+        <span key={tool}>
+          <a href={`#${faq}`} onClick={() => openFaq(faq)}>{tool}</a>
+          {i < tools.length - 2 ? ", " : i === tools.length - 2 ? " and " : null}
+        </span>
+      ))}
+    </p>
+  );
+}
+
 function Hero() {
   const dark = useDark();
   const [run, setRun] = useState(0);
@@ -113,6 +135,7 @@ function Hero() {
           <DownloadButton />
           <BrewCommand />
         </div>
+        <WorksWith />
         <p className="note">{LATEST_VERSION ? <>Version {LATEST_VERSION}. </> : null}{HERO.note}</p>
       </div>
       <div className="demo" data-ss-fill="">
@@ -360,12 +383,19 @@ function WhatsNew() {
 /* ---------- Questions ---------- */
 
 function Faq() {
+  // A visit to /#faq-agents (or any entry's id) opens that entry.
+  useEffect(() => {
+    const open = () => { if (location.hash.startsWith("#faq-")) openFaq(location.hash.slice(1)); };
+    open();
+    addEventListener("hashchange", open);
+    return () => removeEventListener("hashchange", open);
+  }, []);
   return (
     <section className="wrap faq" id="faq" aria-labelledby="faq-h">
       <h2 id="faq-h">Questions</h2>
       <div className="faq-list">
-        {FAQ.map(({ q, a }) => (
-          <details key={q}>
+        {FAQ.map(({ id, q, a }) => (
+          <details key={id} id={id}>
             <summary>{q}</summary>
             <p>{a}</p>
           </details>
