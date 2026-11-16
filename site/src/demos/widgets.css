@@ -1,0 +1,88 @@
+/* The desktop widgets (Widgets.tsx), at the app's own sizes in points. --pt is one widget point, worked out from the
+   width the widget is given (164 or 344 points across), so the whole widget scales together and stays exact.
+   Values are WidgetViews.swift's: padding 16, stacks 8 apart, lines 3 apart, 6 pt meters, 7 pt dots, type 10/11/12/13/15,
+   corner radius 28 (continuous on the Mac). Colours are WidgetPalette's, and the fill and text colours of the app's
+   offline render (white, or white 0.17 in dark mode, with macOS's label colours). */
+.wg {
+  --wg-bg: #fff;
+  --wg-text: rgb(0 0 0 / 0.85);
+  --wg-muted: rgb(0 0 0 / 0.5);
+  --wg-track: rgb(0 0 0 / 0.08);
+  --wg-claude: #c2603f;
+  --wg-codex: #0f8296;
+  --wg-google: #4f4dd0;
+  --wg-working: #1a7f37;
+  container-type: inline-size;
+  position: relative;
+  margin: 0;
+  width: 100%;
+  aspect-ratio: 164 / 164;
+  border-radius: 17.07%;
+  background: var(--wg-bg);
+  color: var(--wg-text);
+  font-family: system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  overflow: hidden;
+}
+.wg-medium { aspect-ratio: 344 / 164; border-radius: 8.14% / 17.07%; }
+/* The widget is the size container, so cqw on its body is the widget's own width. */
+.wg-body {
+  --pt: calc(100cqw / 164);
+  position: absolute;
+  inset: 0;
+  padding: calc(16 * var(--pt));
+  display: flex;
+  flex-direction: column;
+  gap: calc(8 * var(--pt));
+  line-height: 1.27;
+  white-space: nowrap;
+}
+.wg-medium .wg-body { --pt: calc(100cqw / 344); }
+@media (prefers-color-scheme: dark) {
+  .wg {
+    --wg-bg: #2b2b2b;
+    --wg-text: rgb(255 255 255 / 0.85);
+    --wg-muted: rgb(255 255 255 / 0.55);
+    --wg-track: rgb(255 255 255 / 0.12);
+    --wg-claude: #d97857;
+    --wg-codex: #40c8e0;
+    --wg-google: #9c9aff;
+    --wg-working: #3fd06a;
+  }
+}
+/* The page's hairline round the edge, as the pictures had; no shadow. */
+.wg::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--line); pointer-events: none; }
+
+.wg b { font-weight: 600; }
+.wg-head { display: flex; align-items: center; gap: calc(5 * var(--pt)); }
+.wg-medium .wg-head { gap: calc(10 * var(--pt)); justify-content: space-between; }
+.wg-title { font-size: calc(13 * var(--pt)); }
+.wg-plan { margin-left: auto; padding-left: calc(4 * var(--pt)); font-size: calc(10 * var(--pt)); color: var(--wg-muted); }
+.wg-dot { flex: none; width: calc(7 * var(--pt)); height: calc(7 * var(--pt)); border-radius: 50%; background: var(--c); }
+.wg [data-p="claude"] { --c: var(--wg-claude); }
+.wg [data-p="codex"] { --c: var(--wg-codex); }
+.wg [data-p="google"] { --c: var(--wg-google); }
+.wg [data-p="working"] { --c: var(--wg-working); }
+.wg-count { display: flex; align-items: center; gap: calc(4 * var(--pt)); font-size: calc(11 * var(--pt)); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+.wg-meter { position: relative; display: block; height: calc(6 * var(--pt)); border-radius: 999px; background: var(--wg-track); }
+.wg-meter i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--c, var(--wg-claude)); }
+
+/* Small: LimitBlock */
+.wg-block { display: flex; flex-direction: column; gap: calc(3 * var(--pt)); }
+.wg-line { display: flex; align-items: baseline; }
+.wg-window { font-size: calc(11 * var(--pt)); font-weight: 500; }
+.wg-figure { margin-left: auto; padding-left: calc(4 * var(--pt)); font-size: calc(15 * var(--pt)); font-variant-numeric: tabular-nums; }
+.wg-reset { font-size: calc(10 * var(--pt)); color: var(--wg-muted); }
+
+/* Medium: OverviewRow and CompactLimit. The rows share the height under the header, each centred in its band. */
+.wg-rows { flex: 1; display: flex; flex-direction: column; }
+.wg-row { flex: 1; display: flex; align-items: center; gap: calc(10 * var(--pt)); }
+.wg-name { flex: none; width: calc(84 * var(--pt)); display: flex; align-items: center; gap: calc(5 * var(--pt)); font-size: calc(12 * var(--pt)); font-weight: 500; }
+.wg-compact { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: calc(3 * var(--pt)); }
+.wg-compact .wg-line { gap: calc(4 * var(--pt)); }
+/* SwiftUI shrinks the window title first (minimumScaleFactor 0.8, layoutPriority -1), so it draws smaller than 10 pt. */
+.wg-short { font-size: calc(8.5 * var(--pt)); font-weight: 500; }
+.wg-when { font-size: calc(10 * var(--pt)); color: var(--wg-muted); }
+.wg-pct { margin-left: auto; padding-left: calc(2 * var(--pt)); font-size: calc(11 * var(--pt)); font-variant-numeric: tabular-nums; }

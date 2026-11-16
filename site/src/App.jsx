@@ -5,6 +5,7 @@ import { RELEASE_NOTES, LATEST_VERSION, inline } from "./releases";
 import { DashbarDemo } from "./demos/DashbarDemo";
 import { AgentsDemo, LimitsDemo, UsageDemo, ServersDemo, SystemDemo, CleanupDemo } from "./demos/FeatureDemos";
 import { WindowDemo } from "./demos/WindowDemo";
+import { SmallWidget, MediumWidget } from "./demos/Widgets";
 import { REPO, BREW, HERO, TOUR, FEATURES_INTRO, FEATURES, WINDOW, WIDGETS, PACE, PRIVACY, INSTALL } from "./content";
 import { Mark, Footer } from "./Chrome";
 
@@ -13,16 +14,6 @@ import { Mark, Footer } from "./Chrome";
 const DOWNLOAD = LATEST_VERSION
   ? `${REPO}/releases/download/v${LATEST_VERSION}/Dashbar-${LATEST_VERSION}.dmg`
   : `${REPO}/releases/latest`;
-
-/** A picture in the visitor's colour scheme: *-light.png by default, *-dark.png in dark mode. */
-function Shot({ name, alt, width, height, className, lazy = true }) {
-  return (
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcSet={`./${name}-dark.png`} />
-      <img className={className} src={`./${name}-light.png`} width={width} height={height} alt={alt} loading={lazy ? "lazy" : undefined} />
-    </picture>
-  );
-}
 
 /* ---------- Hero: the panel, as a short demo ---------- */
 
@@ -272,10 +263,10 @@ function WindowSection() {
           <h3>{WIDGETS.heading}</h3>
           <p>{WIDGETS.text}</p>
         </div>
-        {/* Rendered by the app (`--snapshot --demo --widget small|medium` at 4x), invented demo data. */}
+        {/* Built in HTML to mirror the app's widget views (demos/Widgets.tsx), with the app's invented demo data. */}
         <div className="widgets-row">
-          <div className="widget-shot widget-small"><Shot name="widget-small" width={656} height={656} alt={WIDGETS.altSmall} /></div>
-          <div className="widget-shot widget-medium"><Shot name="widget-medium" width={1376} height={656} alt={WIDGETS.altMedium} /></div>
+          <div className="widget-shot widget-small"><SmallWidget label={WIDGETS.altSmall} /></div>
+          <div className="widget-shot widget-medium"><MediumWidget label={WIDGETS.altMedium} /></div>
         </div>
       </div>
     </section>

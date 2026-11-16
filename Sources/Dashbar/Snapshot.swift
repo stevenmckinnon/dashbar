@@ -454,7 +454,8 @@ enum MenuBarSnapshot {
 }
 
 /// `--widget small|medium`: one desktop widget at its real size, its own rounded shape and fill on a transparent background
-/// (the site's and README's pictures, `docs/images/widget-*-{light,dark}.png`, at `DASHBAR_SNAPSHOT_SCALE=4`), from the
+/// (the README's pictures and the reference for the site's HTML widgets, `docs/images/widget-*-{light,dark}.png`, at
+/// `DASHBAR_SNAPSHOT_SCALE=4`), from the
 /// store's snapshot as the widget would read it.
 /// `DASHBAR_WIDGET_STATE=nodata|notrunning` shows the widget before the app has saved anything, or after it has quit;
 /// `DASHBAR_WIDGET_TOOLS=1` keeps only the first N tools' limits, to see the medium widget with fewer rows.

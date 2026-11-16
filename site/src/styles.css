@@ -327,19 +327,17 @@ section[id], [id="top"] { scroll-margin-top: 88px; }
   .window-demo { margin-top: 32px; }
 }
 
-/* The widgets, under the window demo: the pictures in the first six columns, their words from column 7 as in every
-   section head. Real proportions (164 and 344 points wide, 16 apart). A hairline in the page's line colour traces each
-   one's edge, as on the film, since the white widget is close to the page in light mode. No shadow. */
+/* The widgets, under the window demo: the widgets (demos/Widgets.tsx) in the first six columns, their words from column 7 as in every
+   section head. Real proportions (164 and 344 points wide, 16 apart). Each carries a hairline in the page's
+   line colour, since the white widget is close to the page in light mode. No shadow. */
 .widgets { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; margin-top: 80px; scroll-margin-top: 88px; }
 .widgets-text { grid-column: 7 / -1; grid-row: 1; }
 .widgets-text h3 { font-size: var(--step-title); letter-spacing: -0.03em; line-height: 1.1; }
 .widgets-text p { margin-top: 16px; max-width: 44ch; color: var(--muted); }
 .widgets-row { grid-column: 1 / span 6; grid-row: 1; display: flex; align-items: flex-start; gap: clamp(16px, 2vw, 26px); min-width: 0; }
-.widget-shot { position: relative; min-width: 0; border-radius: 8.14% / 17.07%; }
-.widget-small { flex: 164 1 0; border-radius: 17.07%; }
+.widget-shot { min-width: 0; }
+.widget-small { flex: 164 1 0; }
 .widget-medium { flex: 344 1 0; }
-.widget-shot img { display: block; width: 100%; height: auto; }
-.widget-shot::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--line); pointer-events: none; }
 /* Narrow desktops: one more column for the pictures, so the medium widget stays near its real size. */
 @media (max-width: 1180px) and (min-width: 901px) {
   .widgets-row { grid-column: 1 / span 7; }
