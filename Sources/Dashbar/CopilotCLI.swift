@@ -530,8 +530,10 @@ final class CopilotUsageScanner {
                   let size = v.fileSize.map(UInt64.init) else {
                 // No event log: usage unknown, for a real session (one with its metadata) used lately. An empty scaffold
                 // left by an aborted start (github/copilot-cli#2836), or a folder of locks being set up, isn't a session.
+                // A session open right now (it holds a lock) may just not have written yet: not unknown, only new.
                 let yaml = dir.appendingPathComponent("workspace.yaml")
-                if let m = (try? yaml.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate, m >= cutoff {
+                let open = !CopilotCLI.lockPIDs((try? fm.contentsOfDirectory(atPath: dir.path)) ?? []).isEmpty
+                if !open, let m = (try? yaml.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate, m >= cutoff {
                     unknown += 1
                 }
                 continue

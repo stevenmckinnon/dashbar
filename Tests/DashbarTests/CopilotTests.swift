@@ -284,6 +284,10 @@ enum CopilotFixture {
         #expect(!u.summary.found)
         #expect(u.unknownSessions == 1)
         #expect(u.shows)
+        // Just opened (it holds a lock) and nothing written yet: new, not unknown.
+        let open = try CopilotFixture.session(fx, "fresh", client: "vscode-agent-host", events: nil)
+        try Data().write(to: open.appendingPathComponent("inuse.20093.lock"))
+        #expect(CopilotUsageScanner(root: state).scan().unknownSessions == 1)
     }
 
     @Test func emptyScaffoldShowsNothing() throws {
@@ -503,7 +507,8 @@ enum CopilotFixture {
         try lock(setup, getpid())
         let c = CopilotCollector(sessionState: fx.root.appendingPathComponent("session-state"),
                                  bridgeDir: fx.root.appendingPathComponent("states"))
-        let s = c.read()
+        // Only the fixture's sessions: a real Copilot running on this Mac adds a row of its own (its folder, idle).
+        let s = c.read().filter { $0.id.hasPrefix("copilot-f3bc") || $0.id.hasPrefix("copilot-ddce") }
         let one = try #require(s.first)
         #expect(s.count == 1)
         #expect(one.id == "copilot-f3bc321d")
