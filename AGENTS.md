@@ -50,7 +50,7 @@ DASHBAR_DEMO_QUIET=long Dashbar --snapshot out.png --demo  # the same, with ever
 DASHBAR_DEMO_IDLE=1 DASHBAR_TAB=agents Dashbar --snapshot out.png --demo --hosted  # Codex unused today: its Usage card folds to one line
 DASHBAR_DEMO_LOOSE_SERVER=1 Dashbar --snapshot out.png --demo  # adds a dev server outside every workspace (Overview's Servers card)
 DASHBAR_DEMO_NO_LIMITS=1 Dashbar --snapshot out.png --demo # no plan limits from any tool (no strip on Overview)
-Dashbar --snapshot out.png --demo --widget small|medium [--dark]   # one widget, transparent around it; docs/images/widget-*.png use DASHBAR_SNAPSHOT_SCALE=4 DASHBAR_DEMO_GOOGLE=1, from a copy outside build/ with PlugIns removed (see Widgets). (DASHBAR_WIDGET_STATE=nodata|notrunning,
+Dashbar --snapshot out.png --demo --widget small|medium [--dark]   # one widget, transparent around it; docs/images/widget-*.png (the README's, and the reference for the site's HTML widgets) use DASHBAR_SNAPSHOT_SCALE=4 DASHBAR_DEMO_GOOGLE=1, from a copy outside build/ with PlugIns removed (see Widgets). (DASHBAR_WIDGET_STATE=nodata|notrunning,
                                                     # DASHBAR_WIDGET_TOOLS=1 for fewer rows, DASHBAR_DEMO_GOOGLE=weekly for two Antigravity groups)
 Dashbar --snapshot out.png --demo --menubar all     # the menu bar item: idle|working|needsyou|done|time|all, on light (--dark) bars
 Dashbar --snapshot x --demo --menubar working --onscreen   # that state in a real status item for 8s (prints its frame)
@@ -99,6 +99,10 @@ the real app's preferences, so reset it afterwards (`defaults write fun.dashbar.
   `lsregister -f "/Applications/Dashbar Local.app"`, then restart the app and `pkill -x DashbarWidgets`.
 - The gallery and placed widgets keep the old code and descriptors until the version changes or the extension restarts:
   commit (a local build's CFBundleVersion is the commit count) or `pkill -x DashbarWidgets`, then reopen the gallery.
+- The site's widgets are not pictures: they are built in HTML and CSS in `site/src/demos/Widgets.tsx` (`widgets.css`),
+  mirroring `DashbarWidgetUI`'s views at their real point sizes, with the same demo numbers. When the widget views change
+  (layout, type, spacing, colours or the demo data), update both, then render the site's widgets at exactly 164 × 164
+  and 344 × 164 pt beside a fresh `--snapshot --demo --widget` render, light and dark, and fix what differs.
 - Never touch the App Group container from a shell: macOS protects it (Operation not permitted). Render widgets with
   `--snapshot --demo --widget`, and check the app's writes with the tests.
 

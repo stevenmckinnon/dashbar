@@ -5,6 +5,7 @@ import { RELEASE_NOTES, LATEST_VERSION, inline } from "./releases";
 import { DashbarDemo } from "./demos/DashbarDemo";
 import { AgentsDemo, LimitsDemo, UsageDemo, ServersDemo, SystemDemo, CleanupDemo } from "./demos/FeatureDemos";
 import { WindowDemo } from "./demos/WindowDemo";
+import { SmallWidget, MediumWidget } from "./demos/Widgets";
 import { REPO, BREW, HERO, TOUR, FEATURES_INTRO, FEATURES, WINDOW, WIDGETS, PACE, PRIVACY, INSTALL } from "./content";
 import { Mark, Footer } from "./Chrome";
 
@@ -13,16 +14,6 @@ import { Mark, Footer } from "./Chrome";
 const DOWNLOAD = LATEST_VERSION
   ? `${REPO}/releases/download/v${LATEST_VERSION}/Dashbar-${LATEST_VERSION}.dmg`
   : `${REPO}/releases/latest`;
-
-/** A picture in the visitor's colour scheme: *-light.png by default, *-dark.png in dark mode. */
-function Shot({ name, alt, width, height, className, lazy = true }) {
-  return (
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcSet={`./${name}-dark.png`} />
-      <img className={className} src={`./${name}-light.png`} width={width} height={height} alt={alt} loading={lazy ? "lazy" : undefined} />
-    </picture>
-  );
-}
 
 /* ---------- Hero: the panel, as a short demo ---------- */
 
@@ -35,6 +26,19 @@ function useDark() {
     return () => mq.removeEventListener("change", on);
   }, []);
   return dark;
+}
+
+/** True while the media query matches, and follows it as the window changes. */
+function useMedia(query) {
+  const [on, setOn] = useState(() => typeof matchMedia !== "undefined" && matchMedia(query).matches);
+  useEffect(() => {
+    const mq = matchMedia(query);
+    const change = () => setOn(mq.matches);
+    change();
+    mq.addEventListener("change", change);
+    return () => mq.removeEventListener("change", change);
+  }, [query]);
+  return on;
 }
 
 /** Copies the Homebrew command, and says so for a moment. */
@@ -203,7 +207,23 @@ function Feature({ Demo, name, text }) {
   );
 }
 
+// On phones the first three features keep their demos and the rest are a short list of words, so six demos don't
+// stack into six screens. Each demo that is shown still plays once and has its Replay pill.
+const DEMOS_ON_PHONES = 3;
+
+function Brief({ name, text }) {
+  return (
+    <article className="feature-brief">
+      <h3>{name}</h3>
+      <p><Inline text={text} /></p>
+    </article>
+  );
+}
+
 function Features() {
+  const phone = useMedia("(max-width: 600px)");
+  const shown = phone ? ITEMS.slice(0, DEMOS_ON_PHONES) : ITEMS;
+  const brief = phone ? ITEMS.slice(DEMOS_ON_PHONES) : [];
   return (
     <section className="wrap features" id="features" aria-labelledby="features-h">
       <div className="section-head">
@@ -211,13 +231,14 @@ function Features() {
         <p>{FEATURES_INTRO}</p>
       </div>
       <div className="feature-list">
-        {ITEMS.map((it) => <Feature key={it.name} {...it} />)}
+        {shown.map((it) => <Feature key={it.name} {...it} />)}
+        {brief.length > 0 && <div className="feature-briefs">{brief.map((it) => <Brief key={it.name} {...it} />)}</div>}
       </div>
     </section>
   );
 }
 
-/* ---------- The Dashbar window ---------- */
+/* ---------- Beyond the menu bar: the Dashbar window, then the desktop widgets ---------- */
 
 function WindowSection() {
   const dark = useDark();
@@ -237,23 +258,16 @@ function WindowSection() {
           <button className="replay-pill" type="button" onClick={() => setRun((n) => n + 1)}><RotateCw size={14} strokeWidth={2} aria-hidden="true" />Replay<span className="sr-only"> the window demo</span></button>
         </div>
       </div>
-    </section>
-  );
-}
-
-/* ---------- The desktop widgets ---------- */
-
-function WidgetsSection() {
-  return (
-    <section className="wrap window widgets" id="widgets" aria-labelledby="widgets-h">
-      <div className="section-head window-head">
-        <h2 id="widgets-h">{WIDGETS.heading}</h2>
-        <p>{WIDGETS.text}</p>
-      </div>
-      {/* Rendered by the app (`--snapshot --demo --widget small|medium` at 4x), invented demo data. */}
-      <div className="widgets-row">
-        <div className="widget-shot widget-small"><Shot name="widget-small" width={656} height={656} alt={WIDGETS.altSmall} /></div>
-        <div className="widget-shot widget-medium"><Shot name="widget-medium" width={1376} height={656} alt={WIDGETS.altMedium} /></div>
+      <div className="widgets" id="widgets">
+        <div className="widgets-text">
+          <h3>{WIDGETS.heading}</h3>
+          <p>{WIDGETS.text}</p>
+        </div>
+        {/* Built in HTML to mirror the app's widget views (demos/Widgets.tsx), with the app's invented demo data. */}
+        <div className="widgets-row">
+          <div className="widget-shot widget-small"><SmallWidget label={WIDGETS.altSmall} /></div>
+          <div className="widget-shot widget-medium"><MediumWidget label={WIDGETS.altMedium} /></div>
+        </div>
       </div>
     </section>
   );
@@ -314,7 +328,7 @@ function Inline({ text }) {
 }
 
 function WhatsNew() {
-  const shown = RELEASE_NOTES.slice(0, 3);
+  const shown = RELEASE_NOTES.slice(0, 1);
   if (!shown.length) return null;
   return (
     <section className="wrap news" id="whats-new" aria-labelledby="news-h">
@@ -337,7 +351,7 @@ function WhatsNew() {
             )}
           </article>
         ))}
-        <a className="link" href={`${REPO}/releases`}>All releases on GitHub</a>
+        <a className="link" href={`${REPO}/releases`}>All releases</a>
       </div>
     </section>
   );
@@ -424,7 +438,6 @@ export default function App() {
         <Tour />
         <Features />
         <WindowSection />
-        <WidgetsSection />
         <Pace />
         <Privacy />
         <WhatsNew />

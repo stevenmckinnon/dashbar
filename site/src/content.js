@@ -37,20 +37,21 @@ export const FEATURES = [
     text: "Finds `node_modules`, `.next`, build folders and Xcode’s DerivedData, shows what you would get back, and moves them to the Trash only after you confirm." },
 ];
 
-// The shortcut sits between `before` and `after`, so the page can show it as a key.
+// One section for Dashbar away from the menu bar: the window, then the widgets. The shortcut sits between
+// `before` and `after`, so the page can show it as a key.
 export const WINDOW = {
-  heading: "Or a whole window",
+  heading: "Beyond the menu bar",
   before: "Press",
   shortcut: "⌃⌥D",
-  after: ", or the arrow at the top of the panel, and Dashbar opens as a window. Its pages and every running workspace sit in a sidebar. A workspace’s page adds up what it is using right now, its dev servers, its agents and everything they started, and shows the processes behind the numbers. You can stop a server, quit a process or move the workspace’s caches to the Trash from there. History shows 30 days of usage and estimated cost, and how full each plan window got.",
+  after: ", or the arrow at the top of the panel, and Dashbar opens as a window. Each running workspace has a page: what it is using right now, its dev servers and agents, and the processes behind them. Stop a server, quit a process or move its caches to the Trash from there. History shows 30 days of usage, estimated cost and how full each plan window got.",
   caption: "The menu bar panel stays the quick glance. Clicking a workspace there opens its page here.",
 };
 
 // The widgets refresh on macOS's schedule: about every 15 minutes, sooner when Dashbar's figures change (WidgetBridge,
 // SnapshotProvider). Keep "every few minutes, not live" true if that changes.
 export const WIDGETS = {
-  heading: "Or on your desktop",
-  text: "Two widgets keep your plan limits in sight. The small one shows Claude’s limits and when they reset. The medium one shows every tool’s limits and how many agents are working. They refresh every few minutes and dim when Dashbar isn’t running.",
+  heading: "On your desktop",
+  text: "Two widgets keep your plan limits in sight. The small one shows Claude’s limits and when they reset. The medium one shows every tool’s limits and how many agents are working. They refresh every few minutes, not live, and dim when Dashbar isn’t running.",
   altSmall: "The small Dashbar widget: Claude on Max 5x, 5-hour limit 55% used, weekly limit 38% used, each with its reset time.",
   altMedium: "The medium Dashbar widget: 2 working, and the 5-hour and weekly limits for Claude (55% and 38%), Codex (21% and 34%) and Antigravity (42% and 61%).",
 };
