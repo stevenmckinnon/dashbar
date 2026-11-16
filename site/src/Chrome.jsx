@@ -39,7 +39,7 @@ export function Footer({ home = "" }) {
         </ul>
         <div className="last">
           <p>© 2026 Steve McKinnon. Free and open source under the MIT licence.</p>
-          <p>{FOOTER.trademarks}</p>
+          <p>{FOOTER.independence}</p>
         </div>
       </div>
     </footer>

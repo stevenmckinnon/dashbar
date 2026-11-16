@@ -5,7 +5,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { FAQ } from "./src/faq.js";
-import { SITE, REPO, BREW, HERO, FEATURES_INTRO, FEATURES, WINDOW, WIDGETS, PACE, PRIVACY, INSTALL, FOOTER, plain } from "./src/content.js";
+import { SITE, REPO, BREW, HERO, FEATURES_INTRO, FEATURES, WINDOW, WIDGETS, PACE, PRIVACY, INSTALL, FOOTER, plain, worksWithText } from "./src/content.js";
 
 const root = new URL("../", import.meta.url);
 const byVersion = (a, b) => b.version.localeCompare(a.version, undefined, { numeric: true });
@@ -39,6 +39,12 @@ const answer = (q) => {
   return hit.a;
 };
 
+const faqById = (id) => {
+  const hit = FAQ.find((f) => f.id === id);
+  if (!hit) throw new Error(`agent-files.js: no FAQ entry with id "${id}"; update HERO.worksWith.faq`);
+  return hit;
+};
+
 /** The date of the last commit, for the sitemap's lastmod. The site deploys only when its sources change. */
 export function lastCommitDay() {
   try { return execFileSync("git", ["log", "-1", "--format=%cs"], { encoding: "utf8" }).trim() || null; } catch { return null; }
@@ -53,6 +59,7 @@ export function indexMd(all) {
   return [
     `# Dashbar`,
     `> ${plain(HERO.lede)}`,
+    `${worksWithText()}. What each one gets is under “${faqById(HERO.worksWith.faq).q}” in Questions.`,
     `${version ? `Version ${version}. ` : ""}${HERO.note}`,
     [
       `- [Download for macOS](${downloadUrl(version)})`,
@@ -85,7 +92,7 @@ export function indexMd(all) {
     `### Download\n\n${INSTALL.download} [Download for macOS](${downloadUrl(version)}).`,
     `### Homebrew\n\n${INSTALL.brew}\n\n\`\`\`sh\n${BREW}\n\`\`\``,
     `---`,
-    `${FOOTER.about} Made by [Steve McKinnon](https://steve.mn). Free and open source under the [MIT licence](${REPO}/blob/main/LICENSE). ${FOOTER.trademarks} Contact: hello@usedashbar.com`,
+    `${FOOTER.about} Made by [Steve McKinnon](https://steve.mn). Free and open source under the [MIT licence](${REPO}/blob/main/LICENSE). ${FOOTER.independence} Contact: hello@usedashbar.com`,
   ].join("\n\n") + "\n";
 }
 
@@ -170,7 +177,7 @@ export function llmsTxt(all) {
   return [
     `# Dashbar`,
     `> ${plain(HERO.lede)}`,
-    `Dashbar is a native menu bar app for macOS 14 or later, on Apple silicon and Intel. It reads Claude Code’s and Codex’s session files on the Mac, the listening ports and processes, and the folders you choose. It is free and open source under the MIT licence. The app has no account and no analytics.${version ? ` The current version is ${version}.` : ""}`,
+    `Dashbar is a native menu bar app for macOS 14 or later, on Apple silicon and Intel. It reads what Claude Code, Codex, Gemini CLI, Antigravity and OpenCode record about their sessions on the Mac, the listening ports and processes, and the folders you choose. It is free and open source under the MIT licence. The app has no account and no analytics.${version ? ` The current version is ${version}.` : ""}`,
     `## Docs`,
     [
       `- [Homepage as Markdown](${SITE}index.md): features, what it reads and sends, what’s new, the FAQ and how to install`,

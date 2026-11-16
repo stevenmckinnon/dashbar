@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { FAQ } from "./src/faq.js";
-import { SITE, REPO, HERO, FEATURES, plain } from "./src/content.js";
+import { SITE, REPO, HERO, FEATURES, plain, worksWithText } from "./src/content.js";
 import { POLICY, policyHtml } from "./src/policy.js";
 import * as agent from "./agent-files.js";
 
@@ -55,6 +55,7 @@ const seo = {
       `<div class="seo-fallback">`,
       `<h1>${esc(HERO.headline)}</h1>`,
       `<p>${esc(plain(HERO.lede))}</p>`,
+      `<p>${esc(worksWithText())}</p>`,
       `<h2>What it shows</h2>`,
       ...FEATURES.map((f) => `<h3>${esc(f.name)}</h3><p>${esc(plain(f.text))}</p>`),
       `<h2>Questions</h2>`,
