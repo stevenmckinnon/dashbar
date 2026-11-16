@@ -47,11 +47,10 @@ struct CommandLineToolSection: View {
                         Text("Copies a command to run in Terminal. It asks for your password.")
                     }
                 }
+                IntegrationDetails(text: "Run dashbar in Terminal to see which agents need you, which are working and your plan limits. dashbar line prints one line for a tmux status bar or a shell prompt. It reads what Dashbar already shows, from a file only you can read, so Dashbar has to be running. Installing with Homebrew adds it for you.",
+                                   label: "How it works")
             } header: {
                 Text("Command-line tool")
-            } footer: {
-                Text("Run dashbar in Terminal to see which agents need you, which are working and your plan limits. dashbar line prints one line for a tmux status bar or a shell prompt. It reads what Dashbar already shows, from a file only you can read, so Dashbar has to be running. Installing with Homebrew adds it for you.")
-                    .settingsFooter()
             }
         }
     }

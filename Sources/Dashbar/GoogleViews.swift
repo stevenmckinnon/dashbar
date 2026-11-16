@@ -115,10 +115,9 @@ struct AntigravityLabsSection: View {
                         .font(.caption).foregroundStyle(.red)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                IntegrationDetails(text: explanation)
             } header: {
                 Text("Antigravity CLI")
-            } footer: {
-                Text(explanation).settingsFooter()
             }
         }
     }

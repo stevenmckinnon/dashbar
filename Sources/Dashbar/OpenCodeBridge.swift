@@ -327,10 +327,9 @@ struct OpenCodeSection: View {
                         .font(.caption).foregroundStyle(.red)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                IntegrationDetails(text: explanation)
             } header: {
                 Text("opencode")
-            } footer: {
-                Text(explanation).settingsFooter()
             }
         }
     }

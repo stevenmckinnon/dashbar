@@ -411,6 +411,24 @@ extension View {
     }
 }
 
+/// The long explanation of an integration (what it changes, what it saves, what Remove does), folded under its row and
+/// closed by default, so a tool's section stays a few compact rows. The wording is the explanation's own, moved here.
+struct IntegrationDetails: View {
+    let text: String
+    var label = "What Dashbar changes"
+    /// `DASHBAR_SETTINGS_EXPANDED=1` opens every one in a demo snapshot.
+    @State private var expanded = CommandLine.arguments.contains("--demo")
+        && ProcessInfo.processInfo.environment["DASHBAR_SETTINGS_EXPANDED"] != nil
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $expanded) {
+            Text(text).settingsFooter().fixedSize(horizontal: false, vertical: true)
+        } label: {
+            Text(label).font(.callout).foregroundStyle(.secondary)
+        }
+    }
+}
+
 private struct CaptureSettingsOpener: ViewModifier {
     @Environment(\.openSettings) private var openSettings
     func body(content: Content) -> some View {
@@ -649,6 +667,8 @@ private struct IntegrationSettings: View {
 
     var body: some View {
         Form {
+            // One section per tool, each integration a row with its explanation folded under it, so the tab stays
+            // short as tools are added. Claude Code always shows; the others only once their tool is found.
             Section {
                 statusLineRow
                 if let problem {
@@ -656,12 +676,7 @@ private struct IntegrationSettings: View {
                         .font(.caption).foregroundStyle(.red)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-            } header: {
-                Text("Claude plan limits")
-            } footer: {
-                Text(statusLineExplanation).settingsFooter()
-            }
-            Section {
+                IntegrationDetails(text: statusLineExplanation)
                 if settings.readClaudeAccounts.count > 1 {
                     ForEach(settings.readClaudeAccounts) { accountPermissionsRow($0) }
                 } else {
@@ -679,23 +694,20 @@ private struct IntegrationSettings: View {
                         .font(.caption).foregroundStyle(.red)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                IntegrationDetails(text: permissionsExplanation)
+                // Last, and labelled: the one setting here that leans on something undocumented.
+                Toggle(isOn: $settings.claudeLimits) {
+                    Text("Also ask Anthropic with Claude Code's sign-in")
+                    Text("Experimental")
+                }
+                IntegrationDetails(text: "Another way to get Claude plan limits, only needed if you'd rather not change Claude Code's status line. Reads Claude Code's sign-in from your Keychain, the same way Claude Code does, and asks an undocumented endpoint that may change. Never refreshes or saves the sign-in. When both are on, Dashbar shows the newer reading.",
+                                   label: "How it works")
             } header: {
-                Text("Claude Code permission prompts")
-            } footer: {
-                Text(permissionsExplanation).settingsFooter()
+                Text("Claude Code")
             }
             AntigravityLabsSection()
             OpenCodeSection()
             CommandLineToolSection()
-            // Last, and labelled: the one setting here that leans on something undocumented.
-            Section {
-                Toggle("Also ask Anthropic with Claude Code's sign-in", isOn: $settings.claudeLimits)
-            } header: {
-                Text("Experimental")
-            } footer: {
-                Text("Another way to get Claude plan limits, only needed if you'd rather not change Claude Code's status line. Reads Claude Code's sign-in from your Keychain, the same way Claude Code does, and asks an undocumented endpoint that may change. Never refreshes or saves the sign-in. When both are on, Dashbar shows the newer reading.")
-                    .settingsFooter()
-            }
         }
         .formStyle(.grouped)
         .onAppear {
@@ -746,7 +758,8 @@ private struct IntegrationSettings: View {
                     .help(message)
             }
         } label: {
-            Text(account.label)
+            // The section is the whole tool's now, so each row says which integration it is.
+            Text("Permission prompts · \(account.label)")
             switch settings.permissionStatus(account) {
             case .installed: Text("Answering in Dashbar")
             case .notInstalled: Text("Asks in the terminal")
