@@ -70,7 +70,11 @@ final class AppSettings: ObservableObject {
     @Published private(set) var claudeStatusLineStatus: StatusLineBridge.Status = .notInstalled(current: nil)
 
     /// Claude Code and Codex folders the user added (other accounts), and names given to any account, default included.
-    @Published var accounts: [AgentAccount] { didSet { Self.saveAccounts(accounts, to: defaults) } }
+    /// Never saved from a `--demo` run: a Settings render binds each account's name field, and SwiftUI writing it back
+    /// once saved the demo's "Personal" and "Work" accounts into the real preferences (the Work folder then showed as missing).
+    @Published var accounts: [AgentAccount] {
+        didSet { if !CommandLine.arguments.contains("--demo") { Self.saveAccounts(accounts, to: defaults) } }
+    }
     /// Whether Dashbar's bridge is in each added Claude account's status line, by folder. The default account's is
     /// `claudeStatusLineStatus`.
     @Published private(set) var accountStatusLines: [String: StatusLineBridge.Status] = [:]
