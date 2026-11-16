@@ -1,0 +1,18 @@
+// Cloudflare deploy for usedashbar.com: the built site (dist/) as Workers static assets.
+// The Worker runs only for "/" (see run_worker_first): it serves the Markdown copy to agents that ask for
+// text/markdown and adds the Link header. Every other path is a plain static file and never runs the Worker,
+// so traffic spikes don't use Worker requests. Deployed by .github/workflows/site.yml.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "usedashbar",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-06-01",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/"],
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "none"
+  }
+}
