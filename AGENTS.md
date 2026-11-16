@@ -94,6 +94,9 @@ the real app's preferences, so reset it afterwards (`defaults write fun.dashbar.
   appears for builds that aren't notarised.
 - `pluginkit -mAvvv -p com.apple.widgetkit-extension | grep -i dashbar -A3` shows which copy is registered. A rebuild in
   `build/` can take the registration from the installed copy: `lsregister -u "build/Dashbar Local.app"` gives it back.
+  Running the `build/` copy (a `--snapshot` render does) registers it again, and chronod then fails every reload with
+  `bundleStubNotSupported … Bundle version did not match` and backs off for an hour. Unregister the `build/` copy,
+  `lsregister -f "/Applications/Dashbar Local.app"`, then restart the app and `pkill -x DashbarWidgets`.
 - The gallery and placed widgets keep the old code and descriptors until the version changes or the extension restarts:
   commit (a local build's CFBundleVersion is the commit count) or `pkill -x DashbarWidgets`, then reopen the gallery.
 - Never touch the App Group container from a shell: macOS protects it (Operation not permitted). Render widgets with
