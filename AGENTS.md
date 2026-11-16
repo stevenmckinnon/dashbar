@@ -12,7 +12,7 @@ the app does; this file is how to work on it.
 |---|---|
 | `Sources/Dashbar/` | The app. The panel UI is split by area: `DashboardView.swift` (root, tab bar, header and bottom bar), `DesignTokens.swift` (`UI` colours and sizes), `Tiles.swift`, `Components.swift` (cards, chips, buttons and other shared building blocks), and one file per tab: `PanelOverview.swift` (Now card, widgets), `PanelPlanStrip.swift` (Overview's plan limits strip and clean-up line), `OverviewRules.swift` (what Overview shows and when, tested), `PanelWorkspaces.swift` (workspace rows, session lines, quick actions), `WorkspaceDetail.swift` (usage tiles, sparkbars, process list), `PanelAgents.swift` (the Usage tab: one card per tool with its plan limits and tokens; its enum case is still `.agents`), `UsageRules.swift` (the order of those cards and when one folds, tested), `PanelServers.swift`, `PanelCleanup.swift`, `PanelSystem.swift`. `Store.swift` the state, `Collectors.swift`, `Usage.swift`, `PlanLimits.swift`, `SystemStats.swift` and `Proc.swift` read data, `Demo.swift` invents data for screenshots, `Snapshot.swift` renders PNGs, `Updater.swift` wraps Sparkle. `AppView.swift` and `AppWindow.swift` are the Dashbar window (sidebar and pages), `WorkspaceUsage.swift` what each workspace's processes use. `Accounts.swift` the extra Claude Code and Codex accounts, `StatusLineBridge.swift` and `PermissionBridge.swift` the opt-in Claude Code settings edits, `History.swift` and `HistoryView.swift` the History page, `Onboarding.swift` the first run, `Pricing.swift` the cost estimate, `Island.swift` (state and placement, tested), `IslandView.swift` and `IslandWindow.swift` the island at the notch |
 | `Sources/DashbarStatus/`, `Sources/dashbar-cli/` | The `dashbar` command-line tool (Foundation only). `DashbarStatus` holds the status file's schema (`StatusSnapshot`), its writer, and the tool's reading and printing (tested); `dashbar-cli` is its `main.swift`. The app's side is `Sources/Dashbar/CLIStatus.swift`, which rebuilds the file from the store when a value it uses changes (at most every 3 s, written only when the content differs), and `CommandLineToolSettings.swift`, the Integrations row. `build.sh` copies the tool to `Contents/Helpers/dashbar` and signs it before the app; the cask's `binary` stanza links it. Add a field to the file only after checking it carries no prompt, title, session id or sign-in, and list it in `CLIStatusTests.allowedKeys` |
-| `Sources/DashbarWidgetUI/`, `Sources/DashbarWidgets/` | The desktop widgets (spike). `DashbarWidgetUI` holds the views and what they show (`WidgetModel`, tested), shared with the app for `--snapshot --widget`; `DashbarWidgets` is the WidgetKit extension's `@main`. `build.sh` bundles it as `Contents/PlugIns/DashbarWidgets.appex` (bundle id `<app id>.widgets`, sandboxed) and signs it before the app. The app's side is `Sources/Dashbar/WidgetBridge.swift`: on each `CLIStatus` rebuild it saves `StatusSnapshot.forWidget()` (limits and agent counts only: no sessions, workspaces, folders or servers) to `Widget/status.json` in the App Group container `<team>.<app id>`, and reloads the widgets at most once a minute. Ad-hoc builds have no team, so no group and no widget data |
+| `Sources/DashbarWidgetUI/`, `Sources/DashbarWidgets/` | The desktop widgets (spike). `DashbarWidgetUI` holds the views and what they show (`WidgetModel`, tested), shared with the app for `--snapshot --widget`; `DashbarWidgets` is the WidgetKit extension's `@main`. `build.sh` bundles it as `Contents/PlugIns/DashbarWidgets.appex` (bundle id `<app id>.widgets`, sandboxed) and signs it before the app. The app's side is `Sources/Dashbar/WidgetBridge.swift`: on each `CLIStatus` rebuild it saves `StatusSnapshot.forWidget()` (limits and agent counts only: no sessions, workspaces, folders or servers) to `Widget/status.json` in the App Group container `<team>.<app id>`, and reloads the widgets at most once a minute. Ad-hoc builds have no team, so no group and no widget data. See "Widgets" below |
 | `Tests/DashbarTests/` | Swift Testing suites that run against throwaway log folders (`Fixtures.swift`) |
 | `build.sh` | Builds the app into `build/`, signs it, embeds Sparkle. A local build is `Dashbar Local.app`; `scripts/release.sh` (via `DASHBAR_HARDENED=1`) makes the real `Dashbar.app`. Flags: `--run`, `--install` |
 | `scripts/release.sh` | Signed, notarised, stapled DMG plus the Sparkle `appcast.xml` entry |
@@ -79,6 +79,24 @@ DASHBAR_STATUS_FILE=out.json "build/Dashbar Local.app/Contents/Helpers/dashbar" 
 Offline snapshots cannot draw native AppKit controls (segmented pickers, the search field): they show as
 yellow "no entry" placeholders. Crop them out or use `--hosted`. A snapshot run also writes `panelTab` into
 the real app's preferences, so reset it afterwards (`defaults write fun.dashbar.app panelTab overview`).
+
+## Widgets
+
+- The extension's executable must be linked with `-e _NSExtensionMain` (Package.swift, `DashbarWidgets` linkerSettings),
+  as Xcode does for app extensions. Without it the `@main` WidgetBundle's own `main` runs, ExtensionFoundation traps in
+  `_EXRunningExtension._shared` on every launch, and chronod logs "query failed - will try lazy reload later": the
+  gallery shows nothing. Running the binary by hand always traps (nothing launched it), so that proves nothing.
+- Crash reports: `~/Library/Logs/DiagnosticReports/DashbarWidgets-*.ips`.
+- chronod (which loads and refreshes widgets) logs through the unified log. Use `/usr/bin/log`, since zsh has a `log`
+  builtin: `/usr/bin/log show --last 5m --info --style compact --predicate 'process == "chronod" AND eventMessage CONTAINS "dashbar"'`.
+  "Updating descriptors" and "query returned 2 widget descriptors" are good; "purging instead because we shouldn't cache it"
+  appears for builds that aren't notarised.
+- `pluginkit -mAvvv -p com.apple.widgetkit-extension | grep -i dashbar -A3` shows which copy is registered. A rebuild in
+  `build/` can take the registration from the installed copy: `lsregister -u "build/Dashbar Local.app"` gives it back.
+- The gallery and placed widgets keep the old code and descriptors until the version changes or the extension restarts:
+  commit (a local build's CFBundleVersion is the commit count) or `pkill -x DashbarWidgets`, then reopen the gallery.
+- Never touch the App Group container from a shell: macOS protects it (Operation not permitted). Render widgets with
+  `--snapshot --demo --widget`, and check the app's writes with the tests.
 
 ## Local builds and the release
 

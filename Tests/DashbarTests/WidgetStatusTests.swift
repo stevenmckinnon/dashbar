@@ -34,6 +34,8 @@ import DashbarStatus
         #expect(counts.total == store.sessions.count)
         #expect(counts == full.agentCounts)
         #expect(counts.working > 0)
+        // Only how many there are and how many work: no count of agents waiting, which throttled refreshes would leave stale.
+        #expect(!text.contains("needsYou") && !text.contains("idle"))
     }
 
     @Test func countsByState() {
@@ -42,7 +44,7 @@ import DashbarStatus
         }
         let s = StatusSnapshot(generatedAt: Date(), app: .init(name: "Dashbar", version: "1", pid: 1),
                                sessions: [session(.working), session(.working), session(.needsYou), session(.permission), session(.idle)])
-        #expect(s.agentCounts == .init(working: 2, needsYou: 2, idle: 1))
+        #expect(s.agentCounts == .init(working: 2, total: 5))
         // The CLI's own file leaves the counts out; only the widget's copy has them.
         #expect(s.agents == nil)
     }
@@ -90,7 +92,7 @@ import DashbarStatus
 
     static let now = Date(timeIntervalSince1970: 2_000_000_000)
 
-    static func snapshot(limits: [StatusSnapshot.LimitGroup], agents: StatusSnapshot.AgentCounts? = .init(working: 1)) -> StatusSnapshot {
+    static func snapshot(limits: [StatusSnapshot.LimitGroup], agents: StatusSnapshot.AgentCounts? = .init(working: 1, total: 2)) -> StatusSnapshot {
         StatusSnapshot(generatedAt: now.addingTimeInterval(-300), app: .init(name: "Dashbar", version: "1", pid: 42),
                        limits: limits, agents: agents)
     }
@@ -159,5 +161,22 @@ import DashbarStatus
         #expect(WidgetModel.resetText(later, now: morning, locale: locale, timeZone: tz) == "14:20")
         let thursday = morning.addingTimeInterval(3 * 86400)
         #expect(WidgetModel.resetText(thursday, now: morning, locale: locale, timeZone: tz).hasPrefix("Thu"))
+    }
+
+    @Test func limitsSharingAWindowAreNamedByTheirGroup() {
+        // Antigravity's weekly limits for two quota groups, as the app flattens them.
+        let gemini = StatusSnapshot.Limit(label: "Gemini · Weekly", window: "Weekly", windowSeconds: 7 * 86400, usedPercent: 3)
+        let others = StatusSnapshot.Limit(label: "Claude and GPT · Weekly", window: "Weekly", windowSeconds: 7 * 86400, usedPercent: 1)
+        #expect(WidgetModel.titles([gemini, others], short: true) == ["Gemini", "Claude and GPT"])
+        #expect(WidgetModel.titles([gemini, others], short: false) == ["Gemini · Weekly", "Claude and GPT · Weekly"])
+        // Different windows keep their short names, even from different groups.
+        let five = StatusSnapshot.Limit(label: "Gemini · 5-hour", window: "5-hour", windowSeconds: 5 * 3600, usedPercent: 3)
+        #expect(WidgetModel.titles([five, others], short: true) == ["5h", "wk"])
+        #expect(WidgetModel.titles([Self.limit("5-hour", 1), Self.limit("Weekly", 2, window: 7 * 86400)], short: false) == ["5-hour", "Weekly"])
+        // Claude's per-model weekly limit is named by its model.
+        let opus = StatusSnapshot.Limit(label: "Weekly · Opus", window: "Weekly", windowSeconds: 7 * 86400, usedPercent: 9)
+        let weekly = StatusSnapshot.Limit(label: "Weekly", window: "Weekly", windowSeconds: 7 * 86400, usedPercent: 9)
+        #expect(WidgetModel.titles([weekly, opus], short: true) == ["Weekly", "Opus"])
+        #expect(WidgetModel.qualifier(weekly) == nil)
     }
 }

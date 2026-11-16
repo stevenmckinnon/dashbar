@@ -32,7 +32,7 @@ struct OverviewWidget: Widget {
             OverviewWidgetView(entry: entry).containerBackground(for: .widget) { Color(nsColor: .windowBackgroundColor) }
         }
         .configurationDisplayName("Plan limits and agents")
-        .description("Each tool's plan limits, and how many agents are working or waiting for you.")
+        .description("Each tool's plan limits, and how many agents are working.")
         .supportedFamilies([.systemMedium])
     }
 }

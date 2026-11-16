@@ -70,6 +70,13 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
 - **Tabs**: Overview · Usage · Servers · System · Clean-up (⌘1–⌘5). Overview puts what needs you first: waiting permission prompts, then the workspace whose agent is waiting, working or went idle in the last 10 minutes, the other workspaces, servers outside them, a strip with each account's tightest plan limit (click it for Usage) and, from 1 GB, a line to Clean-up. Usage has one card per tool, the one closest to running out of plan first: its plan limits with their pace, the period's tokens with the estimated cost, a chart and the in / out / cache split. One Today · 7d · 14d choice at the top drives every card and is kept between launches; with two or more tools in use, a line above the cards adds them up. A tool with no usage in the period and no limits folds to one line.
 - **Menu bar stats** (optional, in Settings): CPU, memory, download speed and, with Claude plan limits on, what's left
   of your Claude 5-hour or weekly limit, beside the icon.
+- **Desktop widgets**: add Dashbar from the widget gallery (right-click the desktop, Edit Widgets). The small widget
+  shows Claude's 5-hour and weekly limits and when they reset; the medium one each tool's limits (Claude, Codex,
+  Antigravity) and how many agents are working. They follow light, dark and tinted widgets. The widget reads a small
+  copy of the status that Dashbar saves in its own App Group container (`~/Library/Group Containers/<team>.fun.dashbar.app`,
+  readable only by you): plan percentages, reset times, plan names and agent counts, no project names, folders or
+  sessions. macOS decides how often widgets refresh, so they can lag a few minutes; when Dashbar isn't running they dim
+  and say since when.
 - **Plan limits**: Codex's 5-hour and weekly limits from its own logs. Claude's come from Claude Code's
   [status line](https://code.claude.com/docs/en/statusline), which Claude Code passes your usage after each
   reply (Pro, Max and Ultra plans). Off until you choose Settings → Integrations → Add to Status Line: Dashbar then

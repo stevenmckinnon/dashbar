@@ -1,6 +1,5 @@
 import Foundation
 import WidgetKit
-import os
 import DashbarStatus
 
 /// Saves the desktop widgets' copy of the status (`StatusSnapshot.forWidget()`: plan limits and agent counts, nothing
@@ -14,8 +13,6 @@ import DashbarStatus
 @MainActor
 final class WidgetBridge {
     static let reloadInterval: TimeInterval = 60
-    /// Says only that it wrote and reloaded, never what: the unified log stays on this Mac, but it needn't hold figures.
-    private static let log = Logger(subsystem: "fun.dashbar.app", category: "widgets")
 
     private let writer: StatusSnapshotWriter
     private let reload: () -> Void
@@ -40,7 +37,6 @@ final class WidgetBridge {
     @discardableResult
     func update(_ snapshot: StatusSnapshot, now: Date = Date()) -> Bool {
         guard writer.write(snapshot.forWidget(), now: now) else { return false }
-        Self.log.info("saved the widgets' status (\(self.writer.writeCount, privacy: .public) so far)")
         requestReload(now: now)
         return true
     }
@@ -49,7 +45,6 @@ final class WidgetBridge {
         let wait = lastReload.addingTimeInterval(Self.reloadInterval).timeIntervalSince(now)
         if wait <= 0 {
             lastReload = now
-            Self.log.info("asked WidgetKit to reload")
             reload()
         } else if !pendingReload {
             pendingReload = true

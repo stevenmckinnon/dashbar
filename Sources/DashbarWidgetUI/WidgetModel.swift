@@ -109,6 +109,28 @@ public struct WidgetModel: Equatable, Sendable {
     /// "5-hour", "Weekly": the window's name when known, else the app's label.
     public static func title(_ limit: StatusSnapshot.Limit) -> String { limit.window ?? limit.label }
 
+    /// What a limit's name says besides its window: its quota group ("Gemini" in "Gemini · Weekly", Antigravity's
+    /// grouped limits as the app names them) or its model ("Opus" in Claude's "Weekly · Opus"). Nil when there is none.
+    public static func qualifier(_ limit: StatusSnapshot.Limit) -> String? {
+        let parts = limit.label.components(separatedBy: " · ")
+        guard parts.count > 1 else { return nil }
+        let rest = parts.filter { $0 != limit.window }
+        return rest.count < parts.count && !rest.isEmpty ? rest.joined(separator: " · ") : nil
+    }
+
+    /// The names a row prints for its limits, one each, so no two read the same. Each is its window's name (`short`:
+    /// "5h", "wk", as `dashbar line` prints it; else "5-hour", "Weekly"); where two would share one, as Antigravity's
+    /// weekly limits for two quota groups do, each is named by what else its label says instead: the medium widget
+    /// prints the group ("Gemini", "Claude and GPT") and keeps the reset time beside it, the small one the whole label.
+    public static func titles(_ limits: [StatusSnapshot.Limit], short: Bool) -> [String] {
+        let base = limits.map { short ? StatusFormat.shortWindow($0) : title($0) }
+        return limits.indices.map { i in
+            guard base.filter({ $0 == base[i] }).count > 1 else { return base[i] }
+            if short, let q = qualifier(limits[i]) { return q }
+            return limits[i].label
+        }
+    }
+
     /// "55%", rounded as the panel rounds it.
     public static func percent(_ limit: StatusSnapshot.Limit) -> String { "\(Int(min(max(limit.usedPercent, 0), 999).rounded()))%" }
 

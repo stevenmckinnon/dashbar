@@ -3,7 +3,8 @@ import Foundation
 /// What the desktop widgets read: the command-line tool's `StatusSnapshot` with everything that names a project left
 /// out. No sessions (so no workspaces, folders or session states one by one), no servers, no token counts; only the app's
 /// name, version and pid, the plan limits (percentages, reset times, plan names, account labels) and how many agents
-/// are working, waiting for you or idle.
+/// there are and how many of them are working. (Not how many wait for you: WidgetKit throttles refreshes, so that count
+/// would be stale when it matters most. The island and notifications carry it.)
 ///
 /// The widget runs in a sandbox and can't read the app's caches, so the app saves this copy in its App Group container
 /// (`~/Library/Group Containers/<team>.fun.dashbar.app[.local]/Widget/status.json`). The release and a local build
@@ -36,31 +37,21 @@ public enum WidgetStatus {
 }
 
 extension StatusSnapshot {
-    /// How many agents are in each state, for the widget (which never sees the sessions themselves).
+    /// How many agents there are and how many are working, for the widget (which never sees the sessions themselves).
     public struct AgentCounts: Codable, Equatable, Sendable {
         public var working: Int
-        /// Stopped for an answer or at a permission prompt.
-        public var needsYou: Int
-        public var idle: Int
+        /// Every agent session, working or not.
+        public var total: Int
 
-        public init(working: Int = 0, needsYou: Int = 0, idle: Int = 0) {
+        public init(working: Int = 0, total: Int = 0) {
             self.working = working
-            self.needsYou = needsYou
-            self.idle = idle
+            self.total = total
         }
-
-        public var total: Int { working + needsYou + idle }
     }
 
-    /// The counts of `sessions`, by state.
+    /// The counts of `sessions`.
     public var agentCounts: AgentCounts {
-        sessions.reduce(into: AgentCounts()) { c, s in
-            switch s.state {
-            case .working: c.working += 1
-            case .idle: c.idle += 1
-            case .needsYou, .permission: c.needsYou += 1
-            }
-        }
+        AgentCounts(working: sessions.filter { $0.state == .working }.count, total: sessions.count)
     }
 
     /// The copy the widget reads: sessions folded into `agents`, servers and token counts left out.

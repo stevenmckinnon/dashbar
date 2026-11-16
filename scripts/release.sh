@@ -57,6 +57,15 @@ lipo -archs "$APP/Contents/MacOS/Dashbar"
 CLI="$APP/Contents/Helpers/dashbar"
 [[ "$(lipo -archs "$CLI")" == *arm64* && "$(lipo -archs "$CLI")" == *x86_64* ]] || { echo "dashbar isn't universal" >&2; exit 1; }
 [[ "$(codesign -dv "$CLI" 2>&1)" == *"(runtime)"* ]] || { echo "Hardened runtime is missing from dashbar" >&2; exit 1; }
+# The widget extension: hardened, and sandboxed (WidgetKit won't load it otherwise) with the app's App Group.
+APPEX="$APP/Contents/PlugIns/DashbarWidgets.appex"
+[[ -d "$APPEX" ]] || { echo "The widget extension is missing: $APPEX" >&2; exit 1; }
+[[ "$(codesign -dv "$APPEX" 2>&1)" == *"(runtime)"* ]] || { echo "Hardened runtime is missing from the widget extension" >&2; exit 1; }
+APPEX_ENTITLEMENTS=$(codesign -d --entitlements - --xml "$APPEX" 2>/dev/null | plutil -convert json -o - - 2>/dev/null || true)
+[[ "$APPEX_ENTITLEMENTS" == *'"com.apple.security.app-sandbox":true'* ]] \
+  || { echo "The widget extension isn't sandboxed (com.apple.security.app-sandbox)" >&2; exit 1; }
+[[ "$APPEX_ENTITLEMENTS" == *'"com.apple.security.application-groups":["'*'.fun.dashbar.app"]'* ]] \
+  || { echo "The widget extension lacks the <team>.fun.dashbar.app App Group" >&2; exit 1; }
 "$CLI" --version
 
 DMG="build/Dashbar-$VERSION.dmg"

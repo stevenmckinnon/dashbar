@@ -150,8 +150,10 @@ public struct LimitsWidgetView: View {
             } else if let row, let problem = row.problem {
                 NoDataView(text: problem)
             } else if let row, !row.limits.isEmpty {
-                ForEach(Array(row.limits.prefix(2).enumerated()), id: \.offset) { _, limit in
-                    LimitBlock(limit: limit, provider: "claude", now: entry.date)
+                let shown = Array(row.limits.prefix(2))
+                let titles = WidgetModel.titles(shown, short: false)
+                ForEach(Array(shown.enumerated()), id: \.offset) { i, limit in
+                    LimitBlock(limit: limit, title: titles[i], provider: "claude", now: entry.date)
                 }
             } else {
                 NoDataView(text: "No Claude plan limits. Dashbar shows them once they're set up in its Settings.")
@@ -171,6 +173,7 @@ public struct LimitsWidgetView: View {
 /// One limit in the small widget: its window and figure, the meter, and when it resets.
 struct LimitBlock: View {
     let limit: StatusSnapshot.Limit
+    let title: String
     let provider: String
     let now: Date
     @Environment(\.colorScheme) private var scheme
@@ -180,7 +183,7 @@ struct LimitBlock: View {
         let reset = limit.hasReset(now: now)
         VStack(alignment: .leading, spacing: 3) {
             HStack(alignment: .firstTextBaseline) {
-                Text(WidgetModel.title(limit)).font(.system(size: WidgetType.caption, weight: .medium))
+                Text(title).font(.system(size: WidgetType.caption, weight: .medium)).lineLimit(1)
                 Spacer(minLength: 4)
                 Text(reset ? "–" : WidgetModel.percent(limit))
                     .font(.system(size: WidgetType.figure, weight: .semibold).monospacedDigit())
@@ -196,13 +199,13 @@ struct LimitBlock: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(WidgetModel.title(limit)) limit, " + (reset ? "reset since the last reading" : "\(WidgetModel.percent(limit)) used"))
+        .accessibilityLabel("\(limit.label) limit, " + (reset ? "reset since the last reading" : "\(WidgetModel.percent(limit)) used"))
     }
 }
 
 // MARK: - Medium: every tool's limits and the agents
 
-/// Plan limits for each tool that reports them, and how many agents are working or waiting for you.
+/// Plan limits for each tool that reports them, and how many agents are working.
 public struct OverviewWidgetView: View {
     let entry: DashbarWidgetEntry
     @Environment(\.colorScheme) private var scheme
@@ -225,15 +228,21 @@ public struct OverviewWidgetView: View {
             } else if model.rows.isEmpty {
                 NoDataView(text: "No plan limits from Claude Code, Codex or Antigravity yet.")
             } else {
-                ForEach(model.rows.prefix(Self.maxRows)) { row in
-                    OverviewRow(row: row, now: entry.date)
+                // The rows share the height below the header equally, each centred in its band, so one, two or three
+                // tools fill the widget the same way (three sit as close as they did when stacked from the top).
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(model.rows.prefix(Self.maxRows)) { row in
+                        OverviewRow(row: row, now: entry.date)
+                            .frame(maxHeight: .infinity)
+                    }
                 }
+                .frame(maxHeight: .infinity)
                 if model.rows.count > Self.maxRows {
                     Text("\(model.rows.count - Self.maxRows) more in Dashbar")
                         .font(.system(size: WidgetType.micro)).foregroundStyle(.secondary)
                 }
             }
-            Spacer(minLength: 0)
+            if model.availability == .noData || model.rows.isEmpty { Spacer(minLength: 0) }
             StatusFooter(model: model, now: entry.date)
         }
         .opacity(LimitsWidgetView.dimmed(model) ? 0.6 : 1)
@@ -246,13 +255,12 @@ struct AgentCountsView: View {
 
     var body: some View {
         let palette = WidgetPalette(scheme)
-        HStack(spacing: 10) {
-            if agents.working == 0 && agents.needsYou == 0 {
-                Text(agents.idle > 0 ? "No agents working" : "No agents")
+        Group {
+            if agents.working == 0 {
+                Text(agents.total > 0 ? "No agents working" : "No agents")
                     .font(.system(size: WidgetType.caption)).foregroundStyle(.secondary)
             } else {
-                if agents.working > 0 { count(agents.working, "working", palette.working) }
-                if agents.needsYou > 0 { count(agents.needsYou, agents.needsYou == 1 ? "needs you" : "need you", palette.attention) }
+                count(agents.working, "working", palette.working)
             }
         }
         .lineLimit(1)
@@ -285,8 +293,9 @@ struct OverviewRow: View {
                 Text("No limits reported").font(.system(size: WidgetType.micro)).foregroundStyle(.secondary)
                 Spacer(minLength: 0)
             } else {
-                ForEach(Array(row.limits.enumerated()), id: \.offset) { _, limit in
-                    CompactLimit(limit: limit, provider: row.provider, now: now)
+                let titles = WidgetModel.titles(row.limits, short: true)
+                ForEach(Array(row.limits.enumerated()), id: \.offset) { i, limit in
+                    CompactLimit(limit: limit, title: titles[i], provider: row.provider, now: now)
                 }
                 if row.limits.count == 1 { Spacer(minLength: 0).frame(maxWidth: .infinity) }
             }
@@ -294,9 +303,11 @@ struct OverviewRow: View {
     }
 }
 
-/// A limit in the medium widget: "5h 14:20  55%" over its meter (the short window name `dashbar line` prints).
+/// A limit in the medium widget: "5h 14:20  55%" over its meter, or "Gemini Sat 23:24  61%" where the window alone
+/// wouldn't tell two limits apart (`WidgetModel.titles`).
 struct CompactLimit: View {
     let limit: StatusSnapshot.Limit
+    let title: String
     let provider: String
     let now: Date
     @Environment(\.colorScheme) private var scheme
@@ -306,10 +317,11 @@ struct CompactLimit: View {
         let reset = limit.hasReset(now: now)
         VStack(alignment: .leading, spacing: 3) {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(StatusFormat.shortWindow(limit)).font(.system(size: WidgetType.micro, weight: .medium)).lineLimit(1)
+                Text(title).font(.system(size: WidgetType.micro, weight: .medium)).lineLimit(1)
+                    .truncationMode(.tail).layoutPriority(-1)
                 if let r = limit.resetsAt {
                     Text(WidgetModel.resetText(r, now: now)).font(.system(size: WidgetType.micro)).foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .lineLimit(1).fixedSize()
                 }
                 Spacer(minLength: 2)
                 Text(reset ? "–" : WidgetModel.percent(limit))
@@ -321,7 +333,7 @@ struct CompactLimit: View {
         }
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(WidgetModel.title(limit)) limit, " + (reset ? "reset since the last reading" : "\(WidgetModel.percent(limit)) used"))
+        .accessibilityLabel("\(limit.label) limit, " + (reset ? "reset since the last reading" : "\(WidgetModel.percent(limit)) used"))
     }
 }
 
