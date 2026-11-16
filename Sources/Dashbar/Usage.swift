@@ -295,7 +295,9 @@ struct JSONLTail {
         needles.contains { line.range(of: $0) != nil }
     }
 
-    private func read(_ url: URL, from start: UInt64, _ handle: ([String: Any]?) -> Void) -> UInt64 {
+    /// Reads complete new lines from `start`, calling `handle` for each that contains a needle; returns the offset after the
+    /// last complete line. Also used on its own for single files (`CopilotUsageScanner`).
+    func read(_ url: URL, from start: UInt64, _ handle: ([String: Any]?) -> Void) -> UInt64 {
         guard let h = try? FileHandle(forReadingFrom: url) else { return start }
         defer { try? h.close() }
         var offset = start

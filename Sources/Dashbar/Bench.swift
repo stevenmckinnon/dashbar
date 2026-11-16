@@ -82,6 +82,12 @@ enum Bench {
         let ocLive = time("OpenCode sessions", runs: 5) { openCode.read() }
         print("  found \(oc.found), today \(Fmt.tokens(oc.today.total)) tokens, format \(oc.warning == nil ? "reads" : "WARNING"), "
               + "\(ocLive.count) live (\(ocLive.filter(\.isBusy).count) working)")
+        let copilotUsage = CopilotUsageScanner()   // no cache: a bench run never writes the app's progress
+        let cp = time("Copilot CLI usage (first)") { copilotUsage.scan() }
+        let copilot = CopilotCollector()
+        let cpLive = time("Copilot CLI sessions", runs: 5) { copilot.read() }
+        print("  found \(cp.summary.found), today \(Fmt.tokens(cp.summary.today.total)) tokens, \(cp.unknownSessions) unknown, "
+              + "format \(cp.summary.warning == nil ? "reads" : "WARNING"), \(cpLive.count) live (\(cpLive.filter(\.isBusy).count) working)")
         // One frame of the menu bar's working animation: the status, its image, and drawing it at 2x as the menu bar does.
         let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 120, pixelsHigh: 36, bitsPerSample: 8, samplesPerPixel: 4,
                                    hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!

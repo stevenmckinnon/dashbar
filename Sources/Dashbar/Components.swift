@@ -114,11 +114,11 @@ struct Card<Content: View>: View {
 }
 
 /// The symbol leading a card's title. Plain, in secondary ink; only the agents' own symbols (Claude's asterisk, Codex's
-/// brackets, Google's sparkle, opencode's square) keep their colour, because there it names the agent.
+/// brackets, Google's sparkle, opencode's square, Copilot's goggles) keep their colour, because there it names the agent.
 struct IconChip: View {
     let symbol: String
     let tint: Color
-    private var namesAnAgent: Bool { symbol == "asterisk" || symbol.hasPrefix("chevron.left.forwardslash") || symbol == UI.googleSymbol || symbol == UI.openCodeSymbol }
+    private var namesAnAgent: Bool { symbol == "asterisk" || symbol.hasPrefix("chevron.left.forwardslash") || symbol == UI.googleSymbol || symbol == UI.openCodeSymbol || symbol == UI.copilotSymbol }
     var body: some View {
         Image(systemName: symbol)
             .font(.system(size: UI.Size.body, weight: .semibold))

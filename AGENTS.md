@@ -10,7 +10,7 @@ the app does; this file is how to work on it.
 
 | Path | What it is |
 |---|---|
-| `Sources/Dashbar/` | The app. The panel UI is split by area: `DashboardView.swift` (root, tab bar, header and bottom bar), `DesignTokens.swift` (`UI` colours and sizes), `Tiles.swift`, `Components.swift` (cards, chips, buttons and other shared building blocks), and one file per tab: `PanelOverview.swift` (Now card, widgets), `PanelPlanStrip.swift` (Overview's plan limits strip and clean-up line), `OverviewRules.swift` (what Overview shows and when, tested), `PanelWorkspaces.swift` (workspace rows, session lines, quick actions), `WorkspaceDetail.swift` (usage tiles, sparkbars, process list), `PanelAgents.swift` (the Usage tab: one card per tool with its plan limits and tokens; its enum case is still `.agents`), `UsageRules.swift` (the order of those cards and when one folds, tested), `PanelServers.swift`, `PanelCleanup.swift`, `PanelSystem.swift`. `Store.swift` the state, `Collectors.swift`, `Usage.swift`, `PlanLimits.swift`, `SystemStats.swift` and `Proc.swift` read data, `Demo.swift` invents data for screenshots, `Snapshot.swift` renders PNGs, `Updater.swift` wraps Sparkle. `AppView.swift` and `AppWindow.swift` are the Dashbar window (sidebar and pages), `WorkspaceUsage.swift` what each workspace's processes use. `Accounts.swift` the extra Claude Code and Codex accounts, `StatusLineBridge.swift` and `PermissionBridge.swift` the opt-in Claude Code settings edits, `History.swift` and `HistoryView.swift` the History page, `Onboarding.swift` the first run, `Pricing.swift` the cost estimate, `Island.swift` (state and placement, tested), `IslandView.swift` and `IslandWindow.swift` the island at the notch. `OpenCode.swift` reads OpenCode's database (sessions, usage, live state, `UI.neutralTool`), `OpenCodeBridge.swift` is its opt-in plugin and Settings row, `DemoOpenCode.swift` its demo data |
+| `Sources/Dashbar/` | The app. The panel UI is split by area: `DashboardView.swift` (root, tab bar, header and bottom bar), `DesignTokens.swift` (`UI` colours and sizes), `Tiles.swift`, `Components.swift` (cards, chips, buttons and other shared building blocks), and one file per tab: `PanelOverview.swift` (Now card, widgets), `PanelPlanStrip.swift` (Overview's plan limits strip and clean-up line), `OverviewRules.swift` (what Overview shows and when, tested), `PanelWorkspaces.swift` (workspace rows, session lines, quick actions), `WorkspaceDetail.swift` (usage tiles, sparkbars, process list), `PanelAgents.swift` (the Usage tab: one card per tool with its plan limits and tokens; its enum case is still `.agents`), `UsageRules.swift` (the order of those cards and when one folds, tested), `PanelServers.swift`, `PanelCleanup.swift`, `PanelSystem.swift`. `Store.swift` the state, `Collectors.swift`, `Usage.swift`, `PlanLimits.swift`, `SystemStats.swift` and `Proc.swift` read data, `Demo.swift` invents data for screenshots, `Snapshot.swift` renders PNGs, `Updater.swift` wraps Sparkle. `AppView.swift` and `AppWindow.swift` are the Dashbar window (sidebar and pages), `WorkspaceUsage.swift` what each workspace's processes use. `Accounts.swift` the extra Claude Code and Codex accounts, `StatusLineBridge.swift` and `PermissionBridge.swift` the opt-in Claude Code settings edits, `History.swift` and `HistoryView.swift` the History page, `Onboarding.swift` the first run, `Pricing.swift` the cost estimate, `Island.swift` (state and placement, tested), `IslandView.swift` and `IslandWindow.swift` the island at the notch. `OpenCode.swift` reads OpenCode's database (sessions, usage, live state, `UI.neutralTool`), `OpenCodeBridge.swift` is its opt-in plugin and Settings row, `DemoOpenCode.swift` its demo data. `CopilotCLI.swift` reads GitHub Copilot CLI's session folders (live state, usage from shutdown records), `CopilotBridge.swift` is its opt-in hook and Settings section, `DemoCopilot.swift` its demo data. `ToolVisibility.swift` is the "Show in Dashbar" switch per tool (hidden set, applying it to readings, `ToolPresence`, the toggle row) |
 | `Sources/DashbarStatus/`, `Sources/dashbar-cli/` | The `dashbar` command-line tool (Foundation only). `DashbarStatus` holds the status file's schema (`StatusSnapshot`), its writer, and the tool's reading and printing (tested); `dashbar-cli` is its `main.swift`. The app's side is `Sources/Dashbar/CLIStatus.swift`, which rebuilds the file from the store when a value it uses changes (at most every 3 s, written only when the content differs), and `CommandLineToolSettings.swift`, the Integrations row. `build.sh` copies the tool to `Contents/Helpers/dashbar` and signs it before the app; the cask's `binary` stanza links it. Add a field to the file only after checking it carries no prompt, title, session id or sign-in, and list it in `CLIStatusTests.allowedKeys` |
 | `Sources/DashbarWidgetUI/`, `Sources/DashbarWidgets/` | The desktop widgets (spike). `DashbarWidgetUI` holds the views and what they show (`WidgetModel`, tested), shared with the app for `--snapshot --widget`; `DashbarWidgets` is the WidgetKit extension's `@main`. `build.sh` bundles it as `Contents/PlugIns/DashbarWidgets.appex` (bundle id `<app id>.widgets`, sandboxed) and signs it before the app. The app's side is `Sources/Dashbar/WidgetBridge.swift`: on each `CLIStatus` rebuild it saves `StatusSnapshot.forWidget()` (limits and agent counts only: no sessions, workspaces, folders or servers) to `Widget/status.json` in the App Group container `<team>.<app id>`, and reloads the widgets at most once a minute. Ad-hoc builds have no team, so no group and no widget data. See "Widgets" below |
 | `Tests/DashbarTests/` | Swift Testing suites that run against throwaway log folders (`Fixtures.swift`) |
@@ -51,6 +51,8 @@ DASHBAR_DEMO_IDLE=1 DASHBAR_TAB=agents Dashbar --snapshot out.png --demo --hoste
 DASHBAR_DEMO_LOOSE_SERVER=1 Dashbar --snapshot out.png --demo  # adds a dev server outside every workspace (Overview's Servers card)
 DASHBAR_DEMO_NO_LIMITS=1 Dashbar --snapshot out.png --demo # no plan limits from any tool (no strip on Overview)
 DASHBAR_DEMO_OPENCODE=1 Dashbar --snapshot out.png --demo  # adds a working OpenCode session and its Usage card (=waiting: it needs you); also shows its Integrations row
+DASHBAR_DEMO_COPILOT=1 Dashbar --snapshot out.png --demo   # adds a working GitHub Copilot CLI session and its Usage card (=waiting: asking permission); also shows its Integrations section
+DASHBAR_DEMO_HIDDEN=copilot,codex Dashbar --snapshot out.png --demo  # those tools switched off (codex, google, opencode, copilot), in memory only
 Dashbar --snapshot out.png --demo --widget small|medium [--dark]   # one widget, transparent around it; docs/images/widget-*.png (the README's, and the reference for the site's HTML widgets) use DASHBAR_SNAPSHOT_SCALE=4 DASHBAR_DEMO_GOOGLE=1, from a copy outside build/ with PlugIns removed (see Widgets). (DASHBAR_WIDGET_STATE=nodata|notrunning,
                                                     # DASHBAR_WIDGET_TOOLS=1 for fewer rows, DASHBAR_DEMO_GOOGLE=weekly for two Antigravity groups)
 Dashbar --snapshot out.png --demo --menubar all     # the menu bar item: idle|working|needsyou|done|time|all, on light (--dark) bars
@@ -181,6 +183,33 @@ images stay clean.
   inside `try`, so it can't break OpenCode. Its state machine runs in tests in JavaScriptCore, on sample events carrying
   private text; the installer runs in temp folders only. Colour: neutral grey (`UI.neutralTool`), no new hue. No plan
   limits, so no strip. Everything OpenCode stays hidden without its database or process.
+- GitHub Copilot CLI (`CopilotCLI.swift`, `CopilotBridge.swift`; "GitHub Copilot CLI" in headings, "Copilot" in compact
+  session lines, `copilot` for the status file's tool id and identifiers). Its folder is `$COPILOT_HOME` else `~/.copilot`.
+  From `session-state/<id>/` Dashbar reads only: folder names, file dates and sizes, `inuse.<pid>.lock` names, the top-level
+  `cwd:` and `client_name:` lines of `workspace.yaml` (never `summary` or `name`), each event's `type` in the last 64 KB of
+  `events.jsonl` (for working, waiting or idle), and from `session.shutdown` lines only `modelMetrics` (requests and token
+  counts per model), `totalPremiumRequests` and `currentModel`, found by a byte match before any parsing. Never message
+  text, prompts, tool arguments or results, `codeChanges` file paths or any sign-in. Shutdown totals are cumulative across
+  resumes, so only their growth is booked. Sessions from other hosts in the same store (`vscode-agent-host`,
+  `github/autopilot`) are skipped. A session with metadata but no `events.jsonl` is "usage unknown", never zero; an empty
+  scaffold folder is ignored; unreadable shutdown records show a format warning. No cost (plan-billed) and no plan limits:
+  premium-request quotas need GitHub's API, and Dashbar adds no network calls. The hook is `dashbar.json` in
+  `~/.copilot/hooks/` (Dashbar's own file, never anyone else's): added only on Add; Remove deletes it only if every
+  command in it is Dashbar's, and a foreign or invalid `dashbar.json` is left alone. It uses only `sessionStart`,
+  `userPromptSubmitted`, `postToolUse`, `notification` (`permission_prompt`, `elicitation_dialog`), `agentStop` and
+  `sessionEnd` (never `preToolUse` or `permissionRequest`, where a hook's output or failure decides something). Its script
+  writes exactly `sessionId`, `cwd`, `state` (working, idle, needsYou, ended) and `timestamp` to
+  `~/Library/Caches/Dashbar/copilot-sessions/` (folder 0700, files 0600), never reads `prompt`, `initialPrompt`, `toolArgs`,
+  `toolResult`, `transcriptPath` or a notification's `message`, prints nothing and always exits 0. Tests run it only in temp
+  folders with sample stdin carrying private text, and run the reader on fixture folders; never the real `~/.copilot`.
+  Colour: neutral grey (`UI.neutralTool`; `UI.copilotHistory`, a lighter grey, where it stacks beside OpenCode).
+- "Show in Dashbar" (`ToolVisibility.swift`): every tool but Claude Code has a switch, first in its Integrations section
+  (Google's three tools share one). Off is saved as `hiddenTools` in UserDefaults (never from a `--demo` run, which uses
+  `DASHBAR_DEMO_HIDDEN` in memory). Off means its collectors are not called (`Worker.otherSessions`, `scanUsage`), its paths
+  aren't watched, and `LiveResult.hiding` / `UsageResult.hiding` / `Store.applyVisibility` drop anything it had, so it is
+  gone from workspaces, Usage, History (Codex's and Antigravity's plan cards too), limits and alerts, notifications, the
+  island, the menu bar, widgets and the status file. Plugins, hooks and status lines stay installed. Codex hidden also
+  drops its Overview limits strip row and "other AI tools" chip.
 - Clean-up only moves rebuildable folders (`node_modules`, `.next`, build output, DerivedData) to the Trash
   after confirmation. Never delete permanently.
 - Do not scan outside the user's chosen folders and the project's own folder for icons.
@@ -196,7 +225,7 @@ images stay clean.
 **Design (app and site)**
 - Colour carries meaning. Green means a working agent, amber means something needs your attention soon (an agent
   waiting for you, a limit on course to run out; `UI.attention`), orange is Claude, teal is Codex, red is a problem
-  (an error, a limit used up). Indigo is Google's agents (Gemini CLI, Antigravity), `UI.google`. OpenCode, and any later tool, is neutral grey (`UI.neutralTool`).
+  (an error, a limit used up). Indigo is Google's agents (Gemini CLI, Antigravity), `UI.google`. OpenCode, GitHub Copilot CLI and any later tool are neutral grey (`UI.neutralTool`).
   Do not add decorative tints, gradients or coloured icon tiles. Workspace tiles show the project's own icon
   or a neutral monogram.
 - Demo and screenshot data is invented (`Demo.swift`). Never put a real project name, path or token in

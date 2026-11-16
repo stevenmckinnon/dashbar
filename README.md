@@ -62,6 +62,21 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
   OpenCode → Add to OpenCode puts one plugin file, `dashbar.js`, in `~/.config/opencode/plugins/`; it saves only each
   session's id, folder, state and time to `~/Library/Caches/Dashbar/opencode-sessions/`, never answers a prompt, and
   Remove deletes it.
+- **GitHub Copilot CLI** (shown only if you use it): [Copilot CLI](https://github.com/github/copilot-cli) sessions as
+  agents in their workspaces, working, idle or asking permission, while a `copilot` process runs, and a Usage card with
+  its tokens, models and premium requests. Copilot writes token counts only when a session ends, so the card is updated
+  then; it shows no cost (Copilot is billed by your plan) and no plan limits (those are only on GitHub, which Dashbar never
+  asks). Read from `~/.copilot/session-state/` (`$COPILOT_HOME` if set): the folder and host from each session's
+  `workspace.yaml`, each event's type near the end of `events.jsonl`, and only the metric fields of its `session.shutdown`
+  records; never prompts, replies, tool input or results, or session titles. A session with no event log is shown as
+  usage unknown, never zero. To see a session that needs you the moment it asks, Settings → Integrations → GitHub Copilot
+  CLI → Add to Copilot puts one file, `dashbar.json`, in `~/.copilot/hooks/`, using Copilot's own hooks; its script saves
+  only each session's id, folder, state and time to `~/Library/Caches/Dashbar/copilot-sessions/`, never answers a
+  permission, and Remove deletes it.
+- **Show in Dashbar, per tool**: each tool other than Claude Code has a Show in Dashbar switch at the top of its section in
+  Settings → Integrations (Gemini CLI and Antigravity share one). Off hides it everywhere (workspaces, Usage, History,
+  limits, notifications, the island, the menu bar, widgets and the `dashbar` command) and stops Dashbar reading its files
+  at all; anything you added to it stays installed, and switching it back on brings everything back.
 - **More than one account**: if you run Claude Code with [`CLAUDE_CONFIG_DIR`](https://code.claude.com/docs/en/authentication#log-in-with-multiple-accounts) (say `~/.claude-work` beside `~/.claude`) or Codex with `CODEX_HOME`, add each folder in Settings → Accounts (Dashbar suggests `~/.claude-*` and `~/.codex-*` folders with logs, looking only at the top of your home folder). It reads every account's sessions and usage, names them by account (only once there's more than one), and shows each Claude account's plan limits from its own status line, saved to `~/Library/Caches/Dashbar/claude-statusline-<id>.json`.
 - **Estimated cost**: what the period's tokens would cost at public API list prices, per model and project, worked out on your Mac from the token counts (a guide for subscribers, not a bill; models without a known price are named, never counted as $0). Settings → General can hide it.
 - **History**: a page in the Dashbar window (or click a card's header on the Usage tab) with each 5-hour and weekly plan window's peak over the last 30 days (how often you hit the limit; with more than one account, one card per account), the current window against an even pace, and 30 days of tokens and estimated cost per day by agent, project and model. Plan readings are kept for 90 days in `~/Library/Application Support/Dashbar/plan-history.json` (usually tens of KB; each extra account beside it as `plan-history-<id>.json`); usage comes from the scan Dashbar already does.
@@ -247,7 +262,8 @@ folders. Claude plan limits come from Claude Code's status line: with your conse
 setting so a local script saves your usage percentages to a file, and it sends nothing. The Antigravity CLI's
 bridge works the same way and picks its fields one by one, so your email, conversation titles and transcript
 paths in that status line's input are never saved. The Antigravity app's database is only ever opened read-only. So is
-OpenCode's; its optional plugin saves only each session's state and folder. The only network
+OpenCode's; its optional plugin saves only each session's state and folder. Copilot CLI's logs are read, never written,
+and its optional hook saves only each session's state and folder. The only network
 requests are update checks and the optional experimental plan-limits setting, which sends Claude Code's own
 sign-in to Anthropic's usage endpoint, the same call Claude Code makes.
 

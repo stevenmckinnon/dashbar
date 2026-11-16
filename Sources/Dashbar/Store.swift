@@ -20,6 +20,9 @@ final class Store: ObservableObject {
     @Published var googleWarning: String?
     /// opencode's usage from its session database (`OpenCode.swift`). Not found for someone who doesn't use it.
     @Published var opencode = UsageSummary.empty
+    /// GitHub Copilot CLI's usage from its session logs' shutdown records (`CopilotCLI.swift`), with premium requests.
+    /// Not found for someone who doesn't use it.
+    @Published var copilot = CopilotUsage.empty
     /// Each account's usage, only while more than one Claude Code (or Codex) account is read; empty otherwise, so a
     /// single account looks exactly as before.
     @Published var claudeAccountUsage: [AccountUsage] = []
@@ -142,7 +145,11 @@ final class Store: ObservableObject {
     /// A log or session format Dashbar can no longer read. Shown instead of quietly reporting nothing.
     var formatWarning: String? {
         claude.warning ?? codex.warning ?? sessionsWarning ?? subagentsWarning ?? google.warning ?? googleWarning ?? opencode.warning
+            ?? copilot.summary.warning
     }
+
+    /// Which tools show (Settings → Integrations → Show in Dashbar). Hidden tools' readings never reach the store.
+    var visibility: ToolVisibility { settings.visibility }
 
     func subagents(for session: LiveSession) -> [Subagent] { subagents[session.id] ?? [] }
 
@@ -216,6 +223,7 @@ final class Store: ObservableObject {
         if demo {
             isDemo = true
             DemoData.apply(to: self)
+            applyVisibility(settings.visibility)   // `DASHBAR_DEMO_HIDDEN`, in memory only
             return
         }
         notifier.setup()
@@ -229,6 +237,7 @@ final class Store: ObservableObject {
             AppWindow.shared.show(store: self, page: .tab(.agents))   // the plan limits live there
         }
         worker.start(live: { [weak self] in self?.apply($0) }, usage: { [weak self] in self?.apply($0) })
+        worker.setVisibility(settings.visibility)
         followAccounts()
         refresh(usage: true, servers: true, panel: true)
         scanCleanup()
@@ -287,6 +296,12 @@ final class Store: ObservableObject {
         settings.refreshClaudeStatusLine()
         AntigravitySettings.shared.refresh()
         OpenCodeSettings.shared.refresh()
+        CopilotSettings.shared.refresh()
+        // A tool switched off stops at once (its collectors skip, what it showed goes); switched on, the next refresh
+        // brings everything back. The new value is passed in: `@Published` sends before the property changes.
+        settings.$visibility.dropFirst().removeDuplicates()
+            .sink { [weak self] v in self?.setVisibility(v) }
+            .store(in: &subscriptions)
         settings.$claudeLimits.removeDuplicates()
             .sink { [weak self] on in Task { @MainActor in self?.plan.setEndpointEnabled(on) } }
             .store(in: &subscriptions)
@@ -318,18 +333,57 @@ final class Store: ObservableObject {
         plan.accounts = claude
         worker.setAccounts(claude: claude, codex: codex)
         update(\.claudeDefaultLabel, claude.count > 1 ? claude.first?.label : nil)
-        // Agent logs and session files change as agents work: react to that instead of polling.
-        let paths = claude.flatMap { [$0.projectsDir.path, $0.sessionsDir.path] } + codex.map(\.sessionsDir.path)
-            + [GeminiUsageScanner.defaultRoot.path, AntigravityStatusLine.sessionsDir.path,
-               OpenCodeBridge.statesDir.path]   // skipped while missing
-        if paths != watchedPaths {   // renaming an account changes nothing on disk
-            watchedPaths = paths
-            watcher = FileWatcher(paths: paths, latency: 1.5, queue: .main) { [weak self] in
-                Task { @MainActor in self?.filesChanged() }
-            }
-        }
+        watchFiles()
         refreshAccountLimits()
         return true
+    }
+
+    /// Agent logs and session files change as agents work: react to that instead of polling. A tool switched off isn't
+    /// watched, so its writes cost nothing.
+    private func watchFiles() {
+        let v = settings.visibility
+        var paths = claudeAccounts.flatMap { [$0.projectsDir.path, $0.sessionsDir.path] }
+        if v.shows(.codex) { paths += codexAccounts.map(\.sessionsDir.path) }
+        // Each skipped while missing.
+        if v.shows(.google) { paths += [GeminiUsageScanner.defaultRoot.path, AntigravityStatusLine.sessionsDir.path] }
+        if v.shows(.opencode) { paths.append(OpenCodeBridge.statesDir.path) }
+        if v.shows(.copilot) { paths += [CopilotCLI.sessionStateURL().path, CopilotBridge.statesDir.path] }
+        guard paths != watchedPaths else { return }   // renaming an account changes nothing on disk
+        watchedPaths = paths
+        watcher = FileWatcher(paths: paths, latency: 1.5, queue: .main) { [weak self] in
+            Task { @MainActor in self?.filesChanged() }
+        }
+    }
+
+    /// Switches tools on or off: the collectors follow, what a hidden tool showed goes now, and a refresh reads the rest.
+    private func setVisibility(_ v: ToolVisibility) {
+        worker.setVisibility(v)
+        applyVisibility(v)
+        watchFiles()
+        refresh(usage: true, servers: false, panel: panelVisible)
+    }
+
+    /// Drops what hidden tools put in the store, as `Worker.LiveResult.hiding` and `UsageResult.hiding` do for readings.
+    func applyVisibility(_ v: ToolVisibility) {
+        guard !v.hidden.isEmpty else { return }
+        rawSessions = v.filter(rawSessions)
+        update(\.sessions, v.filter(sessions))
+        update(\.otherAgents, v.filter(otherAgents))
+        if !v.shows(.codex) {
+            update(\.codex, .empty)
+            update(\.codexLimits, [])
+            update(\.codexAccountUsage, [])
+            update(\.codexAccountLimits, [])
+            codexLimitsAt = .distantPast
+        }
+        if !v.shows(.google) {
+            update(\.google, .empty)
+            update(\.googleSources, [])
+            update(\.antigravityLimits, nil)
+            update(\.googleWarning, nil)
+        }
+        if !v.shows(.opencode) { update(\.opencode, .empty) }
+        if !v.shows(.copilot) { update(\.copilot, .empty) }
     }
 
     /// Reads what each added Claude account's status line bridge saved. A few small files: cheap enough for every refresh.
@@ -387,6 +441,8 @@ final class Store: ObservableObject {
             settings.refreshClaudePermissions()  // …and the permission hook
             AntigravitySettings.shared.refresh() // …and the Antigravity CLI's status line
             OpenCodeSettings.shared.refresh()    // …and opencode's plugin
+            CopilotSettings.shared.refresh()     // …and Copilot's hook
+            ToolPresence.shared.refresh()        // …and which tools are installed
             refreshClaudePlan()
         } else if minute {
             plan.statusLineChanged()
@@ -719,6 +775,8 @@ final class Store: ObservableObject {
     }
 
     private func apply(_ r: Worker.LiveResult) {
+        // A reading taken just before a tool was switched off still carries it.
+        let r = r.hiding(settings.visibility)
         rawSessions = r.sessions
         if permissionRequests.isEmpty {
             update(\.sessions, r.sessions)
@@ -750,6 +808,7 @@ final class Store: ObservableObject {
     }
 
     private func apply(_ r: Worker.UsageResult) {
+        let r = r.hiding(settings.visibility)
         update(\.claude, r.claude)
         update(\.usageLoading, false)
         update(\.codex, r.codex)
@@ -761,6 +820,7 @@ final class Store: ObservableObject {
         update(\.googleSources, r.googleSources)
         update(\.antigravityLimits, r.antigravityLimits)
         update(\.opencode, r.opencode)
+        update(\.copilot, r.copilot)
         codexLimitsAt = r.codexLimitsAt
         checkLimits()
     }
@@ -808,6 +868,7 @@ final class Worker: @unchecked Sendable {
         var googleSources: [SessionAgent] = []
         var antigravityLimits: AntigravityLimits?
         var opencode = UsageSummary.empty
+        var copilot = CopilotUsage.empty
     }
 
     private let liveQueue = DispatchQueue(label: "dashbar.live", qos: .utility)
@@ -836,6 +897,11 @@ final class Worker: @unchecked Sendable {
     /// opencode's live sessions (live queue only) and usage (usage queue only).
     private let openCodeCollector = OpenCodeCollector()
     private let openCodeUsage = OpenCodeUsage()
+    /// GitHub Copilot CLI's live sessions (live queue only) and usage (usage queue only, created at first use).
+    private let copilotCollector = CopilotCollector()
+    private var copilotScanner: CopilotUsageScanner?
+    /// Which tools to read at all. Set from the main thread, read on the live and usage queues.
+    private var visibility = ToolVisibility()
     private let sampler = SystemSampler()
     private let serverActivity = ServerActivity()
     private let workspaceSampler = WorkspaceSampler()
@@ -871,6 +937,19 @@ final class Worker: @unchecked Sendable {
         accountsLock.withLock { (claudeAccounts, codexAccounts) }
     }
 
+    func setVisibility(_ v: ToolVisibility) { accountsLock.withLock { visibility = v } }
+    private var currentVisibility: ToolVisibility { accountsLock.withLock { visibility } }
+
+    /// Every tool's live sessions beyond Claude Code's. A hidden tool's collector isn't called, so none of its files are read.
+    static func otherSessions(_ v: ToolVisibility, google: () -> GoogleLive, opencode: () -> [LiveSession],
+                              copilot: () -> [LiveSession]) -> (sessions: [LiveSession], googleWarning: String?) {
+        let g = v.shows(.google) ? google() : GoogleLive()
+        var out = g.sessions
+        if v.shows(.opencode) { out += opencode() }
+        if v.shows(.copilot) { out += copilot() }
+        return (out, g.warning)
+    }
+
     private func collectLive(_ req: LiveRequest) {
         guard !isStopped else { return }
         var r = LiveResult()
@@ -880,11 +959,12 @@ final class Worker: @unchecked Sendable {
         // Closed, only which subagents run (a folder listing and changed metadata); open, their transcripts' new lines too.
         // Claude Code sessions only: Google's agents and opencode have no subagent transcripts.
         r.subagents = subagentReader.read(reading.sessions, transcript: { self.contextReader.transcript(for: $0) }, detail: req.panel)
-        let google = googleCollector.read()
-        let others = google.sessions + openCodeCollector.read()
-        r.sessions = others.isEmpty ? reading.sessions
-            : (reading.sessions + others).sorted { ($0.urgency, $1.since) < ($1.urgency, $0.since) }
-        r.googleWarning = google.warning
+        let v = currentVisibility
+        let others = Self.otherSessions(v, google: { googleCollector.read() }, opencode: { openCodeCollector.read() },
+                                        copilot: { copilotCollector.read() })
+        r.sessions = others.sessions.isEmpty ? reading.sessions
+            : (reading.sessions + others.sessions).sorted { ($0.urgency, $1.since) < ($1.urgency, $0.since) }
+        r.googleWarning = others.googleWarning
         if req.system { r.system = sampler.sample() }
         if req.servers {
             var listeners = Listeners.read()
@@ -894,7 +974,7 @@ final class Worker: @unchecked Sendable {
             lastListeners = listeners
         }
         if req.panel {
-            r.agents = AgentProcesses.read()
+            r.agents = v.filter(AgentProcesses.read())
             r.topApps = sampler.topApps()
             let workspaces = Workspace.build(sessions: r.sessions,
                                              servers: lastListeners.filter { $0.isDev && $0.root != nil && !$0.isDocker })
@@ -911,7 +991,10 @@ final class Worker: @unchecked Sendable {
 
     private func scanUsage() {
         guard !isStopped else { return }
-        let (claude, codex) = accounts
+        let v = currentVisibility
+        let claude = accounts.claude
+        // Codex switched off: no account is read (its saved progress stays for when it's back).
+        let codex = v.shows(.codex) ? accounts.codex : []
         // Accounts removed in Settings stop being read; their saved progress stays for if they come back.
         claudeScanners = claudeScanners.filter { path, _ in claude.contains { $0.path == path } }
         codexScanners = codexScanners.filter { path, _ in codex.contains { $0.path == path } }
@@ -943,9 +1026,16 @@ final class Worker: @unchecked Sendable {
                               fetchedAt: $0.scanner.limitsStamp > .distantPast ? $0.scanner.limitsStamp : nil)
             }
         }
-        (result.google, result.googleSources) = scanGoogle()
-        result.antigravityLimits = AntigravityStatusLine.readLimits()
-        result.opencode = openCodeUsage.scan()
+        if v.shows(.google) {
+            (result.google, result.googleSources) = scanGoogle()
+            result.antigravityLimits = AntigravityStatusLine.readLimits()
+        }
+        if v.shows(.opencode) { result.opencode = openCodeUsage.scan() }
+        if v.shows(.copilot) {
+            let scanner = copilotScanner ?? CopilotUsageScanner(cache: ScanCache<CopilotUsageScanner.State>.defaultURL("copilot-usage"))
+            copilotScanner = scanner
+            result.copilot = scanner.scan()
+        }
         if lastSave.map({ Date().timeIntervalSince($0) > 30 }) ?? true { save() }
         let done = onUsage
         DispatchQueue.main.async { done?(result) }
@@ -987,6 +1077,7 @@ final class Worker: @unchecked Sendable {
         for scanner in codexScanners.values { scanner.save() }
         geminiScanner?.save()
         antigravityUsage?.save()
+        copilotScanner?.save()
         lastSave = Date()
     }
 

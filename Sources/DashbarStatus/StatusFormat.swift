@@ -29,6 +29,7 @@ public struct StatusFormat {
         case "antigravity": return "Antigravity"
         case "google": return "Gemini"
         case "opencode": return "OpenCode"
+        case "copilot": return "Copilot"
         default: return tool
         }
     }
