@@ -180,3 +180,12 @@ import DashbarStatus
         #expect(WidgetModel.qualifier(weekly) == nil)
     }
 }
+
+@Suite struct StaleWidgetExtensionTests {
+    /// A widget process older than the installed extension is the previous version, left running across an update.
+    @Test func olderProcessIsStale() {
+        let installed = Date(timeIntervalSince1970: 1_000_000)
+        #expect(WidgetBridge.isStale(started: installed.addingTimeInterval(-60), executableModified: installed))
+        #expect(!WidgetBridge.isStale(started: installed.addingTimeInterval(5), executableModified: installed))
+    }
+}
