@@ -14,7 +14,15 @@ import SwiftUI
 ///   and `github/autopilot` for other hosts sharing the store). While a process has the session open the folder also holds
 ///   `inuse.<pid>.lock` (specstoryai/getspecstory `COPILOTCLI-FORMAT.md`, observed on 1.0.105; github/copilot-cli#2446,
 ///   #2655 for `workspace.yaml`). A folder can lack `events.jsonl` (an aborted start leaves an empty scaffold, #2836; old
-///   transcripts are pruned) — then usage is unknown, never zero.
+///   transcripts are pruned) — then usage is unknown, never zero. A folder with only lock files (no `workspace.yaml`) is a
+///   session being set up and is ignored.
+/// - The same store, and the same event log, is written by Copilot's agent in VS Code (its bundled `copilot-runtime`,
+///   `client_name: vscode-agent-host`) and by the GitHub Copilot app (`github/autopilot`), both on this Mac (the format
+///   write-up above: "The same store holds every session regardless of project and every host Copilot runs under"; the
+///   Copilot app keeps only its sidebar in `~/.copilot/data.db`). Cloud agent jobs run on GitHub, not here, so they never
+///   appear. All of these are shown: a session is live while the pid in its `inuse.<pid>.lock` is alive, whatever that
+///   process is called. Checked on a real VS Code session (16 Nov 2026): its log uses the CLI's event types, and Copilot's
+///   hooks in `~/.copilot/hooks/` run there too.
 /// - The event log's format is not documented (github/copilot-cli#3551). The closest thing to a schema is the Copilot SDK's
 ///   generated types (github/copilot-sdk `nodejs/src/generated/session-events.ts`): each line is
 ///   `{type, data, id, timestamp, parentId}`, and events marked `ephemeral` are never written to disk. Per-call usage
@@ -29,10 +37,12 @@ import SwiftUI
 /// from `session.shutdown` lines only the metric fields above. Never message text, prompts, tool arguments or results,
 /// file paths from `codeChanges`, or any sign-in.
 enum CopilotCLI {
-    /// As GitHub's docs name it, for headings. `shortName` is for compact session lines ("Copilot is working").
-    static let displayName = "GitHub Copilot CLI"
+    /// For cards and History. `shortName` is for compact session lines ("Copilot is working"); `integrationsTitle` for
+    /// the Settings section, which says where it works.
+    static let displayName = "GitHub Copilot"
     static let shortName = "Copilot"
-    static let formatWarning = "Couldn't read GitHub Copilot CLI's usage. Its session log format may have changed, so check for a Dashbar update."
+    static let integrationsTitle = "GitHub Copilot (CLI and VS Code agent)"
+    static let formatWarning = "Couldn't read GitHub Copilot's usage. Its session log format may have changed, so check for a Dashbar update."
 
     /// `$COPILOT_HOME` when it's an absolute path, else `~/.copilot`.
     static func homeURL(environment: [String: String] = ProcessInfo.processInfo.environment) -> URL {
@@ -89,12 +99,14 @@ enum CopilotCLI {
         return parseWorkspace(String(decoding: data, as: UTF8.self))
     }
 
-    /// The terminal CLI's own sessions. The same store also holds VS Code's and the Copilot app's, which are other
-    /// products: their folders are skipped. VS Code's CLI integration (`vscode`) runs this CLI, so it counts. Sessions from
-    /// before `client_name` existed count too.
-    static func isCLIClient(_ client: String?) -> Bool {
-        guard let client, !client.isEmpty else { return true }
-        return client == "github/cli" || client == "vscode"
+    /// Where a session runs, from `client_name`, as `LiveSession.entrypoint`: VS Code's (`vscode`, `vscode-agent-host`)
+    /// read as "VS Code", the Copilot app's as its name, the terminal's (and unknown hosts') as the CLI. Clicking a session
+    /// still goes to the app found above its process (`HostApp`), so VS Code's open in VS Code.
+    static func entrypoint(client: String?) -> String {
+        guard let client else { return "cli" }
+        if client.hasPrefix("vscode") { return "vscode" }
+        if client == "github/autopilot" { return "Copilot app" }
+        return "cli"
     }
 
     // MARK: State from the event log
@@ -168,6 +180,8 @@ enum CopilotCLI {
         var id: String
         var cwd: String?
         var client: String?
+        /// It has a `workspace.yaml`. A folder with only lock files is a session still being set up: never shown.
+        var hasWorkspace = true
         /// `events.jsonl`'s modification time; nil when the session has none.
         var eventsModified: Date?
         /// From `inuse.<pid>.lock` names.
@@ -185,15 +199,24 @@ enum CopilotCLI {
 
     // MARK: Live sessions
 
-    /// Copilot's live sessions, while it runs: each folder a running Copilot holds open (its lock, else the newest session
-    /// in that process's folder written since it started), with the hook's state where it is the newer news. A folder
-    /// where Copilot runs with no session yet still shows, idle. Nothing shows when no Copilot process runs.
+    /// Copilot's live sessions: each folder whose lock names a live process (the CLI, VS Code's `copilot-runtime`, the
+    /// Copilot app: any name), else, for a running `copilot` with no lock, the newest session in its folder written since it
+    /// started, with the hook's state where it is the newer news. A folder where the CLI runs with no session yet still
+    /// shows, idle. Nothing shows when no session is open and no `copilot` process runs.
     static func live(folders: [SessionFolder], bridged: [CopilotBridge.SessionState],
                      processes: [(pid: Int32, cwd: String, started: Date?)], aliases: [Int32: Int32] = [:],
+                     alive: (Int32) -> Bool = ClaudeSessions.isAlive,
                      now: Date = Date(), root: (String) -> String = Fmt.root(fromCwd:)) -> [LiveSession] {
-        guard !processes.isEmpty else { return [] }
-        let home = homeDir.path
+        let usable = folders.filter(\.hasWorkspace)
+            .sorted { ($0.eventsModified ?? .distantPast) > ($1.eventsModified ?? .distantPast) }
         let byPID = Dictionary(processes.map { ($0.pid, $0) }, uniquingKeysWith: { a, _ in a })
+        /// The process holding a folder's lock: a known Copilot process, or any live pid.
+        func owner(_ f: SessionFolder) -> Int32? {
+            f.lockPIDs.lazy.map { aliases[$0] ?? $0 }.first { byPID[$0] != nil || alive($0) }
+        }
+        let locked = usable.compactMap { f in owner(f).map { (f, $0) } }
+        guard !processes.isEmpty || !locked.isEmpty else { return [] }
+        let home = homeDir.path
         let states = Dictionary(bridged.map { ($0.id, $0) }, uniquingKeysWith: { $0.writtenAt > $1.writtenAt ? $0 : $1 })
         var out: [LiveSession] = []
         var claimed = Set<Int32>(), idsShown = Set<String>()
@@ -214,15 +237,14 @@ enum CopilotCLI {
                 case .unknown: status = now.timeIntervalSince(modified) < activeWindow ? "busy" : "idle"
                 }
             }
-            out.append(session(id: f.id, cwd: cwd, root: rt, status: status, since: since, pid: pid, waitingFor: waitingFor))
+            out.append(session(id: f.id, cwd: cwd, root: rt, status: status, since: since, pid: pid, waitingFor: waitingFor,
+                               entrypoint: entrypoint(client: f.client)))
             idsShown.insert(f.id)
         }
 
-        let usable = folders.filter { isCLIClient($0.client) }.sorted { ($0.eventsModified ?? .distantPast) > ($1.eventsModified ?? .distantPast) }
-        // 1. Folders a running Copilot has locked.
-        for f in usable {
-            guard let pid = f.lockPIDs.lazy.map({ aliases[$0] ?? $0 }).first(where: { byPID[$0] != nil }), let p = byPID[pid] else { continue }
-            add(f, pid: pid, processCwd: p.cwd)
+        // 1. Folders a live process has locked (VS Code's runtime may hold several).
+        for (f, pid) in locked {
+            add(f, pid: pid, processCwd: byPID[pid]?.cwd ?? "")
             claimed.insert(pid)
         }
         // 2. No lock (an older or newer layout): the newest session in the process's folder written since it started.
@@ -257,9 +279,9 @@ enum CopilotCLI {
     }
 
     private static func session(id: String, cwd: String, root: String, status: String, since: Date, pid: Int32,
-                                waitingFor: String?) -> LiveSession {
+                                waitingFor: String?, entrypoint: String = "cli") -> LiveSession {
         var s = LiveSession(id: "copilot-" + id, pid: pid, name: Fmt.project(fromCwd: root), cwd: cwd, status: status,
-                            since: since, entrypoint: "cli", root: root, waitingFor: waitingFor)
+                            since: since, entrypoint: entrypoint, root: root, waitingFor: waitingFor)
         s.agent = .copilot
         return s
     }
@@ -284,12 +306,18 @@ enum CopilotCLI {
 final class CopilotProcesses {
     private var known: [Int32: (started: Date?, match: Bool)] = [:]
 
-    /// The outermost processes, and every matched child mapped to its outermost (a lock may name either).
-    func scan() -> (processes: [(pid: Int32, cwd: String, started: Date?)], aliases: [Int32: Int32]) {
+    /// The outermost CLI processes, every matched child mapped to its outermost (a lock may name either), and when the
+    /// oldest host runtime started (VS Code's `copilot-runtime`), so sessions it has held open since then are looked at.
+    func scan() -> (processes: [(pid: Int32, cwd: String, started: Date?)], aliases: [Int32: Int32], oldestHost: Date?) {
         var seen = Set<Int32>()
         var found: [Int32: (cwd: String, started: Date?, parent: Int32)] = [:]
+        var oldestHost: Date?
         for pid in Proc.allPIDs() {
             let name = Proc.name(pid)
+            if name == "copilot-runtime" {
+                if let s = Proc.bsdInfo(pid)?.started { oldestHost = min(oldestHost ?? s, s) }
+                continue
+            }
             guard ["copilot", "node", "bun"].contains(name) else { continue }
             seen.insert(pid)
             let info = Proc.bsdInfo(pid)
@@ -309,13 +337,14 @@ final class CopilotProcesses {
             if top != pid { aliases[pid] = top }
         }
         let outer = found.filter { found[$0.value.parent] == nil }.map { ($0.key, $0.value.cwd, $0.value.started) }.sorted { $0.0 < $1.0 }
-        return (outer.map { (pid: $0.0, cwd: $0.1, started: $0.2) }, aliases)
+        return (outer.map { (pid: $0.0, cwd: $0.1, started: $0.2) }, aliases, oldestHost)
     }
 }
 
 /// Copilot's live sessions for the store's live refresh. Cheap for someone who doesn't use it: one pass over process
-/// names, and nothing else unless Copilot is running. Then only session folders changed since the oldest Copilot
-/// started (or already open) are listed, and `workspace.yaml` is read again only when it changes.
+/// names and a check that `session-state` exists. Then one listing of it, and only folders changed in the last day, since
+/// the oldest Copilot process started, or already open are looked inside; `workspace.yaml` is read again only when it
+/// changes.
 final class CopilotCollector {
     private let processes = CopilotProcesses()
     let sessionState: URL
@@ -330,8 +359,9 @@ final class CopilotCollector {
 
     func read(now: Date = Date()) -> [LiveSession] {
         let found = processes.scan()
-        guard !found.processes.isEmpty else { open = []; return [] }
-        let oldest = found.processes.compactMap(\.started).min() ?? now.addingTimeInterval(-CopilotCLI.idleShown)
+        guard FileManager.default.fileExists(atPath: sessionState.path) else { open = []; return [] }
+        // A session's folder changes when its lock is made, as it opens: anything open since the oldest process started.
+        let oldest = (found.processes.compactMap(\.started) + [found.oldestHost, now.addingTimeInterval(-86400)].compactMap { $0 }).min()!
         let folders = self.folders(changedSince: oldest.addingTimeInterval(-120), now: now)
         open = Set(folders.filter { !$0.lockPIDs.isEmpty }.map(\.id))
         let states = FileManager.default.fileExists(atPath: bridgeDir.path)
@@ -359,7 +389,8 @@ final class CopilotCollector {
             let ws = workspace(dir, id: id, present: names.contains("workspace.yaml"))
             f.cwd = ws.cwd
             f.client = ws.client
-            if let m = eventsModified, CopilotCLI.isCLIClient(ws.client) {
+            f.hasWorkspace = names.contains("workspace.yaml")
+            if let m = eventsModified {
                 f.activity = CopilotCLI.activity(types: CopilotCLI.recentTypes(events), modified: m, now: now)
             }
             out.append(f)
@@ -468,14 +499,12 @@ final class CopilotUsageScanner {
                 // No event log: usage unknown, for a real session (one with its metadata) used lately. An empty scaffold
                 // left by an aborted start (github/copilot-cli#2836) isn't a session.
                 let yaml = dir.appendingPathComponent("workspace.yaml")
-                if let m = (try? yaml.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate, m >= cutoff,
-                   CopilotCLI.isCLIClient(workspace(dir).client) {
+                if let m = (try? yaml.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate, m >= cutoff {
                     unknown += 1
                 }
                 continue
             }
             let ws = workspace(dir)
-            guard CopilotCLI.isCLIClient(ws.client) else { continue }
             anyLog = true
             guard mtime >= cutoff else { continue }
             var offset = tail.offsets[events.path] ?? 0

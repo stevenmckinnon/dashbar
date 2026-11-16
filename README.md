@@ -62,15 +62,16 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
   OpenCode → Add to OpenCode puts one plugin file, `dashbar.js`, in `~/.config/opencode/plugins/`; it saves only each
   session's id, folder, state and time to `~/Library/Caches/Dashbar/opencode-sessions/`, never answers a prompt, and
   Remove deletes it.
-- **GitHub Copilot CLI** (shown only if you use it): [Copilot CLI](https://github.com/github/copilot-cli) sessions as
-  agents in their workspaces, working, idle or asking permission, while a `copilot` process runs, and a Usage card with
+- **GitHub Copilot (CLI and VS Code agent)** (shown only if you use it): [Copilot CLI](https://github.com/github/copilot-cli)
+  sessions, and Copilot's agent sessions in VS Code (which keep the same session folders), as agents in their workspaces,
+  working, idle or asking permission, while the process holding each session runs, and a Usage card with
   its tokens, models and premium requests. Copilot writes token counts only when a session ends, so the card is updated
   then; it shows no cost (Copilot is billed by your plan) and no plan limits (those are only on GitHub, which Dashbar never
   asks). Read from `~/.copilot/session-state/` (`$COPILOT_HOME` if set): the folder and host from each session's
   `workspace.yaml`, each event's type near the end of `events.jsonl`, and only the metric fields of its `session.shutdown`
   records; never prompts, replies, tool input or results, or session titles. A session with no event log is shown as
-  usage unknown, never zero. To see a session that needs you the moment it asks, Settings → Integrations → GitHub Copilot
-  CLI → Add to Copilot puts one file, `dashbar.json`, in `~/.copilot/hooks/`, using Copilot's own hooks; its script saves
+  usage unknown, never zero. To see a session that needs you the moment it asks (in the terminal or VS Code), Settings →
+  Integrations → GitHub Copilot → Add to Copilot puts one file, `dashbar.json`, in `~/.copilot/hooks/`, using Copilot's own hooks; its script saves
   only each session's id, folder, state and time to `~/Library/Caches/Dashbar/copilot-sessions/`, never answers a
   permission, and Remove deletes it.
 - **Show in Dashbar, per tool**: each tool other than Claude Code has a Show in Dashbar switch at the top of its section in
@@ -262,7 +263,7 @@ folders. Claude plan limits come from Claude Code's status line: with your conse
 setting so a local script saves your usage percentages to a file, and it sends nothing. The Antigravity CLI's
 bridge works the same way and picks its fields one by one, so your email, conversation titles and transcript
 paths in that status line's input are never saved. The Antigravity app's database is only ever opened read-only. So is
-OpenCode's; its optional plugin saves only each session's state and folder. Copilot CLI's logs are read, never written,
+OpenCode's; its optional plugin saves only each session's state and folder. Copilot's session logs are read, never written,
 and its optional hook saves only each session's state and folder. The only network
 requests are update checks and the optional experimental plan-limits setting, which sends Claude Code's own
 sign-in to Anthropic's usage endpoint, the same call Claude Code makes.

@@ -87,7 +87,7 @@ extension Store {
                 service: .opencode, title: "OpenCode", icon: UI.openCodeSymbol, tint: UI.neutralTool, fill: UI.neutralTool,
                 summary: opencode, costNote: OpenCodeUsageText.costNote, hasNotice: opencode.warning != nil))
         }
-        // Only for someone with Copilot CLI's session logs. No limits: its premium-request allowance lives on GitHub,
+        // Only for someone with Copilot's session logs (the CLI, its agent in VS Code, the Copilot app). No limits: its premium-request allowance lives on GitHub,
         // which Dashbar never asks. Tokens arrive when a session ends, as Copilot writes them only then.
         if shows.shows(.copilot), copilot.shows {
             out.append(ServiceUsage(
@@ -827,7 +827,7 @@ struct ClaudeAccountLimitsView: View {
 
 /// Wording for GitHub Copilot CLI's Usage card.
 enum CopilotUsageText {
-    static let caption = "Updated when a session ends: Copilot saves token counts only then."
+    static let caption = "Updated when a session ends, in the terminal or VS Code: Copilot saves token counts only then."
     static let costNote = "GitHub Copilot is billed by your plan's premium requests, not by token, so Dashbar shows no cost "
         + "for it. Premium requests are Copilot's own count, saved when each session ends. Your plan's allowance is only on GitHub."
 

@@ -417,7 +417,7 @@ private struct UsageHistorySection: View {
                  + "On a Claude, ChatGPT or Google AI plan you pay the plan's price, not this."
                  + (google == nil ? "" : " Antigravity CLI costs are its own estimates.")
                  + (opencode == nil ? "" : " OpenCode's own costs are used where it recorded them.")
-                 + (copilot == nil ? "" : " GitHub Copilot CLI is billed by your plan's premium requests, not by token, so its tokens carry no cost here.")
+                 + (copilot == nil ? "" : " GitHub Copilot is billed by your plan's premium requests, not by token, so its tokens carry no cost here.")
                  + (unpriced.isEmpty ? "" : " No price is known for \(unpriced.joined(separator: ", ")), so its tokens are left out of the cost.")
                  + " Dashbar reads the last 30 days of logs and keeps totals by day, project and model, not by session.")
                 .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)

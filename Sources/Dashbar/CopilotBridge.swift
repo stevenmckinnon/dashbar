@@ -33,8 +33,8 @@ enum CopilotBridge {
     /// Mac has; `plutil` reads the payload and writes the file, so text is always escaped properly.
     static let script = #"""
     #!/bin/sh
-    # Dashbar's GitHub Copilot CLI hook (version 1). Dashbar added it with your consent, from Settings > Integrations.
-    # Copilot CLI runs it at a few moments in each session. It saves four things (the session's id, its folder, whether
+    # Dashbar's GitHub Copilot hook (version 1). Dashbar added it with your consent, from Settings > Integrations.
+    # Copilot (the CLI, or its agent in VS Code) runs it at a few moments in each session. It saves four things (the session's id, its folder, whether
     # it is working, idle, waiting for you or ended, and the time) to a file on this Mac that only you can read, so
     # Dashbar can show it. It never saves prompts, tool input or results, transcripts or notification text, never answers
     # a permission, prints nothing, always exits 0 and sends nothing anywhere. Remove it in Dashbar's Settings.
@@ -309,7 +309,7 @@ struct CopilotSection: View {
                     IntegrationDetails(text: explanation)
                 }
             } header: {
-                Text(CopilotCLI.displayName)
+                Text(CopilotCLI.integrationsTitle)
             }
         }
     }
@@ -321,7 +321,7 @@ struct CopilotSection: View {
                 Button("Remove") { problem = settings.set(false) }
             } label: {
                 Text("In Copilot's hooks")
-                Text("Shows when a session needs you. Takes effect in new Copilot sessions.")
+                Text("Shows when a session needs you, in the terminal and VS Code. Takes effect in new sessions.")
             }
         case .notInstalled, .absent:
             LabeledContent {
@@ -342,10 +342,10 @@ struct CopilotSection: View {
 
     private var explanation: String {
         let paths = CopilotBridge.Paths.default()
-        return "Without it, Dashbar sees Copilot working, idle or asking permission from each session's event log, and "
-            + "reads token use when a session ends. Adding Dashbar puts one file, \(CopilotBridge.configName), in "
-            + "\(Fmt.tilde(paths.hooks.path)), using Copilot's own hooks. It saves each session's state and folder to files "
-            + "on this Mac the moment it changes. It never saves prompts, tool input or results, or what a notification "
+        return "Without it, Dashbar sees Copilot working, idle or asking permission from each session's event log, in the "
+            + "terminal and in VS Code's agent, and reads token use when a session ends. Adding Dashbar puts one file, "
+            + "\(CopilotBridge.configName), in \(Fmt.tilde(paths.hooks.path)), using Copilot's own hooks, which both run. It saves "
+            + "each session's state and folder to files on this Mac the moment it changes. It never saves prompts, tool input or results, or what a notification "
             + "says, and never answers a permission. Remove deletes the file."
     }
 }

@@ -18,7 +18,7 @@ enum HideableTool: String, CaseIterable, Codable, Sendable, Identifiable {
         case .codex: return "Codex"
         case .google: return "Gemini CLI and Antigravity"
         case .opencode: return "OpenCode"
-        case .copilot: return CopilotCLI.displayName
+        case .copilot: return CopilotCLI.integrationsTitle
         }
     }
 }

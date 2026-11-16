@@ -72,12 +72,12 @@ enum CopilotFixture {
         #expect(CopilotCLI.parseWorkspace("cwd: relative/path\n").cwd == nil)
     }
 
-    @Test func onlyTheTerminalCLIsSessions() {
-        #expect(CopilotCLI.isCLIClient(nil))
-        #expect(CopilotCLI.isCLIClient("github/cli"))
-        #expect(CopilotCLI.isCLIClient("vscode"))
-        #expect(!CopilotCLI.isCLIClient("vscode-agent-host"))
-        #expect(!CopilotCLI.isCLIClient("github/autopilot"))
+    @Test func everyLocalHostWithWhereItRuns() {
+        #expect(CopilotCLI.entrypoint(client: nil) == "cli")
+        #expect(CopilotCLI.entrypoint(client: "github/cli") == "cli")
+        #expect(CopilotCLI.entrypoint(client: "vscode") == "vscode")
+        #expect(CopilotCLI.entrypoint(client: "vscode-agent-host") == "vscode")
+        #expect(CopilotCLI.entrypoint(client: "github/autopilot") == "Copilot app")
     }
 
     @Test func lockNamesGivePIDs() {
@@ -174,11 +174,33 @@ enum CopilotFixture {
         #expect(t.first?.isBusy == true)
     }
 
-    @Test func otherHostsAreSkippedAndAProcessAloneShowsIdle() {
-        let s = CopilotCLI.live(folders: [folder("vs", locks: [10], client: "vscode-agent-host")], bridged: [],
-                                processes: [(pid: 10, cwd: "/Users/x/dev/api", started: now)], now: now, root: root)
+    @Test func aCLIProcessAloneShowsIdle() {
+        let s = CopilotCLI.live(folders: [], bridged: [], processes: [(pid: 10, cwd: "/Users/x/dev/api", started: now)],
+                                now: now, root: root)
         #expect(s.map(\.id) == ["copilot-pid-10"])
         #expect(s.first?.isBusy == false)
+    }
+
+    @Test func vsCodeSessionIsLiveWhileItsLockHolderIs() throws {
+        // VS Code's `copilot-runtime` isn't a `copilot` process: the live pid in the lock is enough.
+        let vs = folder("vs", locks: [94548], client: "vscode-agent-host")
+        let s = CopilotCLI.live(folders: [vs], bridged: [], processes: [], alive: { $0 == 94548 }, now: now, root: root)
+        let one = try #require(s.first)
+        #expect(s.count == 1)
+        #expect(one.pid == 94548)
+        #expect(one.entrypoint == "vscode")
+        #expect(one.surface == "VS Code")
+        #expect(one.isBusy)
+        // Its holder gone: nothing.
+        #expect(CopilotCLI.live(folders: [vs], bridged: [], processes: [], alive: { _ in false }, now: now, root: root).isEmpty)
+    }
+
+    @Test func lockOnlyFoldersAreNeverShown() {
+        var f = folder("setup", locks: [94548])
+        f.hasWorkspace = false
+        f.cwd = nil
+        f.eventsModified = nil
+        #expect(CopilotCLI.live(folders: [f], bridged: [], processes: [], alive: { _ in true }, now: now, root: root).isEmpty)
     }
 
     @Test func withoutALockTheNewestSessionInItsFolder() {
@@ -265,11 +287,24 @@ enum CopilotFixture {
         #expect(!u.shows)
     }
 
-    @Test func otherHostsSessionsAreNotCopilotCLIs() throws {
+    @Test func vsCodeSessionsCountWhenTheyEnd() throws {
         let fx = try Fixture(); defer { fx.remove() }
-        try CopilotFixture.session(fx, "vs", client: "vscode-agent-host", events: [CopilotFixture.shutdown(["gpt-5.4": (100, 10, 0, 1, 1)])])
+        try CopilotFixture.session(fx, "vs", client: "vscode-agent-host", events: [
+            CopilotFixture.event("session.start"), CopilotFixture.event("session.usage_record"),
+            CopilotFixture.shutdown(["gpt-5.4": (100, 10, 0, 1, 1)]),
+        ])
         let u = CopilotUsageScanner(root: fx.root.appendingPathComponent("session-state")).scan()
-        #expect(!u.shows)
+        #expect(u.summary.today.total == 110)
+    }
+
+    @Test func lockOnlyFolderIsNotASession() throws {
+        let fx = try Fixture(); defer { fx.remove() }
+        let dir = try fx.dir("session-state/ddce3193")
+        for name in ["inuse.94548.lock", "inuse.94548.hold"] {
+            try Data().write(to: dir.appendingPathComponent(name))
+        }
+        let u = CopilotUsageScanner(root: fx.root.appendingPathComponent("session-state")).scan()
+        #expect(u == .empty)
     }
 
     @Test func unreadableShutdownsWarn() throws {
@@ -436,5 +471,45 @@ enum CopilotFixture {
 
     @Test func quotesPathsForTheShell() {
         #expect(CopilotBridge.quote("/Users/o'neil/x y") == #"'/Users/o'\''neil/x y'"#)
+    }
+}
+
+/// The live collector on fixture folders shaped like the real VS Code session: workspace.yaml, events.jsonl, a lock and
+/// a hold file. Its own test process stands in for VS Code's runtime (a live pid that isn't called `copilot`).
+@Suite struct CopilotCollectorTests {
+    func lock(_ dir: URL, _ pid: Int32) throws {
+        try Data().write(to: dir.appendingPathComponent("inuse.\(pid).lock"))
+        try Data().write(to: dir.appendingPathComponent("inuse.\(pid).hold"))
+    }
+
+    @Test func vsCodeAgentSessionWithALiveLock() throws {
+        let fx = try Fixture(); defer { fx.remove() }
+        let dir = try CopilotFixture.session(fx, "f3bc321d", cwd: "/Users/x/dev/shop", client: "vscode-agent-host", events: [
+            CopilotFixture.event("session.start"), CopilotFixture.event("user.message", ["content": CopilotFixture.secret]),
+            CopilotFixture.event("assistant.turn_start"), CopilotFixture.event("session.usage_record"),
+            CopilotFixture.event("permission.requested"), CopilotFixture.event("hook.start"), CopilotFixture.event("hook.end"),
+        ])
+        try lock(dir, getpid())
+        let setup = try fx.dir("session-state/ddce3193")   // lock only: being set up
+        try lock(setup, getpid())
+        let c = CopilotCollector(sessionState: fx.root.appendingPathComponent("session-state"),
+                                 bridgeDir: fx.root.appendingPathComponent("states"))
+        let s = c.read()
+        let one = try #require(s.first)
+        #expect(s.count == 1)
+        #expect(one.id == "copilot-f3bc321d")
+        #expect(one.pid == getpid())
+        #expect(one.isWaiting)
+        #expect(one.waitingFor == "permission prompt")
+        #expect(one.entrypoint == "vscode")
+    }
+
+    @Test func deadLockHolderShowsNothing() throws {
+        let fx = try Fixture(); defer { fx.remove() }
+        let dir = try CopilotFixture.session(fx, "gone", client: "vscode-agent-host", events: [CopilotFixture.event("assistant.turn_start")])
+        try lock(dir, 99_999_999)   // no such process
+        let c = CopilotCollector(sessionState: fx.root.appendingPathComponent("session-state"),
+                                 bridgeDir: fx.root.appendingPathComponent("states"))
+        #expect(c.read().filter { $0.id == "copilot-gone" }.isEmpty)
     }
 }
