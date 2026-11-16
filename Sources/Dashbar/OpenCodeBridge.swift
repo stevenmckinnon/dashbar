@@ -81,7 +81,7 @@ enum OpenCodeBridge {
     static var script: String {
         #"""
         // Dashbar's opencode plugin (version 1). Dashbar added it with your consent, from Settings > Integrations.
-        // It tells Dashbar whether each opencode session is working, idle or waiting for you, by saving four fields per
+        // It tells Dashbar whether each OpenCode session is working, idle or waiting for you, by saving four fields per
         // session (its id, its folder, that state and the time) to files on this Mac that only you can read. It never
         // saves prompts, replies, titles, tool input, file contents or what a permission asks, never answers a prompt,
         // and sends nothing anywhere. Remove it in Dashbar's Settings, which deletes this file.
@@ -118,13 +118,13 @@ enum OpenCodeBridge {
           "question.asked", "question.replied", "question.rejected"]
         tidy()
 
-        // opencode 1.x: hooks, with every event passed to `event`.
+        // OpenCode 1.x: hooks, with every event passed to `event`.
         async function server(input) {
           var directory = input && input.directory
           return { event: async function (input) { handle(input && input.event, directory) } }
         }
 
-        // opencode 2.x: a subscription to the event stream, stopped when the plugin unloads.
+        // OpenCode 2.x: a subscription to the event stream, stopped when the plugin unloads.
         async function setup(ctx) {
           var stop = new AbortController()
           var directory = ctx && ctx.location && ctx.location.directory
@@ -180,7 +180,7 @@ enum OpenCodeBridge {
             case .notOurs(let path):
                 return "There's already a dashbar.js that Dashbar didn't write (\(Fmt.tilde(path))). Dashbar left it alone. Rename or remove it, then try again."
             case .writeFailed(let why):
-                return "Couldn't save the plugin to opencode's plugins folder (\(why)). Nothing was changed."
+                return "Couldn't save the plugin to OpenCode's plugins folder (\(why)). Nothing was changed."
             }
         }
     }
@@ -329,7 +329,7 @@ struct OpenCodeSection: View {
                 }
                 IntegrationDetails(text: explanation)
             } header: {
-                Text("opencode")
+                Text("OpenCode")
             }
         }
     }
@@ -340,22 +340,22 @@ struct OpenCodeSection: View {
             LabeledContent {
                 Button("Remove") { problem = settings.set(false) }
             } label: {
-                Text("In opencode's plugins")
-                Text("Shows when a session needs you. Takes effect next time opencode starts.")
+                Text("In OpenCode's plugins")
+                Text("Shows when a session needs you. Takes effect next time OpenCode starts.")
             }
         case .notInstalled:
             LabeledContent {
-                Button("Add to opencode") { problem = settings.set(true) }
+                Button("Add to OpenCode") { problem = settings.set(true) }
             } label: {
-                Text("Show when opencode needs you")
+                Text("Show when OpenCode needs you")
                 Text("Off until you add it. Sends nothing.")
             }
         case .conflict:
             LabeledContent {
                 Button("Check Again") { problem = nil; settings.refresh() }
             } label: {
-                Text("Show when opencode needs you")
-                Text("opencode's plugins folder already has a dashbar.js that Dashbar didn't write, so Dashbar left it alone.")
+                Text("Show when OpenCode needs you")
+                Text("OpenCode's plugins folder already has a dashbar.js that Dashbar didn't write, so Dashbar left it alone.")
             }
         case .absent:
             EmptyView()
@@ -364,9 +364,9 @@ struct OpenCodeSection: View {
 
     private var explanation: String {
         let folder = Fmt.tilde(OpenCodeBridge.Paths.default().plugins.path)
-        return "Without it, Dashbar sees opencode working from its session database. Adding Dashbar puts one file, "
+        return "Without it, Dashbar sees OpenCode working from its session database. Adding Dashbar puts one file, "
             + "dashbar.js, in \(folder). It saves each session's state (working, idle or waiting for you) and folder to files "
-            + "on this Mac, for opencode 1.x and 2.x. It never saves prompts, titles or what a permission asks, and never "
+            + "on this Mac, for OpenCode 1.x and 2.x. It never saves prompts, titles or what a permission asks, and never "
             + "answers one. Remove deletes the file."
     }
 }

@@ -16,7 +16,7 @@ enum SessionAgent: String, Equatable, CaseIterable {
         case .geminiCLI: return "Gemini CLI"
         case .antigravityCLI: return "Antigravity CLI"
         case .antigravity: return "Antigravity"
-        case .opencode: return "opencode"   // the project writes its name in lower case
+        case .opencode: return "OpenCode"   // as its brand page writes it (opencode.ai/brand); the command is `opencode`
         }
     }
 

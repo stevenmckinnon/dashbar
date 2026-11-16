@@ -363,14 +363,14 @@ private struct UsageHistorySection: View {
         var out = claude.days.map { Bar(key: $0.key, date: $0.date, agent: "Claude Code", tokens: $0.tokens, cost: $0.cost) }
         if let codex { out += codex.days.map { Bar(key: $0.key, date: $0.date, agent: "Codex", tokens: $0.tokens, cost: $0.cost) } }
         if let google { out += google.days.map { Bar(key: $0.key, date: $0.date, agent: googleName, tokens: $0.tokens, cost: $0.cost) } }
-        if let opencode { out += opencode.days.map { Bar(key: $0.key, date: $0.date, agent: "opencode", tokens: $0.tokens, cost: $0.cost) } }
+        if let opencode { out += opencode.days.map { Bar(key: $0.key, date: $0.date, agent: "OpenCode", tokens: $0.tokens, cost: $0.cost) } }
         return out
     }
 
     /// The agents shown, with their colours, in order.
     private var agents: [(String, Color)] {
         [("Claude Code", UI.claude)] + (codex == nil ? [] : [("Codex", UI.codex)]) + (google == nil ? [] : [(googleName, UI.google)])
-            + (opencode == nil ? [] : [("opencode", UI.neutralTool)])
+            + (opencode == nil ? [] : [("OpenCode", UI.neutralTool)])
     }
 
     var body: some View {
@@ -406,7 +406,7 @@ private struct UsageHistorySection: View {
             Text("Costs are estimates of what these tokens would cost on the pay-as-you-go API, at list prices from \(Pricing.asOf). "
                  + "On a Claude, ChatGPT or Google AI plan you pay the plan's price, not this."
                  + (google == nil ? "" : " Antigravity CLI costs are its own estimates.")
-                 + (opencode == nil ? "" : " opencode's own costs are used where it recorded them.")
+                 + (opencode == nil ? "" : " OpenCode's own costs are used where it recorded them.")
                  + (unpriced.isEmpty ? "" : " No price is known for \(unpriced.joined(separator: ", ")), so its tokens are left out of the cost.")
                  + " Dashbar reads the last 30 days of logs and keeps totals by day, project and model, not by session.")
                 .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)

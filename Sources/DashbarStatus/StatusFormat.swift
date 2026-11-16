@@ -28,7 +28,7 @@ public struct StatusFormat {
         case "antigravity-cli": return "Antigravity CLI"
         case "antigravity": return "Antigravity"
         case "google": return "Gemini"
-        case "opencode": return "opencode"
+        case "opencode": return "OpenCode"
         default: return tool
         }
     }

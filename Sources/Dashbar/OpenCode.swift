@@ -28,7 +28,7 @@ import SQLite3
 /// 2.x tables beside the 1.x ones; `packages/core/src/database/v1-migration.bun.ts` copies each session across under
 /// the same id). A session in `session_v2` is read from there only, so nothing is counted twice.
 enum OpenCode {
-    static let formatWarning = "Couldn't read opencode's sessions. Its database format may have changed, so check for a Dashbar update."
+    static let formatWarning = "Couldn't read OpenCode's sessions. Its database format may have changed, so check for a Dashbar update."
 
     /// `$XDG_DATA_HOME/opencode/opencode.db`, else `~/.local/share/opencode/opencode.db`.
     static func databaseURL(environment: [String: String] = ProcessInfo.processInfo.environment) -> URL {
@@ -337,7 +337,7 @@ enum OpenCode {
             let t = TokenTotals(input: r.input ?? 0, output: r.output + r.reasoning, cacheRead: r.cacheRead, cacheWrite: r.cacheWrite,
                                 messages: 1)
             guard t.total > 0 else { continue }
-            let model = r.model.flatMap { $0.isEmpty ? nil : $0 } ?? "opencode"
+            let model = r.model.flatMap { $0.isEmpty ? nil : $0 } ?? "OpenCode"
             let listed = Pricing.cost(t, model: model, promptTokens: t.input + t.cacheRead + t.cacheWrite)
             let cost: Double?
             switch r.cost {
@@ -345,7 +345,7 @@ enum OpenCode {
             case let c? where c == 0: cost = listed ?? 0
             default: cost = listed
             }
-            let project = r.directory.isEmpty ? "opencode" : Fmt.project(fromCwd: Fmt.root(fromCwd: r.directory))
+            let project = r.directory.isEmpty ? "OpenCode" : Fmt.project(fromCwd: Fmt.root(fromCwd: r.directory))
             book.add(t, at: r.created, model: model, project: project, session: r.session, cost: cost, subagent: r.subagent)
         }
         return book

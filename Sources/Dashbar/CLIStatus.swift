@@ -118,7 +118,7 @@ enum CLIStatus {
         }
         let tools = [tokens("claude", "Claude", store.claude), tokens("codex", "Codex", store.codex),
                      tokens("google", GoogleUsage.title(store.googleSources), store.google),
-                     tokens("opencode", "opencode", store.opencode)].compactMap { $0 }
+                     tokens("opencode", "OpenCode", store.opencode)].compactMap { $0 }
         return tools.isEmpty ? nil : .init(day: StatusSnapshot.dayKey(now), tools: tools)
     }
 }

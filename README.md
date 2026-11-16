@@ -54,12 +54,12 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
   then runs your own status line as before. Dashbar then shows Antigravity's 5-hour and weekly limits per model group with
   their pace (and in History), its usage with the CLI's own cost estimate, and its sessions, "needs you" when it asks to
   confirm a tool. Never your email or conversations. Remove puts your previous status line back exactly.
-- **opencode** (shown only if you use it): [opencode](https://github.com/anomalyco/opencode) sessions (1.x and 2.x) as
+- **OpenCode** (shown only if you use it): [OpenCode](https://github.com/anomalyco/opencode) sessions (1.x and 2.x) as
   agents in their workspaces, working or idle, while an `opencode` process runs, and a Usage card with its tokens, models
-  and estimated cost (opencode's own cost where it recorded one; no plan limits, since you bring your own provider). Read
+  and estimated cost (OpenCode's own cost where it recorded one; no plan limits, since you bring your own provider). Read
   read-only from `~/.local/share/opencode/opencode.db`: only session ids, folders and times, and each reply's model, token
   counts and cost; never titles, prompts or replies. To see when a session is waiting for you, Settings → Integrations →
-  opencode → Add to opencode puts one plugin file, `dashbar.js`, in `~/.config/opencode/plugins/`; it saves only each
+  OpenCode → Add to OpenCode puts one plugin file, `dashbar.js`, in `~/.config/opencode/plugins/`; it saves only each
   session's id, folder, state and time to `~/Library/Caches/Dashbar/opencode-sessions/`, never answers a prompt, and
   Remove deletes it.
 - **More than one account**: if you run Claude Code with [`CLAUDE_CONFIG_DIR`](https://code.claude.com/docs/en/authentication#log-in-with-multiple-accounts) (say `~/.claude-work` beside `~/.claude`) or Codex with `CODEX_HOME`, add each folder in Settings → Accounts (Dashbar suggests `~/.claude-*` and `~/.codex-*` folders with logs, looking only at the top of your home folder). It reads every account's sessions and usage, names them by account (only once there's more than one), and shows each Claude account's plan limits from its own status line, saved to `~/Library/Caches/Dashbar/claude-statusline-<id>.json`.
@@ -247,7 +247,7 @@ folders. Claude plan limits come from Claude Code's status line: with your conse
 setting so a local script saves your usage percentages to a file, and it sends nothing. The Antigravity CLI's
 bridge works the same way and picks its fields one by one, so your email, conversation titles and transcript
 paths in that status line's input are never saved. The Antigravity app's database is only ever opened read-only. So is
-opencode's; its optional plugin saves only each session's state and folder. The only network
+OpenCode's; its optional plugin saves only each session's state and folder. The only network
 requests are update checks and the optional experimental plan-limits setting, which sends Claude Code's own
 sign-in to Anthropic's usage endpoint, the same call Claude Code makes.
 

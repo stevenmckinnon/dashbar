@@ -77,9 +77,9 @@ enum Bench {
         print("  Gemini CLI and Antigravity sessions: \(googleLive.sessions.count) (\(googleLive.sessions.filter(\.isBusy).count) working), "
               + "format \(googleLive.warning == nil ? "reads" : "WARNING")")
         let openCodeUsage = OpenCodeUsage()
-        let oc = time("opencode usage (first)") { openCodeUsage.scan() }
+        let oc = time("OpenCode usage (first)") { openCodeUsage.scan() }
         let openCode = OpenCodeCollector()
-        let ocLive = time("opencode sessions", runs: 5) { openCode.read() }
+        let ocLive = time("OpenCode sessions", runs: 5) { openCode.read() }
         print("  found \(oc.found), today \(Fmt.tokens(oc.today.total)) tokens, format \(oc.warning == nil ? "reads" : "WARNING"), "
               + "\(ocLive.count) live (\(ocLive.filter(\.isBusy).count) working)")
         // One frame of the menu bar's working animation: the status, its image, and drawing it at 2x as the menu bar does.

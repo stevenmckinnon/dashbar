@@ -75,7 +75,7 @@ extension Store {
         // Only for someone with opencode's database. No limits: it runs on the user's own providers.
         if opencode.found {
             out.append(ServiceUsage(
-                service: .opencode, title: "opencode", icon: UI.openCodeSymbol, tint: UI.neutralTool, fill: UI.neutralTool,
+                service: .opencode, title: "OpenCode", icon: UI.openCodeSymbol, tint: UI.neutralTool, fill: UI.neutralTool,
                 summary: opencode, costNote: OpenCodeUsageText.costNote, hasNotice: opencode.warning != nil))
         }
         return out
@@ -795,5 +795,5 @@ struct ClaudeAccountLimitsView: View {
 
 /// Wording for opencode's Usage card.
 enum OpenCodeUsageText {
-    static let costNote = "opencode's own cost is used where it recorded one; otherwise list prices, and models without a known price are left out."
+    static let costNote = "OpenCode's own cost is used where it recorded one; otherwise list prices, and models without a known price are left out."
 }

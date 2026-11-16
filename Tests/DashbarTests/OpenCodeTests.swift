@@ -355,7 +355,7 @@ enum OpenCodeFixture {
         let out = live(rows)
         #expect(out.map(\.id) == ["opencode-main"])
         let s = out[0]
-        #expect(s.agent == .opencode && s.pid == 4242 && s.name == "app" && s.title == "opencode")
+        #expect(s.agent == .opencode && s.pid == 4242 && s.name == "app" && s.title == "OpenCode")
     }
 
     @Test func theFoldersNewestSessionStaysWhileOpencodeRunsThere() {
@@ -374,7 +374,7 @@ enum OpenCodeFixture {
         let asks = OpenCodeBridge.SessionState(id: "a", directory: "/p/app", state: "needsYou", writtenAt: ago(20))
         let out = live([row("a", updated: 30, last: 30)], bridged: [asks])
         #expect(out.first?.isWaiting == true)
-        #expect(out.first?.waitingSentence == "opencode is waiting for you")
+        #expect(out.first?.waitingSentence == "OpenCode is waiting for you")
         // A session only the plugin knows about yet.
         let only = OpenCodeBridge.SessionState(id: "b", directory: "/p/app", state: "working", writtenAt: ago(5))
         #expect(live([], bridged: [only]).map(\.id) == ["opencode-b"])
@@ -632,7 +632,7 @@ enum OpenCodeFixture {
         #expect(!store.usageServices(settings: AppSettings.shared, antigravityInstalled: false).contains { $0.service == .opencode })
         store.opencode = UsageSummary(found: true)
         let card = store.usageServices(settings: AppSettings.shared, antigravityInstalled: false).first { $0.service == .opencode }
-        #expect(card?.title == "opencode" && card?.limits.isEmpty == true && card?.hasNotice == false)
+        #expect(card?.title == "OpenCode" && card?.limits.isEmpty == true && card?.hasNotice == false)
         store.opencode.warning = OpenCode.formatWarning
         #expect(store.formatWarning != nil)
         #expect(store.usageServices(settings: AppSettings.shared, antigravityInstalled: false).first { $0.service == .opencode }?.hasNotice == true)
@@ -650,10 +650,12 @@ enum OpenCodeFixture {
         let data = try StatusSnapshot.encoder().encode(CLIStatus.snapshot(of: store, showsClaudeLimits: true))
         let text = String(decoding: data, as: UTF8.self)
         #expect(!text.contains("SECRETID"))
-        #expect(text.contains("\"opencode\""))
+        #expect(text.contains("\"opencode\""))     // the tool id stays lower case: the schema doesn't change
+        #expect(text.contains("\"OpenCode\""))     // the name people read is the brand's (opencode.ai/brand)
+        #expect(SessionAgent.opencode.name == "OpenCode")
         let obj = try JSONSerialization.jsonObject(with: data)
         #expect(CLIStatusSnapshotTests.keys(obj).subtracting(CLIStatusSnapshotTests.allowedKeys).isEmpty)
         #expect(CLIStatus.toolID(.opencode) == "opencode")
-        #expect(StatusFormat.toolName("opencode") == "opencode")
+        #expect(StatusFormat.toolName("opencode") == "OpenCode")
     }
 }
