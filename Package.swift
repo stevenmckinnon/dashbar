@@ -43,7 +43,7 @@ let package = Package(
             dependencies: ["DashbarStatus", "DashbarWidgetUI"],
             path: "Sources/DashbarWidgets",
             swiftSettings: [.swiftLanguageMode(.v5), .unsafeFlags(["-application-extension"])],
-            linkerSettings: [.unsafeFlags(["-Xlinker", "-application_extension"])]
+            linkerSettings: [.unsafeFlags(["-Xlinker", "-application_extension", "-Xlinker", "-e", "-Xlinker", "_NSExtensionMain"])]
         ),
         .testTarget(
             name: "DashbarTests",
