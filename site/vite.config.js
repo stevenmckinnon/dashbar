@@ -75,7 +75,7 @@ const seo = {
 };
 
 // The privacy policy, a second page (privacy.html, from src/policy.js). Its text goes into the HTML as well, like the
-// homepage's. GitHub Pages serves privacy.html at /privacy; a copy at privacy/index.html makes /privacy/ work too.
+// homepage's. Cloudflare serves privacy.html at /privacy; a copy at privacy/index.html makes /privacy/ work too.
 const privacyPage = {
   name: "privacy-page",
   transformIndexHtml(html, ctx) {
@@ -94,7 +94,7 @@ const privacyPage = {
 };
 
 // The files for agents and crawlers (see agent-files.js), written next to index.html. robots.txt is static, in
-// docs/images. GitHub Pages can't negotiate content or add headers, so index.md is linked from index.html instead.
+// docs/images. index.md is linked from index.html, and site/worker serves it to agents that ask for text/markdown.
 const agentFiles = {
   name: "agent-files",
   apply: "build",

@@ -8,7 +8,7 @@ When you open a pull request, the template asks for a short summary, renders for
 
 - `Sources/Dashbar/`: the app. `DashboardView.swift` is the panel, `Store.swift` the state, `Collectors.swift`, `Usage.swift`, `PlanLimits.swift`, `SystemStats.swift` and `Proc.swift` read data, `Demo.swift` invents data for screenshots, `AppView.swift` and `AppWindow.swift` are the Dashbar window.
 - `Tests/DashbarTests/`: Swift Testing suites that run against throwaway log folders (`Fixtures.swift`).
-- `site/`: the product site, a Vite and React app deployed to GitHub Pages by `.github/workflows/pages.yml`. Its pictures come from `docs/images`, rendered with `Dashbar --snapshot … --demo`.
+- `site/`: the product site, a Vite and React app deployed to Cloudflare by `.github/workflows/site.yml` (`site/wrangler.jsonc`). Its pictures come from `docs/images`, rendered with `Dashbar --snapshot … --demo`.
 - `release-notes/`: one `X.Y.Z.md` per release.
 
 ## Run the tests

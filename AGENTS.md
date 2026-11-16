@@ -3,7 +3,7 @@
 Dashbar is a native macOS menu bar app (SwiftUI, SwiftPM, macOS 14+) that shows Claude Code and Codex
 sessions, token usage, plan limits, local dev servers, system stats and a clean-up of rebuildable caches.
 It is open source (MIT) at `stevenmckinnon/dashbar`. The product site lives in `site/` and is deployed to
-GitHub Pages at https://usedashbar.com/ (domain at Cloudflare, proxied with SSL/TLS mode Full, not strict, so GitHub's own certificate lapsing behind the proxy can't take the site down; `docs/images/CNAME`). Read `README.md` for what
+Cloudflare at https://usedashbar.com/ as Workers static assets (`site/wrangler.jsonc`, deployed by `.github/workflows/site.yml`). The domain is on Cloudflare; Always Use HTTPS and a Redirect Rule (www to the apex) are set in its dashboard. Read `README.md` for what
 the app does; this file is how to work on it.
 
 ## Layout
@@ -128,7 +128,7 @@ images stay clean.
 **Privacy and safety (the product's promise: it sends nothing)**
 - Never add analytics, accounts or network calls to the app. The only allowed requests are Sparkle update checks to
   GitHub and the opt-in, experimental Claude plan limits request to `api.anthropic.com`.
-- The website (`site/`) is served through Cloudflare's proxy and counts visits with Cloudflare Web Analytics, which uses no cookies. Its snippet is in
+- The website (`site/`) is served by Cloudflare and counts visits with Cloudflare Web Analytics, which uses no cookies. Its snippet is in
   `site/index.html` (the dev server drops it). Add nothing else: no other trackers, no cookies. If that changes,
   update the line about it in the site's Privacy section, so the site never claims more than is true.
 - Claude plan limits come first from Claude Code's status line (`StatusLineBridge.swift`). Dashbar edits
@@ -186,7 +186,7 @@ images stay clean.
   (Instrument Sans). Respect `prefers-reduced-motion`. Every demo plays once and has a Replay pill.
 - Do not invent facts on the site: no user counts, quotes, star counts or prices. FAQ answers must state
   what the app really does today.
-- GitHub Pages can't add headers or negotiate content (Cloudflare's proxy could, with rules; none are set up yet), so agents find the Markdown copy through `llms.txt` and the `<link rel="alternate">` in `index.html`. Keep `actions/upload-pages-artifact` at v3: v4 leaves out dotfolders, which would drop `/.well-known/`.
+- The site's only code is `site/worker/index.js`, and it runs only for `/` (`run_worker_first`): agents that ask for `text/markdown` get `/index.md`, and both answers carry a `Link` header (Markdown copy, `llms.txt`, sitemap). Keep everything else static, so traffic spikes never use Worker requests (the free plan allows 100,000 a day). Headers for static files go in `docs/images/_headers`. Agents also find the Markdown copy through `llms.txt` and the `<link rel="alternate">` in `index.html`.
 - Site demos mirror the app. When a visual in the app changes (tiles, header icons, card layout), update
   `site/src/demos/` to match, then re-render `docs/images/` (and `og.png` with `scripts/render-og.sh`) and re-check the demos' heights.
 
@@ -205,7 +205,7 @@ Only when the user asks. A release publishes publicly and cannot be quietly undo
 5. `gh release create vX.Y.Z build/Dashbar-X.Y.Z.dmg --title "Dashbar X.Y.Z" --notes-file build/github-release-X.Y.Z.md`
    (`release.sh` builds that body from the notes file plus the install line and SHA-256).
 6. Copy the cask into `stevenmckinnon/homebrew-tap` under `Casks/dashbar.rb` and push.
-7. Pushing to `main` redeploys the site (`.github/workflows/pages.yml`). Check the run and the live page.
+7. Pushing to `main` redeploys the site (`.github/workflows/site.yml`, to Cloudflare). Check the run and the live page.
 
 The Sparkle signing key lives only in the login Keychain (public half in `Resources/sparkle-public-key.txt`).
 It was backed up to a password manager. Never commit, paste or print it; losing it means installed copies

@@ -82,7 +82,7 @@ export const POLICY = {
       heading: "This website",
       blocks: [
         { list: [
-          "usedashbar.com is a static site hosted on GitHub Pages and served through Cloudflare, which sits in front of it to deliver and cache pages. Cloudflare and GitHub may log visitors’ IP addresses for security, as [Cloudflare’s privacy policy](https://www.cloudflare.com/privacypolicy/) and the [GitHub Pages documentation](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages#data-collection) explain.",
+          "usedashbar.com is a static site hosted by Cloudflare. Cloudflare may log visitors’ IP addresses for security, as [its privacy policy](https://www.cloudflare.com/privacypolicy/) explains.",
           "It counts visits with [Cloudflare Web Analytics](https://www.cloudflare.com/web-analytics/), which loads a small script from Cloudflare and uses no cookies. It shows me totals such as page views and referring sites, not individual visitors.",
           "It sets no cookies, and has no other analytics, trackers or ads.",
           "Its typeface, Instrument Sans, is served from this site, not from Google Fonts.",
