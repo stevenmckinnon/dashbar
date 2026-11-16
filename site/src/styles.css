@@ -159,6 +159,21 @@ section[id], [id="top"] { scroll-margin-top: 88px; }
   .feature-art { margin-top: 24px; max-width: none; }
 }
 
+/* Phones: closer rows, and the features after the first three as a list of words (App.jsx, DEMOS_ON_PHONES). */
+@media (max-width: 600px) {
+  .features { padding-block: 72px 56px; }
+  .feature-list { margin-top: 40px; gap: 56px; }
+  .feature-text p { margin-top: 12px; }
+  .feature-text .replay-pill { margin-top: 12px; }
+  .feature-art { margin-top: 20px; }
+  .feature-briefs { display: grid; }
+  .feature-brief { padding-block: 24px; border-top: 1px solid var(--line); }
+  .feature-brief:last-child { padding-bottom: 0; }
+  .feature-brief h3 { font-size: var(--step-lead); letter-spacing: -0.02em; line-height: 1.2; }
+  .feature-brief p { margin-top: 8px; color: var(--muted); }
+  .feature-brief code { font-size: 0.82em; }
+}
+
 /* ---------- Pace ---------- */
 .pace { display: grid; grid-template-columns: repeat(12, 1fr); gap: var(--gap); padding-block: var(--section); align-items: start; }
 .pace-text { grid-column: 1 / span 5; }
@@ -312,18 +327,27 @@ section[id], [id="top"] { scroll-margin-top: 88px; }
   .window-demo { margin-top: 32px; }
 }
 
-/* The two widgets as they sit on the desktop: real proportions (164 and 344 points wide, 16 apart), never more than 1.6x
-   their real size, side by side from the content grid's first column. A hairline in the page's line colour traces each
+/* The widgets, under the window demo: the pictures in the first six columns, their words from column 7 as in every
+   section head. Real proportions (164 and 344 points wide, 16 apart). A hairline in the page's line colour traces each
    one's edge, as on the film, since the white widget is close to the page in light mode. No shadow. */
-.widgets-row { grid-column: 1 / -1; display: flex; align-items: flex-start; gap: clamp(16px, 2vw, 26px); width: 100%;
-  max-width: calc(508px * 1.6 + 26px); margin-top: 64px; }
+.widgets { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; margin-top: 80px; scroll-margin-top: 88px; }
+.widgets-text { grid-column: 7 / -1; grid-row: 1; }
+.widgets-text h3 { font-size: var(--step-title); letter-spacing: -0.03em; line-height: 1.1; }
+.widgets-text p { margin-top: 16px; max-width: 44ch; color: var(--muted); }
+.widgets-row { grid-column: 1 / span 6; grid-row: 1; display: flex; align-items: flex-start; gap: clamp(16px, 2vw, 26px); min-width: 0; }
 .widget-shot { position: relative; min-width: 0; border-radius: 8.14% / 17.07%; }
 .widget-small { flex: 164 1 0; border-radius: 17.07%; }
 .widget-medium { flex: 344 1 0; }
 .widget-shot img { display: block; width: 100%; height: auto; }
 .widget-shot::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--line); pointer-events: none; }
+/* Narrow desktops: one more column for the pictures, so the medium widget stays near its real size. */
+@media (max-width: 1180px) and (min-width: 901px) {
+  .widgets-row { grid-column: 1 / span 7; }
+  .widgets-text { grid-column: 8 / -1; }
+}
 @media (max-width: 900px) {
-  .widgets-row { margin-top: 32px; }
+  .widgets { display: block; margin-top: 56px; }
+  .widgets-row { margin-top: 24px; max-width: calc(508px * 1.6 + 26px); }
 }
 /* Phones: stacked, small above medium, medium across the content width and small at its real width beside it. */
 @media (max-width: 600px) {

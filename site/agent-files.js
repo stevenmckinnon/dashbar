@@ -64,7 +64,7 @@ export function indexMd(all) {
     ...FEATURES.map((f) => `### ${f.name}\n\n${f.text}`),
     `## ${WINDOW.heading}`,
     `${WINDOW.before} ${WINDOW.shortcut} (Control-Option-D)${WINDOW.after}`,
-    `## ${WIDGETS.heading}`,
+    `### ${WIDGETS.heading}`,
     WIDGETS.text,
     `## ${PACE.heading}`,
     `${PACE.lead} ${PACE.note}`,
