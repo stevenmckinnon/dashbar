@@ -69,8 +69,8 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
   ends; it shows no cost (Copilot is billed by your plan) and no plan limits (those are only on GitHub, which Dashbar never
   asks). Read from `~/.copilot/session-state/` (`$COPILOT_HOME` if set): the folder and host from each session's
   `workspace.yaml`, each event's type near the end of `events.jsonl`, and only the model and token fields of its
-  `session.usage_record` and `session.shutdown` records; never prompts, replies, tool input or results, or session titles. A session with no event log is shown as
-  usage unknown, never zero. To see a session that needs you the moment it asks (in the terminal or VS Code), Settings →
+  `session.usage_record` and `session.shutdown` records; never prompts, replies, tool input or results, or session titles. Copilot writes no event log until a
+  prompt is sent, so a session with nothing typed adds nothing. To see a session that needs you the moment it asks (in the terminal or VS Code), Settings →
   Integrations → GitHub Copilot → Add to Copilot puts one file, `dashbar.json`, in `~/.copilot/hooks/`, using Copilot's own hooks; its script saves
   only each session's id, folder, state and time to `~/Library/Caches/Dashbar/copilot-sessions/`, never answers a
   permission, and Remove deletes it.

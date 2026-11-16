@@ -276,18 +276,23 @@ enum CopilotFixture {
         #expect(abs(m.premium - 1.33) < 0.0001)
     }
 
-    @Test func missingLogIsUnknownNotZero() throws {
+    @Test func aSessionWithNothingTypedUsedNothing() throws {
+        // Copilot writes no event log until a prompt is sent: opened and closed (or still open) with nothing typed is no
+        // usage, not unknown usage. No card, no warning.
         let fx = try Fixture(); defer { fx.remove() }
         let state = fx.root.appendingPathComponent("session-state")
-        try CopilotFixture.session(fx, "nolog", events: nil)
-        let u = CopilotUsageScanner(root: state).scan()
-        #expect(!u.summary.found)
-        #expect(u.unknownSessions == 1)
-        #expect(u.shows)
-        // Just opened (it holds a lock) and nothing written yet: new, not unknown.
+        try CopilotFixture.session(fx, "closed", events: nil)
         let open = try CopilotFixture.session(fx, "fresh", client: "vscode-agent-host", events: nil)
         try Data().write(to: open.appendingPathComponent("inuse.20093.lock"))
-        #expect(CopilotUsageScanner(root: state).scan().unknownSessions == 1)
+        let u = CopilotUsageScanner(root: state).scan()
+        #expect(u == .empty)
+        #expect(!u.shows)
+    }
+
+    @Test func unknownNoteWordingStaysHonest() {
+        let u = CopilotUsage(unknownSessions: 1)
+        #expect(u.shows)
+        #expect(CopilotUsageText.unknown(1)?.hasPrefix("Usage unknown for 1 session") == true)
     }
 
     @Test func emptyScaffoldShowsNothing() throws {

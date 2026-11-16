@@ -521,21 +521,19 @@ final class CopilotUsageScanner {
         guard let dirs = try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles])
         else { found = false; return .empty }
         let cutoff = now.addingTimeInterval(-31 * 86400), recentCutoff = now.addingTimeInterval(-2 * 86400)
-        var unknown = 0, live: [String: UInt64] = [:], anyLog = false
+        var live: [String: UInt64] = [:], anyLog = false
         for dir in dirs {
             guard (try? dir.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true else { continue }
             let session = dir.lastPathComponent
             let events = dir.appendingPathComponent("events.jsonl")
             guard let v = try? events.resourceValues(forKeys: Set(keys)), let mtime = v.contentModificationDate,
                   let size = v.fileSize.map(UInt64.init) else {
-                // No event log: usage unknown, for a real session (one with its metadata) used lately. An empty scaffold
-                // left by an aborted start (github/copilot-cli#2836), or a folder of locks being set up, isn't a session.
-                // A session open right now (it holds a lock) may just not have written yet: not unknown, only new.
-                let yaml = dir.appendingPathComponent("workspace.yaml")
-                let open = !CopilotCLI.lockPIDs((try? fm.contentsOfDirectory(atPath: dir.path)) ?? []).isEmpty
-                if !open, let m = (try? yaml.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate, m >= cutoff {
-                    unknown += 1
-                }
+                // No event log. Copilot writes `events.jsonl` once a prompt is sent (the format write-up: a session with
+                // only `!` commands "leaves no transcript"), and on this Mac every recent folder without one was a session
+                // opened and closed with nothing typed (or still open, not yet typed in), an empty scaffold from an
+                // aborted start (github/copilot-cli#2836) or a folder of locks being set up. All of those used nothing,
+                // so none is "usage unknown". (Pruned transcripts are old sessions, beyond the 31 days read.) The card's
+                // unknown note stays for a reason Dashbar can tell apart one day; nothing sets it now.
                 continue
             }
             anyLog = true
@@ -561,7 +559,7 @@ final class CopilotUsageScanner {
         if stale { rebuild(now: now) }
         let oldest = UsageBook.dayKey.string(from: cutoff)
         premiumByDay = premiumByDay.filter { $0.key >= oldest }
-        var out = CopilotUsage(unknownSessions: unknown)
+        var out = CopilotUsage()
         guard found else { return out }
         out.summary = book.summary(found: true)
         out.summary.warning = unreadable > 0 && readable == 0 ? CopilotCLI.formatWarning : nil

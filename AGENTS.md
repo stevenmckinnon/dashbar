@@ -198,8 +198,9 @@ images stay clean.
   both). Sessions filed under `~/.copilot/chats/` (VS Code with no folder) aren't workspaces, as OpenCode's folderless
   sessions aren't; their usage counts under "Copilot chat". Never message
   text, prompts, tool arguments or results, `codeChanges` file paths or any sign-in. Shutdown totals are cumulative across
-  resumes, so only their growth is booked; a format warning shows only when every recent usage line failed. A session with metadata but no `events.jsonl` is "usage unknown", never zero; an empty
-  scaffold folder is ignored; unreadable shutdown records show a format warning. No cost (plan-billed) and no plan limits:
+  resumes, so only their growth is booked; a format warning shows only when every recent usage line failed. A folder with no `events.jsonl` is a session where nothing was
+  typed (Copilot writes the log once a prompt is sent; checked on a real Mac), an empty scaffold or one being set up: it
+  counts as no usage, not unknown, and never warns. No cost (plan-billed) and no plan limits:
   premium-request quotas need GitHub's API, and Dashbar adds no network calls. The hook is `dashbar.json` in
   `~/.copilot/hooks/` (Dashbar's own file, never anyone else's): added only on Add; Remove deletes it only if every
   command in it is Dashbar's, and a foreign or invalid `dashbar.json` is left alone. It uses only `sessionStart`,
