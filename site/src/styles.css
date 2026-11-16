@@ -343,6 +343,8 @@ section[id], [id="top"] { scroll-margin-top: 88px; }
 .policy p, .policy ul { margin-top: 16px; }
 .policy ul { padding-left: 1.25em; display: grid; gap: 10px; }
 .policy li::marker { color: var(--muted); }
+.not-found { min-height: 50vh; }
+.not-found .not-found-actions { margin-top: 36px; }
 .policy strong { font-weight: 600; }
 @media (max-width: 760px) { .policy { padding-block: 32px 88px; } .policy section { margin-top: 44px; } }
 
