@@ -267,8 +267,9 @@ struct ServiceUsageCard: View {
                     .font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
                     .lineLimit(1).minimumScaleFactor(0.9)
                     .help("Input, output, and cache reads and writes, which together make the total")
-                if let premium = service.premiumRequests, premium.indices.contains(period.rawValue) {
-                    Text(CopilotUsageText.premiumLine(premium[period.rawValue], period: period))
+                if let premium = service.premiumRequests, premium.indices.contains(period.rawValue),
+                   let line = CopilotUsageText.premiumLine(premium[period.rawValue], period: period) {
+                    Text(line)
                         .font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
                         .help(service.costNote ?? "")
                 }
@@ -831,8 +832,10 @@ enum CopilotUsageText {
     static let costNote = "GitHub Copilot is billed by your plan's premium requests, not by token, so Dashbar shows no cost "
         + "for it. Tokens come from each model call as Copilot logs it, replaced by the session's own totals when it ends. Premium requests are Copilot's own count, saved when each session ends. Your plan's allowance is only on GitHub."
 
-    /// "12 premium requests today", "1 premium request in 7 days", "2.5 premium requests …".
-    static func premiumLine(_ n: Double, period: UsagePeriod) -> String {
+    /// "12 premium requests today", "1 premium request in 7 days", "2.5 premium requests …". Nil for none: Copilot
+    /// saves the count only when a session ends, so mid-session a zero means "not known yet", never "none used".
+    static func premiumLine(_ n: Double, period: UsagePeriod) -> String? {
+        guard n > 0 else { return nil }
         let figure = n == n.rounded() ? String(Int(n)) : String(format: "%.1f", n)
         return "\(figure) premium request\(n == 1 ? "" : "s") \(period.span)"
     }

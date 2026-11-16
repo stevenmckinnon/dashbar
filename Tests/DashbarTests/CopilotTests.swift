@@ -340,6 +340,8 @@ enum CopilotFixture {
         #expect(CopilotUsageText.premiumLine(1, period: .today) == "1 premium request today")
         #expect(CopilotUsageText.premiumLine(12, period: .week) == "12 premium requests in 7 days")
         #expect(CopilotUsageText.premiumLine(2.5, period: .today) == "2.5 premium requests today")
+        // Saved only when a session ends, so no count yet shows no line rather than "0 premium requests".
+        #expect(CopilotUsageText.premiumLine(0, period: .today) == nil)
         #expect(CopilotUsageText.unknown(0) == nil)
         #expect(CopilotUsageText.unknown(2)?.hasPrefix("Usage unknown for 2 sessions") == true)
     }
