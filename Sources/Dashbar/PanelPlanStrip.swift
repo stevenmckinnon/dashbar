@@ -38,6 +38,7 @@ struct PlanStripCard: View {
             .foregroundStyle(UI.textInfo)
             .contentShape(Rectangle())
         }
+        .linkPointer()
         .buttonStyle(PressStyle())
         .help("Show every limit and your usage (⌘2)")
         .accessibilityLabel("Usage")

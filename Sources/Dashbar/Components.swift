@@ -328,3 +328,22 @@ enum Meter {
         return min(length, max(minimum, length * CGFloat(min(fraction, 1))))
     }
 }
+
+/// The pointing hand over text that navigates somewhere (Apple's HIG keeps it for links). Buttons, rows and other
+/// controls keep the arrow, as in Apple's own apps.
+extension View {
+    func linkPointer() -> some View { modifier(LinkPointer()) }
+}
+
+/// Pops the hand when the link disappears under the pointer too (clicking "Usage" switches tab), so it never sticks.
+private struct LinkPointer: ViewModifier {
+    @State private var pushed = false
+    func body(content: Content) -> some View {
+        content
+            .onHover { inside in
+                if inside, !pushed { NSCursor.pointingHand.push(); pushed = true }
+                else if !inside, pushed { NSCursor.pop(); pushed = false }
+            }
+            .onDisappear { if pushed { NSCursor.pop(); pushed = false } }
+    }
+}
