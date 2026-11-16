@@ -39,9 +39,11 @@ enum Snapshot {
                 exit(0)
             }
             if let flag = CommandLine.arguments.firstIndex(of: "--widget") {
-                // A desktop widget (small or medium) from the demo data, drawn by the same views the extension uses.
-                let size = CommandLine.arguments.dropFirst(flag + 1).first.flatMap(DashbarWidgetSize.init(rawValue:)) ?? .small
-                WidgetSnapshot.render(size, store: store, dark: dark, to: path)
+                // A desktop widget (small or medium, or `pair`: both side by side) from the demo data, drawn by the same views
+                // the extension uses.
+                let name = CommandLine.arguments.dropFirst(flag + 1).first
+                let sizes: [DashbarWidgetSize] = name == "pair" ? [.small, .medium] : [name.flatMap(DashbarWidgetSize.init(rawValue:)) ?? .small]
+                WidgetSnapshot.render(sizes, store: store, dark: dark, to: path)
                 exit(0)
             }
             if CommandLine.arguments.contains("--glyphs") {
@@ -453,12 +455,13 @@ enum MenuBarSnapshot {
     }
 }
 
-/// `--widget small|medium`: a desktop widget on a plain backdrop, from the store's snapshot as the widget would read it.
+/// `--widget small|medium|pair`: desktop widgets on a plain neutral surface with rounded corners, from the store's snapshot
+/// as the widget would read it (`pair` is the site's and README's picture). `DASHBAR_SNAPSHOT_SCALE=4` renders at 4x.
 /// `DASHBAR_WIDGET_STATE=nodata|notrunning` shows the widget before the app has saved anything, or after it has quit;
 /// `DASHBAR_WIDGET_TOOLS=1` keeps only the first N tools' limits, to see the medium widget with fewer rows.
 @MainActor
 enum WidgetSnapshot {
-    static func render(_ size: DashbarWidgetSize, store: Store, dark: Bool, to path: String) {
+    static func render(_ sizes: [DashbarWidgetSize], store: Store, dark: Bool, to path: String) {
         let now = Date()
         let state = ProcessInfo.processInfo.environment["DASHBAR_WIDGET_STATE"]
         var snapshot = CLIStatus.snapshot(of: store, showsClaudeLimits: true, now: now).forWidget()
@@ -466,19 +469,22 @@ enum WidgetSnapshot {
             snapshot.limits = Array(snapshot.limits.prefix(tools))
         }
         let entry = DashbarWidgetEntry(date: now, snapshot: state == "nodata" ? nil : snapshot, running: state != "notrunning")
-        let points = size.points
-        let content = size.view(entry)
-            .padding(16)
-            .frame(width: points.width, height: points.height, alignment: .topLeading)
-            .background(dark ? Color(white: 0.17) : Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))   // chronod: 27.88
-            .padding(24)
-            .background(dark ? Color(white: 0.08) : Color(white: 0.88))
-            .environment(\.colorScheme, dark ? .dark : .light)
+        let content = HStack(alignment: .top, spacing: 24) {
+            ForEach(sizes, id: \.self) { size in
+                size.view(entry)
+                    .padding(16)
+                    .frame(width: size.points.width, height: size.points.height, alignment: .topLeading)
+                    .background(dark ? Color(white: 0.17) : Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))   // chronod: 27.88
+            }
+        }
+        .padding(32)
+        .background(dark ? Color(white: 0.08) : Color(white: 0.88))
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .environment(\.colorScheme, dark ? .dark : .light)
         let renderer = ImageRenderer(content: content)
         renderer.scale = Snapshot.scale ?? 2
-        if let image = renderer.nsImage, let tiff = image.tiffRepresentation,
-           let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
+        if let image = renderer.cgImage, let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) {
             try? png.write(to: URL(fileURLWithPath: path))
         }
     }

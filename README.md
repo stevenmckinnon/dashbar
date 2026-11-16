@@ -77,6 +77,11 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
   readable only by you): plan percentages, reset times, plan names and agent counts, no project names, folders or
   sessions. macOS decides how often widgets refresh, so they can lag a few minutes; when Dashbar isn't running they dim
   and say since when.
+
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/widgets-dark.png">
+    <img src="docs/images/widgets-light.png" alt="The small Dashbar widget with Claude's 5-hour and weekly limits, beside the medium one with the limits for Claude, Codex and Antigravity and 2 agents working" width="600">
+  </picture>
 - **Plan limits**: Codex's 5-hour and weekly limits from its own logs. Claude's come from Claude Code's
   [status line](https://code.claude.com/docs/en/statusline), which Claude Code passes your usage after each
   reply (Pro, Max and Ultra plans). Off until you choose Settings → Integrations → Add to Status Line: Dashbar then

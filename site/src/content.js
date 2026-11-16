@@ -46,6 +46,14 @@ export const WINDOW = {
   caption: "The menu bar panel stays the quick glance. Clicking a workspace there opens its page here.",
 };
 
+// The widgets refresh on macOS's schedule: about every 15 minutes, sooner when Dashbar's figures change (WidgetBridge,
+// SnapshotProvider). Keep "every few minutes, not live" true if that changes.
+export const WIDGETS = {
+  heading: "Or on your desktop",
+  text: "Two widgets keep your plan limits in sight. The small one shows Claude’s 5-hour and weekly limits and when they reset; the medium one shows each tool’s limits and how many agents are working. Add them from Edit Widgets on the desktop. They refresh every few minutes, not live, and dim when Dashbar isn’t running.",
+  alt: "Two Dashbar widgets. The small one shows Claude on Max 5x: 5-hour 55% used, resets 15:39, and weekly 38% used, resets Friday 01:27. The medium one says 2 working and shows the 5-hour and weekly limits for Claude (55% and 38%), Codex (21% and 34%) and Antigravity (42% and 61%).",
+};
+
 export const PACE = {
   heading: "When would you run out?",
   lead: "Dashbar projects your current rate forward to 100%.",

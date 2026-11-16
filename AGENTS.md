@@ -50,7 +50,7 @@ DASHBAR_DEMO_QUIET=long Dashbar --snapshot out.png --demo  # the same, with ever
 DASHBAR_DEMO_IDLE=1 DASHBAR_TAB=agents Dashbar --snapshot out.png --demo --hosted  # Codex unused today: its Usage card folds to one line
 DASHBAR_DEMO_LOOSE_SERVER=1 Dashbar --snapshot out.png --demo  # adds a dev server outside every workspace (Overview's Servers card)
 DASHBAR_DEMO_NO_LIMITS=1 Dashbar --snapshot out.png --demo # no plan limits from any tool (no strip on Overview)
-Dashbar --snapshot out.png --demo --widget small|medium [--dark]   # a desktop widget (DASHBAR_WIDGET_STATE=nodata|notrunning,
+Dashbar --snapshot out.png --demo --widget small|medium|pair [--dark]   # desktop widgets; pair is docs/images/widgets-*.png (DASHBAR_SNAPSHOT_SCALE=4 DASHBAR_DEMO_GOOGLE=1), from a copy outside build/ with PlugIns removed (see Widgets). (DASHBAR_WIDGET_STATE=nodata|notrunning,
                                                     # DASHBAR_WIDGET_TOOLS=1 for fewer rows, DASHBAR_DEMO_GOOGLE=weekly for two Antigravity groups)
 Dashbar --snapshot out.png --demo --menubar all     # the menu bar item: idle|working|needsyou|done|time|all, on light (--dark) bars
 Dashbar --snapshot x --demo --menubar working --onscreen   # that state in a real status item for 8s (prints its frame)

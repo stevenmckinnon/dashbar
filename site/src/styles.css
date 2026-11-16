@@ -312,6 +312,9 @@ section[id], [id="top"] { scroll-margin-top: 88px; }
   .window-demo { margin-top: 32px; }
 }
 
+/* The widgets picture: the same grammar as the window, at the widgets' own width so their text reads at about its real size. */
+.widgets-shot img { display: block; width: 100%; max-width: 900px; height: auto; }
+
 /* ---------- Privacy policy (/privacy): one readable column ---------- */
 .policy { padding-block: 56px var(--section); }
 .policy article { max-width: 68ch; }
