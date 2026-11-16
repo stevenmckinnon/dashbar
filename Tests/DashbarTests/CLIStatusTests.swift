@@ -15,6 +15,8 @@ import DashbarStatus
         "label", "window", "windowSeconds", "usedPercent", "resetsAt", "pace", "runsOutAt",
         "day", "tools", "input", "output", "cacheRead", "cacheWrite", "total",
         "port", "command", "title",
+        // The widget's copy (`forWidget()`): counts of agents by state.
+        "agents", "working", "needsYou", "idle",
     ]
 
     static func keys(_ value: Any) -> Set<String> {

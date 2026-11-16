@@ -15,6 +15,7 @@ enum CLIStatus {
     /// Starts following `store`. Not for demo stores or snapshot runs, which must never replace the real file.
     static func follow(_ store: Store) -> AnyCancellable {
         let writer = StatusSnapshotWriter(url: StatusSnapshot.fileURL(appName: BuildInfo.appName))
+        let widgets = WidgetBridge.forThisBuild()
         let changes: [AnyPublisher<Void, Never>] = [
             store.$sessions.map { _ in () }.eraseToAnyPublisher(),
             store.$subagents.map { _ in () }.eraseToAnyPublisher(),
@@ -36,7 +37,9 @@ enum CLIStatus {
             .receive(on: RunLoop.main)
             .sink { [weak store] in
                 guard let store else { return }
-                writer.write(snapshot(of: store, showsClaudeLimits: AppSettings.shared.showsClaudeLimits))
+                let status = snapshot(of: store, showsClaudeLimits: AppSettings.shared.showsClaudeLimits)
+                writer.write(status)
+                widgets?.update(status)
             }
     }
 
