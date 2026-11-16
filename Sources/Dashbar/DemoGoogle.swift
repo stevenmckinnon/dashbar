@@ -51,6 +51,20 @@ extension DemoData {
                 RateLimit(label: "Weekly", usedPercent: 27, resetsAt: now.addingTimeInterval(2.6 * 86400), window: 7 * 86400),
             ]),
         ], fetchedAt: minutes(1))
+        // DASHBAR_DEMO_GOOGLE=weekly: both groups well into their weekly limits and barely into their 5-hour ones, so the
+        // tightest two are weekly limits of different groups (the medium widget names them by group).
+        if ProcessInfo.processInfo.environment["DASHBAR_DEMO_GOOGLE"] == "weekly" {
+            store.antigravityLimits = AntigravityLimits(planTier: "Pro", groups: [
+                .init(key: "gemini", name: "Gemini", limits: [
+                    RateLimit(label: "5-hour", usedPercent: 6, resetsAt: now.addingTimeInterval(3.2 * 3600), window: 5 * 3600),
+                    RateLimit(label: "Weekly", usedPercent: 58, resetsAt: now.addingTimeInterval(5.4 * 86400), window: 7 * 86400),
+                ]),
+                .init(key: "claude-and-gpt", name: "Claude and GPT", limits: [
+                    RateLimit(label: "5-hour", usedPercent: 4, resetsAt: now.addingTimeInterval(4.0 * 3600), window: 5 * 3600),
+                    RateLimit(label: "Weekly", usedPercent: 44, resetsAt: now.addingTimeInterval(5.0 * 86400), window: 7 * 86400),
+                ]),
+            ], fetchedAt: minutes(1))
+        }
         // DASHBAR_DEMO_GOOGLE=quota: the reading as the CLI shapes it, with bucket IDs Dashbar has to name by rule
         // ("3p-5h", a group with an unknown short word) and most windows at 0%, to see the names and the folded rows.
         if ProcessInfo.processInfo.environment["DASHBAR_DEMO_GOOGLE"] == "quota" {

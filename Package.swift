@@ -10,7 +10,7 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "Dashbar",
-            dependencies: [.product(name: "Sparkle", package: "Sparkle"), "DashbarStatus"],
+            dependencies: [.product(name: "Sparkle", package: "Sparkle"), "DashbarStatus", "DashbarWidgetUI"],
             path: "Sources/Dashbar",
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
@@ -28,9 +28,26 @@ let package = Package(
             path: "Sources/dashbar-cli",
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
+        // The desktop widgets' views and what they show, shared by the extension and the app (which renders them offline
+        // for `--snapshot --widget`). Built for app extensions, so the extension can link it.
+        .target(
+            name: "DashbarWidgetUI",
+            dependencies: ["DashbarStatus"],
+            path: "Sources/DashbarWidgetUI",
+            swiftSettings: [.swiftLanguageMode(.v5), .unsafeFlags(["-application-extension"])]
+        ),
+        // The widget extension's executable, bundled by build.sh as Contents/PlugIns/DashbarWidgets.appex. Its entry point is
+        // WidgetKit's, through the `@main` WidgetBundle.
+        .executableTarget(
+            name: "DashbarWidgets",
+            dependencies: ["DashbarStatus", "DashbarWidgetUI"],
+            path: "Sources/DashbarWidgets",
+            swiftSettings: [.swiftLanguageMode(.v5), .unsafeFlags(["-application-extension"])],
+            linkerSettings: [.unsafeFlags(["-Xlinker", "-application_extension", "-Xlinker", "-e", "-Xlinker", "_NSExtensionMain"])]
+        ),
         .testTarget(
             name: "DashbarTests",
-            dependencies: ["Dashbar", "DashbarStatus"],
+            dependencies: ["Dashbar", "DashbarStatus", "DashbarWidgetUI"],
             path: "Tests/DashbarTests",
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),

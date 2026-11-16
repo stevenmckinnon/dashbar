@@ -5,7 +5,7 @@ import { RELEASE_NOTES, LATEST_VERSION, inline } from "./releases";
 import { DashbarDemo } from "./demos/DashbarDemo";
 import { AgentsDemo, LimitsDemo, UsageDemo, ServersDemo, SystemDemo, CleanupDemo } from "./demos/FeatureDemos";
 import { WindowDemo } from "./demos/WindowDemo";
-import { REPO, BREW, HERO, TOUR, FEATURES_INTRO, FEATURES, WINDOW, PACE, PRIVACY, INSTALL } from "./content";
+import { REPO, BREW, HERO, TOUR, FEATURES_INTRO, FEATURES, WINDOW, WIDGETS, PACE, PRIVACY, INSTALL } from "./content";
 import { Mark, Footer } from "./Chrome";
 
 // The DMG itself, so the button downloads straight away. The version comes from the update feed at build time;
@@ -241,6 +241,24 @@ function WindowSection() {
   );
 }
 
+/* ---------- The desktop widgets ---------- */
+
+function WidgetsSection() {
+  return (
+    <section className="wrap window widgets" id="widgets" aria-labelledby="widgets-h">
+      <div className="section-head window-head">
+        <h2 id="widgets-h">{WIDGETS.heading}</h2>
+        <p>{WIDGETS.text}</p>
+      </div>
+      {/* Rendered by the app (`--snapshot --demo --widget small|medium` at 4x), invented demo data. */}
+      <div className="widgets-row">
+        <div className="widget-shot widget-small"><Shot name="widget-small" width={656} height={656} alt={WIDGETS.altSmall} /></div>
+        <div className="widget-shot widget-medium"><Shot name="widget-medium" width={1376} height={656} alt={WIDGETS.altMedium} /></div>
+      </div>
+    </section>
+  );
+}
+
 /* ---------- Pace, worked out the way the app does it ---------- */
 
 const WINDOW_HOURS = 5;
@@ -406,6 +424,7 @@ export default function App() {
         <Tour />
         <Features />
         <WindowSection />
+        <WidgetsSection />
         <Pace />
         <Privacy />
         <WhatsNew />

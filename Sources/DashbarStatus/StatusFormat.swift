@@ -39,7 +39,7 @@ public struct StatusFormat {
     }
 
     /// "5h", "wk", "day", "mo", "8h", "3d" for the one-line form; the label when the window's length isn't known.
-    static func shortWindow(_ limit: StatusSnapshot.Limit) -> String {
+    public static func shortWindow(_ limit: StatusSnapshot.Limit) -> String {
         guard let window = limit.window else { return limit.label }
         switch window {
         case "Daily": return "day"

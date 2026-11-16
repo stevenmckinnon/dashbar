@@ -62,6 +62,23 @@ cp -R "$(dirname "$BINARY")/Sparkle.framework" "$APP/Contents/Frameworks/"
 install_name_tool -add_rpath @executable_path/../Frameworks "$APP/Contents/MacOS/$APP_NAME"
 cp "$ICON_ICNS" "$APP/Contents/Resources/AppIcon.icns"
 
+# Sign with a stable identity when one exists, so macOS recognises rebuilds as the same app
+# (Keychain "Always Allow" and other permissions persist). Override with DASHBAR_SIGN_IDENTITY;
+# falls back to ad-hoc signing, which macOS treats as a new app on every build.
+IDENTITY="${DASHBAR_SIGN_IDENTITY:-$(security find-identity -v -p codesigning 2>/dev/null \
+  | grep -E '"(Developer ID Application|Apple Development):' | head -1 | sed -E 's/.*"(.*)".*/\1/')}"
+if [[ "$IDENTITY" == "-" ]]; then IDENTITY=""; fi
+# The team behind the identity (its certificate's OU), which prefixes the App Group the app and its widget share:
+# "<team>.fun.dashbar.app" for the release, "<team>.fun.dashbar.app.local" for a local build, so neither reads the
+# other's widget data. A team-prefixed group needs no provisioning profile on macOS. Ad-hoc builds have no team, so
+# they get no group: the widget is still embedded but says the app has saved nothing.
+TEAM_ID=""
+if [[ -n "$IDENTITY" ]]; then
+  TEAM_ID="$(security find-certificate -c "$IDENTITY" -p 2>/dev/null | openssl x509 -noout -subject 2>/dev/null \
+    | sed -nE 's/.*OU ?= ?([A-Z0-9]{10}).*/\1/p' | head -1 || true)"
+fi
+APP_GROUP="${TEAM_ID:+$TEAM_ID.$BUNDLE_ID}"
+
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -93,6 +110,10 @@ elif [[ -f "$PUBLIC_KEY_FILE" ]]; then
 else
   UPDATES=""
 fi
+if [[ -n "$APP_GROUP" ]]; then
+  UPDATES="$UPDATES
+  <key>DashbarAppGroup</key><string>$APP_GROUP</string>"
+fi
 python3 - "$APP/Contents/Info.plist" "$UPDATES" <<'PY'
 import sys
 path, updates = sys.argv[1], sys.argv[2]
@@ -102,11 +123,53 @@ PY
 sed -i '' -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD_NUMBER/" \
   -e "s/__NAME__/$APP_NAME/g" -e "s/__BUNDLE_ID__/$BUNDLE_ID/" "$APP/Contents/Info.plist"
 
-# Sign with a stable identity when one exists, so macOS recognises rebuilds as the same app
-# (Keychain "Always Allow" and other permissions persist). Override with DASHBAR_SIGN_IDENTITY;
-# falls back to ad-hoc signing, which macOS treats as a new app on every build.
-IDENTITY="${DASHBAR_SIGN_IDENTITY:-$(security find-identity -v -p codesigning 2>/dev/null \
-  | grep -E '"(Developer ID Application|Apple Development):' | head -1 | sed -E 's/.*"(.*)".*/\1/')}"
+# The desktop widgets: a WidgetKit extension in PlugIns. Its bundle id is a child of the app's and its version matches
+# the app's, as ExtensionKit requires. It runs sandboxed and reads only the App Group container (WidgetBridge.swift).
+APPEX="$APP/Contents/PlugIns/DashbarWidgets.appex"
+mkdir -p "$APPEX/Contents/MacOS"
+cp "$(dirname "$BINARY")/DashbarWidgets" "$APPEX/Contents/MacOS/DashbarWidgets"
+python3 - "$APPEX/Contents/Info.plist" "$APP_NAME" "$BUNDLE_ID.widgets" "$VERSION" "$BUILD_NUMBER" "$APP_GROUP" \
+  "$(xcrun --sdk macosx --show-sdk-version)" "$(xcrun --sdk macosx --show-sdk-build-version)" <<'PY'
+import plistlib, sys
+path, name, bundle_id, version, build, group, sdk, sdk_build = sys.argv[1:]
+info = {
+    # What Xcode writes into every bundle it builds; WidgetKit's daemon records the platform and SDK of each widget.
+    "CFBundleSupportedPlatforms": ["MacOSX"],
+    "DTPlatformName": "macosx",
+    "DTPlatformVersion": sdk,
+    "DTSDKName": f"macosx{sdk}",
+    "DTSDKBuild": sdk_build,
+    "CFBundleDevelopmentRegion": "en",
+    "CFBundleDisplayName": name,
+    "CFBundleName": "DashbarWidgets",
+    "CFBundleExecutable": "DashbarWidgets",
+    "CFBundleIdentifier": bundle_id,
+    "CFBundleInfoDictionaryVersion": "6.0",
+    "CFBundlePackageType": "XPC!",
+    "CFBundleShortVersionString": version,
+    "CFBundleVersion": build,
+    "LSMinimumSystemVersion": "14.0",
+    "NSExtension": {"NSExtensionPointIdentifier": "com.apple.widgetkit-extension"},
+}
+if group:
+    info["DashbarAppGroup"] = group
+with open(path, "wb") as f:
+    plistlib.dump(info, f)
+PY
+
+# Entitlements: the widget is sandboxed (WidgetKit requires it) with only its App Group; the app has only the group.
+ENTITLEMENTS="build/entitlements"
+mkdir -p "$ENTITLEMENTS"
+python3 - "$ENTITLEMENTS" "$APP_GROUP" <<'PY'
+import plistlib, sys
+folder, group = sys.argv[1:]
+groups = {"com.apple.security.application-groups": [group]} if group else {}
+with open(f"{folder}/widgets.plist", "wb") as f:
+    plistlib.dump({"com.apple.security.app-sandbox": True, **groups}, f)
+with open(f"{folder}/app.plist", "wb") as f:
+    plistlib.dump(groups, f)
+PY
+
 # Nested code is signed first (inside out), then the app, so every signature covers what's inside it.
 sign() {
   local flags=()
@@ -119,8 +182,10 @@ sign "$SPARKLE/Autoupdate"
 sign "$SPARKLE/Updater.app"
 sign "$APP/Contents/Frameworks/Sparkle.framework"
 sign --identifier "$BUNDLE_ID.cli" "$APP/Contents/Helpers/dashbar"
-sign "$APP"
+sign --entitlements "$ENTITLEMENTS/widgets.plist" "$APPEX"
+sign --entitlements "$ENTITLEMENTS/app.plist" "$APP"
 if [[ -n "$IDENTITY" ]]; then echo "Signed with: $IDENTITY"; else echo "Signed ad-hoc (no signing identity found)"; fi
+if [[ -n "$APP_GROUP" ]]; then echo "Widget App Group: $APP_GROUP"; else echo "No App Group (ad-hoc): the widget will show no data"; fi
 echo "Built $APP"
 
 if [[ "${1:-}" == "--install" || "${2:-}" == "--install" ]]; then

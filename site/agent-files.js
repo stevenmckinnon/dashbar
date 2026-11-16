@@ -5,7 +5,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { FAQ } from "./src/faq.js";
-import { SITE, REPO, BREW, HERO, FEATURES_INTRO, FEATURES, WINDOW, PACE, PRIVACY, INSTALL, FOOTER, plain } from "./src/content.js";
+import { SITE, REPO, BREW, HERO, FEATURES_INTRO, FEATURES, WINDOW, WIDGETS, PACE, PRIVACY, INSTALL, FOOTER, plain } from "./src/content.js";
 
 const root = new URL("../", import.meta.url);
 const byVersion = (a, b) => b.version.localeCompare(a.version, undefined, { numeric: true });
@@ -64,6 +64,8 @@ export function indexMd(all) {
     ...FEATURES.map((f) => `### ${f.name}\n\n${f.text}`),
     `## ${WINDOW.heading}`,
     `${WINDOW.before} ${WINDOW.shortcut} (Control-Option-D)${WINDOW.after}`,
+    `## ${WIDGETS.heading}`,
+    WIDGETS.text,
     `## ${PACE.heading}`,
     `${PACE.lead} ${PACE.note}`,
     `## ${PRIVACY.heading}`,
@@ -174,7 +176,7 @@ export function llmsTxt(all) {
       `- [Homepage as Markdown](${SITE}index.md): features, what it reads and sends, what’s new, the FAQ and how to install`,
       `- [Full text](${SITE}llms-full.txt): the homepage plus the notes for every release`,
       `- [README](${REPO}/blob/main/README.md): features, settings, privacy and building from source`,
-      `- [FAQ](${SITE}#faq): supported agents, Claude plan limits, privacy, updating and uninstalling`,
+      `- [FAQ](${SITE}#faq): supported agents, Claude plan limits, widgets, privacy, updating and uninstalling`,
       `- [Privacy](${SITE}#privacy): every file it reads and the only two requests it can make`,
       `- [Privacy policy](${SITE}privacy): what the app and this website do with data, and who to contact`,
     ].join("\n"),

@@ -312,6 +312,26 @@ section[id], [id="top"] { scroll-margin-top: 88px; }
   .window-demo { margin-top: 32px; }
 }
 
+/* The two widgets as they sit on the desktop: real proportions (164 and 344 points wide, 16 apart), never more than 1.6x
+   their real size, side by side from the content grid's first column. A hairline in the page's line colour traces each
+   one's edge, as on the film, since the white widget is close to the page in light mode. No shadow. */
+.widgets-row { grid-column: 1 / -1; display: flex; align-items: flex-start; gap: clamp(16px, 2vw, 26px); width: 100%;
+  max-width: calc(508px * 1.6 + 26px); margin-top: 64px; }
+.widget-shot { position: relative; min-width: 0; border-radius: 8.14% / 17.07%; }
+.widget-small { flex: 164 1 0; border-radius: 17.07%; }
+.widget-medium { flex: 344 1 0; }
+.widget-shot img { display: block; width: 100%; height: auto; }
+.widget-shot::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--line); pointer-events: none; }
+@media (max-width: 900px) {
+  .widgets-row { margin-top: 32px; }
+}
+/* Phones: stacked, small above medium, medium across the content width and small at its real width beside it. */
+@media (max-width: 600px) {
+  .widgets-row { flex-direction: column; gap: 16px; }
+  .widget-small { flex: none; width: 47.67%; max-width: 262px; }
+  .widget-medium { flex: none; width: 100%; max-width: 550px; }
+}
+
 /* ---------- Privacy policy (/privacy): one readable column ---------- */
 .policy { padding-block: 56px var(--section); }
 .policy article { max-width: 68ch; }

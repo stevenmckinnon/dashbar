@@ -18,9 +18,12 @@ public struct StatusSnapshot: Codable, Equatable, Sendable {
     public var limits: [LimitGroup]
     public var usageToday: UsageToday?
     public var servers: [Server]
+    /// How many agents are in each state. Only in the widget's copy (`forWidget()`), which has no sessions.
+    public var agents: AgentCounts?
 
     public init(schema: Int = StatusSnapshot.currentSchema, generatedAt: Date, app: App, warning: String? = nil,
-                sessions: [Session] = [], limits: [LimitGroup] = [], usageToday: UsageToday? = nil, servers: [Server] = []) {
+                sessions: [Session] = [], limits: [LimitGroup] = [], usageToday: UsageToday? = nil, servers: [Server] = [],
+                agents: AgentCounts? = nil) {
         self.schema = schema
         self.generatedAt = generatedAt
         self.app = app
@@ -29,6 +32,7 @@ public struct StatusSnapshot: Codable, Equatable, Sendable {
         self.limits = limits
         self.usageToday = usageToday
         self.servers = servers
+        self.agents = agents
     }
 
     public struct App: Codable, Equatable, Sendable {

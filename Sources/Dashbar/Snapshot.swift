@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import DashbarStatus
+import DashbarWidgetUI
 
 /// `Dashbar --snapshot out.png [--dark]` renders the dashboard with live data to a PNG and exits.
 /// Handy for README screenshots and visual checks without clicking the menu bar.
@@ -35,6 +36,12 @@ enum Snapshot {
                 let snapshot = CLIStatus.snapshot(of: store, showsClaudeLimits: demo || AppSettings.shared.showsClaudeLimits)
                 let data = (try? StatusSnapshot.encoder().encode(snapshot)) ?? Data()
                 try? data.write(to: URL(fileURLWithPath: path))
+                exit(0)
+            }
+            if let flag = CommandLine.arguments.firstIndex(of: "--widget") {
+                // A desktop widget (small or medium) from the demo data, drawn by the same views the extension uses.
+                let size = CommandLine.arguments.dropFirst(flag + 1).first.flatMap(DashbarWidgetSize.init(rawValue:)) ?? .small
+                WidgetSnapshot.render(size, store: store, dark: dark, to: path)
                 exit(0)
             }
             if CommandLine.arguments.contains("--glyphs") {
@@ -443,5 +450,35 @@ enum MenuBarSnapshot {
         }
         let seconds = Double(ProcessInfo.processInfo.environment["DASHBAR_ONSCREEN_SECONDS"] ?? "") ?? 8
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { exit(0) }
+    }
+}
+
+/// `--widget small|medium`: one desktop widget at its real size, its own rounded shape and fill on a transparent background
+/// (the site's and README's pictures, `docs/images/widget-*-{light,dark}.png`, at `DASHBAR_SNAPSHOT_SCALE=4`), from the
+/// store's snapshot as the widget would read it.
+/// `DASHBAR_WIDGET_STATE=nodata|notrunning` shows the widget before the app has saved anything, or after it has quit;
+/// `DASHBAR_WIDGET_TOOLS=1` keeps only the first N tools' limits, to see the medium widget with fewer rows.
+@MainActor
+enum WidgetSnapshot {
+    static func render(_ size: DashbarWidgetSize, store: Store, dark: Bool, to path: String) {
+        let now = Date()
+        let state = ProcessInfo.processInfo.environment["DASHBAR_WIDGET_STATE"]
+        var snapshot = CLIStatus.snapshot(of: store, showsClaudeLimits: true, now: now).forWidget()
+        if let tools = ProcessInfo.processInfo.environment["DASHBAR_WIDGET_TOOLS"].flatMap(Int.init) {
+            snapshot.limits = Array(snapshot.limits.prefix(tools))
+        }
+        let entry = DashbarWidgetEntry(date: now, snapshot: state == "nodata" ? nil : snapshot, running: state != "notrunning")
+        let content = size.view(entry)
+            .padding(16)
+            .frame(width: size.points.width, height: size.points.height, alignment: .topLeading)
+            .background(dark ? Color(white: 0.17) : Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))   // chronod: 27.88
+            .environment(\.colorScheme, dark ? .dark : .light)
+        let renderer = ImageRenderer(content: content)
+        renderer.scale = Snapshot.scale ?? 2
+        renderer.isOpaque = false
+        if let image = renderer.cgImage, let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) {
+            try? png.write(to: URL(fileURLWithPath: path))
+        }
     }
 }
