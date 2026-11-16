@@ -200,6 +200,44 @@ import Testing
         }
     }
 
+    // MARK: Touch Macs (a Dynamic Island where the notch was)
+
+    @Test func aNewInstallOnATouchMacLeavesTheIslandOff() throws {
+        #expect(IslandSettings.enabledAtLaunch(newInstall: true, saved: nil, touch: true) == nil)
+        try withTestDefaults { defaults in
+            IslandSettings.applyLaunchDefault(defaults, newInstall: true, touch: true)
+            // Left unset rather than saved as off, so it stays nobody's choice; it reads as off.
+            #expect(defaults.object(forKey: IslandSettings.enabledKey) == nil)
+            #expect(!IslandSettings.Values.read(defaults).enabled)
+        }
+    }
+
+    @Test func aNewInstallWithoutTouchStillTurnsTheIslandOn() throws {
+        #expect(IslandSettings.enabledAtLaunch(newInstall: true, saved: nil, touch: false) == true)
+        try withTestDefaults { defaults in
+            IslandSettings.applyLaunchDefault(defaults, newInstall: true, touch: false)
+            #expect(IslandSettings.Values.read(defaults).enabled)
+        }
+        // An update never turns it on, touch or not.
+        #expect(IslandSettings.enabledAtLaunch(newInstall: false, saved: nil, touch: false) == nil)
+        #expect(IslandSettings.enabledAtLaunch(newInstall: false, saved: nil, touch: true) == nil)
+    }
+
+    @Test func aSavedIslandChoiceIsNeverChanged() throws {
+        for newInstall in [true, false] {
+            for touch in [true, false] {
+                for saved in [true, false] {
+                    #expect(IslandSettings.enabledAtLaunch(newInstall: newInstall, saved: saved, touch: touch) == nil)
+                    try withTestDefaults { defaults in
+                        defaults.set(saved, forKey: IslandSettings.enabledKey)
+                        IslandSettings.applyLaunchDefault(defaults, newInstall: newInstall, touch: touch)
+                        #expect(IslandSettings.Values.read(defaults).enabled == saved)
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: Placement
 
     /// A 14-inch MacBook Pro as NSScreen reports it: 1512 × 982, a 185 × 32 notch, a 33-point menu bar.

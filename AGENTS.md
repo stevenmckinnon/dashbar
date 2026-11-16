@@ -53,6 +53,8 @@ DASHBAR_DEMO_NO_LIMITS=1 Dashbar --snapshot out.png --demo # no plan limits from
 DASHBAR_DEMO_OPENCODE=1 Dashbar --snapshot out.png --demo  # adds a working OpenCode session and its Usage card (=waiting: it needs you); also shows its Integrations row
 DASHBAR_DEMO_COPILOT=1 Dashbar --snapshot out.png --demo   # adds a working GitHub Copilot session and its Usage card (=waiting: asking permission); also shows its Integrations section
 DASHBAR_DEMO_HIDDEN=copilot,codex Dashbar --snapshot out.png --demo  # those tools switched off (codex, google, opencode, copilot), in memory only
+DASHBAR_DEMO_TOUCH=1 Dashbar --snapshot out.png --demo     # as on a Mac with a touch display (see Touch Macs), in memory only; also works with --settings notifications
+DASHBAR_DEMO_TOUCH=1 Dashbar --snapshot out.png --demo --settings notifications -islandEnabled NO  # the touch note under the island toggle (-key value is an argument default: never saved)
 Dashbar --snapshot out.png --demo --widget small|medium [--dark]   # one widget, transparent around it; docs/images/widget-*.png (the README's, and the reference for the site's HTML widgets) use DASHBAR_SNAPSHOT_SCALE=4 DASHBAR_DEMO_GOOGLE=1, from a copy outside build/ with PlugIns removed (see Widgets). (DASHBAR_WIDGET_STATE=nodata|notrunning,
                                                     # DASHBAR_WIDGET_TOOLS=1 for fewer rows, DASHBAR_DEMO_GOOGLE=weekly for two Antigravity groups)
 Dashbar --snapshot out.png --demo --menubar all     # the menu bar item: idle|working|needsyou|done|time|all, on light (--dark) bars
@@ -83,6 +85,21 @@ DASHBAR_STATUS_FILE=out.json "build/Dashbar Local.app/Contents/Helpers/dashbar" 
 Offline snapshots cannot draw native AppKit controls (segmented pickers, the search field): they show as
 yellow "no entry" placeholders. Crop them out or use `--hosted`. A snapshot run also writes `panelTab` into
 the real app's preferences, so reset it afterwards (`defaults write fun.dashbar.app panelTab overview`).
+
+## Touch Macs
+
+The MacBook Pro with the PROLED XDR display has a touch screen and a Dynamic Island instead of the notch. macOS has
+no API for the island, so `TouchDisplay.present` (`TouchDisplay.swift`) asks whether any screen's
+`NSScreen.touchCapabilities` (macOS 27) contains `.multiTouch`, or `DASHBAR_DEMO_TOUCH=1` is set. Nobody here has that
+hardware: the touch paths are checked only with the demo flag.
+
+- The island: a new install turns it on (`Onboarding.decideAtLaunch`), except on a touch Mac, where `islandEnabled` is
+  left unset (it reads as off) so Dashbar's island never sits on Apple's. A saved value is never changed, in either
+  direction (`IslandSettings.enabledAtLaunch`, tested). Settings → Notifications says why under the toggle while it's off.
+- The panel and the window set `\.touchFriendly` at their root. On, rows whose actions wait for a hover (Servers,
+  Clean-up) always show them, and `IconButton`, `ConfirmButton`, the prompt's Allow/Deny, the gear menu and the filter's
+  clear button get a 30-point hit area through `.touchTarget()`, with the drawn glyph unchanged. Off, every view must
+  stay pixel-identical: compare offline renders against a build of the previous commit when touching this.
 
 ## Widgets
 

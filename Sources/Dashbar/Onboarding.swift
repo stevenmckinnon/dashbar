@@ -43,9 +43,9 @@ enum Onboarding {
         let show = shouldShow(seen: seen, storedKeys: keys, hasSavedData: FileManager.default.fileExists(atPath: saved))
         // Existing users are marked too, so a later launch never mistakes them for new.
         if !show && !seen { defaults.set(true, forKey: seenKey) }
-        // The island is on for a new install only. Someone updating gets nothing new drawn over their notch
-        // unasked (it's in Settings → General).
-        if show, defaults.object(forKey: IslandSettings.enabledKey) == nil { defaults.set(true, forKey: IslandSettings.enabledKey) }
+        // The island is on for a new install only, and not on a touch Mac, whose Dynamic Island it would sit on.
+        // Someone updating gets nothing new drawn over their notch unasked (it's in Settings → Notifications).
+        IslandSettings.applyLaunchDefault(defaults, newInstall: show, touch: TouchDisplay.present)
         pendingAtLaunch = show
     }
 

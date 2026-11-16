@@ -61,6 +61,7 @@ struct ServerRow: View {
     @State private var confirmStop = false
     @FocusState private var focusedAction: Int?
     @Environment(\.inWindow) private var inWindow
+    @Environment(\.touchFriendly) private var touch
 
     private var starter: LiveSession? {
         listener.startedBy.flatMap { pid in store.sessions.first { $0.pid == pid } }
@@ -86,8 +87,10 @@ struct ServerRow: View {
         ports.count <= max ? (ports, 0) : (Array(ports.prefix(max)), ports.count - max)
     }
 
-    /// Actions show on hover, and also whenever one of them holds keyboard focus. The window always shows them.
-    private var revealed: Bool { inWindow || hover || confirmStop || focusedAction != nil }
+    /// The window has room for them, and a touch display has no hover to wait for.
+    private var alwaysShowsActions: Bool { inWindow || touch }
+    /// Actions show on hover, and also whenever one of them holds keyboard focus. The window and touch Macs always show them.
+    private var revealed: Bool { alwaysShowsActions || hover || confirmStop || focusedAction != nil }
 
     private var memoryText: some View {
         Text(Fmt.bytes(listener.memory)).font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
@@ -121,11 +124,11 @@ struct ServerRow: View {
                 }
             }
             Spacer(minLength: 4)
-            if inWindow && listener.memory > 0 && !compact && !confirmStop {
+            if alwaysShowsActions && listener.memory > 0 && !compact && !confirmStop {
                 memoryText.padding(.trailing, 4)
             }
             ZStack(alignment: .trailing) {
-                if listener.memory > 0 && !compact && !inWindow {
+                if listener.memory > 0 && !compact && !alwaysShowsActions {
                     memoryText.opacity(revealed ? 0 : 1)
                 }
                 HStack(spacing: 2) {

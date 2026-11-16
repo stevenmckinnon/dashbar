@@ -600,6 +600,7 @@ private struct NotificationSettings: View {
     @AppStorage(IslandSettings.expandOnNeedsYouKey) private var islandNeedsYou = true
     @AppStorage(IslandSettings.replacesNotificationsKey) private var islandInstead = false
     @AppStorage(IslandSettings.showsPillKey) private var islandPill = false
+    private let touchMac = TouchDisplay.present
 
     var body: some View {
         Form {
@@ -616,6 +617,11 @@ private struct NotificationSettings: View {
             Section {
                 Toggle("Show the island when something happens", isOn: $island)
                     .help("A small black pill on the notch (or below the menu bar) with your agents' status. It opens briefly when something happens, and on hover lists your sessions.")
+                if touchMac && !island {
+                    // macOS has no way to ask for the Dynamic Island itself; today every Mac with a touch display has one.
+                    Text("Off by default on a Mac with a touch display, to stay out of the way of its Dynamic Island. Turn it on to use it anyway.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 if island {
                     Picker("Position", selection: $islandPosition) {
                         Text("Automatic").tag(IslandPosition.automatic.rawValue)

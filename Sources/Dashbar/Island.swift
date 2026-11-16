@@ -51,6 +51,25 @@ enum IslandSettings {
     }
 }
 
+extension IslandSettings {
+    /// What a launch saves for `enabledKey`, or nil to leave it alone. A new install turns the island on, except on a Mac
+    /// with a touch display: today that is only the MacBook Pro with a Dynamic Island in place of the notch, which
+    /// Dashbar's island would sit on top of. There it stays unset, so it reads as off and is still nobody's choice. A
+    /// saved value is the user's (or an earlier launch's) and is never changed, in either direction.
+    static func enabledAtLaunch(newInstall: Bool, saved: Bool?, touch: Bool) -> Bool? {
+        guard newInstall, saved == nil, !touch else { return nil }
+        return true
+    }
+
+    /// Applies `enabledAtLaunch` to `defaults`.
+    static func applyLaunchDefault(_ defaults: UserDefaults, newInstall: Bool, touch: Bool) {
+        let saved = defaults.object(forKey: enabledKey) as? Bool
+        if let value = enabledAtLaunch(newInstall: newInstall, saved: saved, touch: touch) {
+            defaults.set(value, forKey: enabledKey)
+        }
+    }
+}
+
 enum IslandPosition: String, CaseIterable {
     /// On the notch, or below another app's island when one is already there.
     case automatic

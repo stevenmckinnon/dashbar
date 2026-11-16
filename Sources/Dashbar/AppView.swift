@@ -24,6 +24,7 @@ struct AppView: View {
         .onAppear { store.setPanelVisible(true, surface: "window") }
         .onDisappear { store.setPanelVisible(false, surface: "window") }
         .environment(\.inWindow, true)
+        .environment(\.touchFriendly, TouchDisplay.present)
         // ⌘1…⌘6 and ⌘K are items in the app's Go menu (WindowCommands); ⌘K arrives here as a request.
         .onChange(of: model.filterRequests) { _, _ in searchFocused = true }
     }
