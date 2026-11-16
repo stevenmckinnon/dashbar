@@ -3,6 +3,16 @@
     <channel>
         <title>Dashbar</title>
         <item>
+            <title>0.10.1</title>
+            <pubDate>Mon, 16 Nov 2026 21:35:32 +0000</pubDate>
+            <sparkle:version>230</sparkle:version>
+            <sparkle:shortVersionString>0.10.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[- Desktop widgets no longer go blank after an update: Dashbar now restarts its widget when it launches as a new version.
+]]></description>
+            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.10.1/Dashbar-0.10.1.dmg" length="10181601" type="application/octet-stream" sparkle:edSignature="6rFL3tBLzPZgKegFgs0bUezpxnwjcetUyKMSoLP7adxeJVblCKngBMP+6prZcLH2YgzXAEAc8a5q2fCQ+wa0Cw=="/>
+        </item>
+        <item>
             <title>0.10.0</title>
             <pubDate>Mon, 16 Nov 2026 21:08:04 +0000</pubDate>
             <sparkle:version>227</sparkle:version>
@@ -23,16 +33,6 @@
 - Settings → Integrations is shorter: one section per tool, each with its Add or Remove button, and the details of what Dashbar changes folded underneath.
 ]]></description>
             <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.9.0/Dashbar-0.9.0.dmg" length="9816593" type="application/octet-stream" sparkle:edSignature="tB2ogp37TrTahyNJSQqhK6TcOiHPN1UwyFfTGKHvfU3r8w9GnQPMzhiRo5LDNaBDDfRh3QpmZtZSa1FcFGWgCQ=="/>
-        </item>
-        <item>
-            <title>0.8.0</title>
-            <pubDate>Mon, 16 Nov 2026 13:41:16 +0000</pubDate>
-            <sparkle:version>199</sparkle:version>
-            <sparkle:shortVersionString>0.8.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[- **Desktop widgets**: add Dashbar from the widget gallery (right-click the desktop, Edit Widgets). The small one shows Claude's 5-hour and weekly limits and when they reset, the medium one each tool's limits and how many agents are working. When Dashbar isn't running they dim and say since when
-]]></description>
-            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.8.0/Dashbar-0.8.0.dmg" length="9634805" type="application/octet-stream" sparkle:edSignature="MOwVViepKhQtPGBwKjIPZ0G86uuL1H0sHPyyiipFCUpGGaKvtzdkRqUYk2r7i4Rhv5WiLvEODjYORW6irF7KAA=="/>
         </item>
     </channel>
 </rss>
