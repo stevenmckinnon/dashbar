@@ -250,9 +250,10 @@ function WidgetsSection() {
         <h2 id="widgets-h">{WIDGETS.heading}</h2>
         <p>{WIDGETS.text}</p>
       </div>
-      <div className="window-demo widgets-shot">
-        {/* Rendered by the app (`--snapshot --demo --widget pair` at 4x), invented demo data. */}
-        <Shot name="widgets" width={2384} height={912} alt={WIDGETS.alt} />
+      {/* Rendered by the app (`--snapshot --demo --widget small|medium` at 4x), invented demo data. */}
+      <div className="widgets-row">
+        <div className="widget-shot widget-small"><Shot name="widget-small" width={656} height={656} alt={WIDGETS.altSmall} /></div>
+        <div className="widget-shot widget-medium"><Shot name="widget-medium" width={1376} height={656} alt={WIDGETS.altMedium} /></div>
       </div>
     </section>
   );

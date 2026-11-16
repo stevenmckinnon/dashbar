@@ -79,8 +79,8 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
   and say since when.
 
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/widgets-dark.png">
-    <img src="docs/images/widgets-light.png" alt="The small Dashbar widget with Claude's 5-hour and weekly limits, beside the medium one with the limits for Claude, Codex and Antigravity and 2 agents working" width="600">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/widget-medium-dark.png">
+    <img src="docs/images/widget-medium-light.png" alt="The medium Dashbar widget: 2 agents working, and the 5-hour and weekly limits for Claude, Codex and Antigravity" width="430">
   </picture>
 - **Plan limits**: Codex's 5-hour and weekly limits from its own logs. Claude's come from Claude Code's
   [status line](https://code.claude.com/docs/en/statusline), which Claude Code passes your usage after each

@@ -50,8 +50,9 @@ export const WINDOW = {
 // SnapshotProvider). Keep "every few minutes, not live" true if that changes.
 export const WIDGETS = {
   heading: "Or on your desktop",
-  text: "Two widgets keep your plan limits in sight. The small one shows Claude’s 5-hour and weekly limits and when they reset; the medium one shows each tool’s limits and how many agents are working. Add them from Edit Widgets on the desktop. They refresh every few minutes, not live, and dim when Dashbar isn’t running.",
-  alt: "Two Dashbar widgets. The small one shows Claude on Max 5x: 5-hour 55% used, resets 15:39, and weekly 38% used, resets Friday 01:27. The medium one says 2 working and shows the 5-hour and weekly limits for Claude (55% and 38%), Codex (21% and 34%) and Antigravity (42% and 61%).",
+  text: "Two widgets keep your plan limits in sight. The small one shows Claude’s limits and when they reset. The medium one shows every tool’s limits and how many agents are working. They refresh every few minutes and dim when Dashbar isn’t running.",
+  altSmall: "The small Dashbar widget: Claude on Max 5x, 5-hour limit 55% used, weekly limit 38% used, each with its reset time.",
+  altMedium: "The medium Dashbar widget: 2 working, and the 5-hour and weekly limits for Claude (55% and 38%), Codex (21% and 34%) and Antigravity (42% and 61%).",
 };
 
 export const PACE = {
