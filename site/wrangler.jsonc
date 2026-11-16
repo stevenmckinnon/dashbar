@@ -8,6 +8,9 @@
   "main": "worker/index.js",
   "compatibility_date": "2026-06-01",
   "workers_dev": true,
+  // usedashbar.com's DNS records are proxied, so this route sends all of its traffic here. www is sent to the
+  // apex by a Redirect Rule in the Cloudflare dashboard (Rules → Redirect Rules), which runs before Workers.
+  "routes": [{ "pattern": "usedashbar.com/*", "zone_name": "usedashbar.com" }],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
