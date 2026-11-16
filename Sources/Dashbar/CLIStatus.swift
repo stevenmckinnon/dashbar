@@ -27,6 +27,7 @@ enum CLIStatus {
             store.$claude.map { _ in () }.eraseToAnyPublisher(),
             store.$codex.map { _ in () }.eraseToAnyPublisher(),
             store.$google.map { _ in () }.eraseToAnyPublisher(),
+            store.$opencode.map { _ in () }.eraseToAnyPublisher(),
             store.$listeners.map { _ in () }.eraseToAnyPublisher(),
             store.$paused.map { _ in () }.eraseToAnyPublisher(),
             store.$sessionsWarning.map { _ in () }.eraseToAnyPublisher(),
@@ -67,6 +68,7 @@ enum CLIStatus {
         case .geminiCLI: return "gemini-cli"
         case .antigravityCLI: return "antigravity-cli"
         case .antigravity: return "antigravity"
+        case .opencode: return "opencode"
         }
     }
 
@@ -115,7 +117,8 @@ enum CLIStatus {
                          cacheRead: s.today.cacheRead, cacheWrite: s.today.cacheWrite)
         }
         let tools = [tokens("claude", "Claude", store.claude), tokens("codex", "Codex", store.codex),
-                     tokens("google", GoogleUsage.title(store.googleSources), store.google)].compactMap { $0 }
+                     tokens("google", GoogleUsage.title(store.googleSources), store.google),
+                     tokens("opencode", "opencode", store.opencode)].compactMap { $0 }
         return tools.isEmpty ? nil : .init(day: StatusSnapshot.dayKey(now), tools: tools)
     }
 }

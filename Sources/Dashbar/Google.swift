@@ -3,10 +3,11 @@ import AppKit
 
 // MARK: - Google's agents: Gemini CLI, Antigravity CLI (agy) and the Antigravity app
 
-/// Which agent a live session belongs to. Claude Code's sessions are the default; the rest come from Google's tools,
-/// each read from what that tool already keeps on this Mac (see `GeminiCLI`, `AntigravityStatusLine`, `AntigravityApp`).
+/// Which agent a live session belongs to. Claude Code's sessions are the default; the rest come from Google's tools and
+/// opencode, each read from what that tool already keeps on this Mac (see `GeminiCLI`, `AntigravityStatusLine`,
+/// `AntigravityApp`, `OpenCode`).
 enum SessionAgent: String, Equatable, CaseIterable {
-    case claude, geminiCLI, antigravityCLI, antigravity
+    case claude, geminiCLI, antigravityCLI, antigravity, opencode
 
     /// "Claude", "Gemini CLI", "Antigravity CLI", "Antigravity": the subject of "… is working".
     var name: String {
@@ -15,14 +16,28 @@ enum SessionAgent: String, Equatable, CaseIterable {
         case .geminiCLI: return "Gemini CLI"
         case .antigravityCLI: return "Antigravity CLI"
         case .antigravity: return "Antigravity"
+        case .opencode: return "opencode"   // the project writes its name in lower case
         }
     }
 
-    var isGoogle: Bool { self != .claude }
+    var isGoogle: Bool { [.geminiCLI, .antigravityCLI, .antigravity].contains(self) }
 
-    /// The symbol that names the agent: Claude's asterisk, or the one sparkle every Google agent shares.
-    var symbol: String { self == .claude ? "asterisk" : UI.googleSymbol }
-    var tint: Color { self == .claude ? UI.claude : UI.google }
+    /// The symbol that names the agent: Claude's asterisk, the one sparkle every Google agent shares, or opencode's.
+    var symbol: String {
+        switch self {
+        case .claude: return "asterisk"
+        case .opencode: return UI.openCodeSymbol
+        default: return UI.googleSymbol
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .claude: return UI.claude
+        case .opencode: return UI.neutralTool
+        default: return UI.google
+        }
+    }
 }
 
 extension UI {
@@ -87,10 +102,10 @@ extension LiveSession {
     var hasOwnTitle: Bool { name != project }
     /// What a row calls the session: its own title, or else the agent ("Antigravity CLI"), so the folder isn't repeated.
     var title: String { hasOwnTitle ? name : agent.name }
-    /// Where and what, for a line under `title`: the project, and a Google agent's name unless `title` already is it.
+    /// Where and what, for a line under `title`: the project, and another agent's name unless `title` already is it.
     var identityParts: [String] {
-        [project] + (agent.isGoogle && hasOwnTitle ? [agent.name] : [])
+        [project] + (agent != .claude && hasOwnTitle ? [agent.name] : [])
     }
-    /// A Google agent's name for a row under a workspace heading, unless `title` already is it.
-    var agentNote: String? { agent.isGoogle && hasOwnTitle ? agent.name : nil }
+    /// Another agent's name (not Claude's) for a row under a workspace heading, unless `title` already is it.
+    var agentNote: String? { agent != .claude && hasOwnTitle ? agent.name : nil }
 }

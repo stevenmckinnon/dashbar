@@ -2,11 +2,13 @@ import Foundation
 
 /// What the Usage tab shows, and in what order. Kept apart from the views so the rules are tested.
 ///
-/// The tab has one card per tool (Claude Code, Codex, Google's). The tool closest to running out of plan comes first,
-/// so the card that may need you is the one in view; a tool with nothing to say for the period folds to one line.
+/// The tab has one card per tool (Claude Code, Codex, Google's, opencode). The tool closest to running out of plan comes
+/// first, so the card that may need you is the one in view; a tool with nothing to say for the period folds to one line.
+/// opencode reports no plan limits (people bring their own provider), so its card ranks by tokens among the tools
+/// without limits.
 enum UsageRules {
     enum Service: String, CaseIterable, Identifiable {
-        case claude, codex, google
+        case claude, codex, google, opencode
         var id: String { rawValue }
     }
 
@@ -45,7 +47,7 @@ enum UsageRules {
     static func isIdle(_ d: Digest) -> Bool { d.tokens == 0 && d.limits.isEmpty && !d.hasNotice }
 
     /// Cards in order: the tool whose tightest windowed limit is closest to running out first (whole percents, as the
-    /// rows print them), then by tokens in the period, then Claude Code, Codex, Google. Tools with no limits follow
+    /// rows print them), then by tokens in the period, then Claude Code, Codex, Google, opencode. Tools with no limits follow
     /// every tool with one, and idle tools come last.
     static func order(_ digests: [Digest], now: Date) -> [Digest] {
         func rank(_ d: Digest) -> Int {

@@ -62,7 +62,7 @@ public struct StatusSnapshot: Codable, Equatable, Sendable {
     }
 
     public struct Session: Codable, Equatable, Sendable {
-        /// "claude", "gemini-cli", "antigravity-cli" or "antigravity".
+        /// "claude", "gemini-cli", "antigravity-cli", "antigravity" or "opencode".
         public var tool: String
         /// The account's name, only while the app reads more than one account of this tool.
         public var account: String?
@@ -161,7 +161,7 @@ public struct StatusSnapshot: Codable, Equatable, Sendable {
     }
 
     public struct ToolTokens: Codable, Equatable, Sendable {
-        /// "claude", "codex" or "google" (Gemini CLI and the Antigravity CLI together).
+        /// "claude", "codex", "google" (Gemini CLI and the Antigravity CLI together) or "opencode".
         public var tool: String
         /// "Claude", "Codex", "Gemini CLI and Antigravity CLI".
         public var name: String

@@ -290,6 +290,7 @@ enum DemoData {
         ]
         store.cleanupScanned = true
         if ProcessInfo.processInfo.environment["DASHBAR_DEMO_GOOGLE"] != nil { applyGoogle(to: store, now: now) }
+        if let mode = ProcessInfo.processInfo.environment["DASHBAR_DEMO_OPENCODE"] { applyOpenCode(to: store, now: now, waiting: mode == "waiting") }
         if ProcessInfo.processInfo.environment["DASHBAR_DEMO_WORST"] != nil { applyWorstCase(to: store, now: now, home: home) }
         if let quiet = ProcessInfo.processInfo.environment["DASHBAR_DEMO_QUIET"] { applyQuiet(to: store, now: now, long: quiet == "long") }
         if ProcessInfo.processInfo.environment["DASHBAR_DEMO_LONG_NAMES"] != nil { applyLongNames(to: store, now: now, home: home) }

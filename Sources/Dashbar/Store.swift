@@ -18,6 +18,8 @@ final class Store: ObservableObject {
     @Published var antigravityLimits: AntigravityLimits?
     /// A Google format Dashbar no longer reads (the Antigravity app's conversations).
     @Published var googleWarning: String?
+    /// opencode's usage from its session database (`OpenCode.swift`). Not found for someone who doesn't use it.
+    @Published var opencode = UsageSummary.empty
     /// Each account's usage, only while more than one Claude Code (or Codex) account is read; empty otherwise, so a
     /// single account looks exactly as before.
     @Published var claudeAccountUsage: [AccountUsage] = []
@@ -139,7 +141,7 @@ final class Store: ObservableObject {
 
     /// A log or session format Dashbar can no longer read. Shown instead of quietly reporting nothing.
     var formatWarning: String? {
-        claude.warning ?? codex.warning ?? sessionsWarning ?? subagentsWarning ?? google.warning ?? googleWarning
+        claude.warning ?? codex.warning ?? sessionsWarning ?? subagentsWarning ?? google.warning ?? googleWarning ?? opencode.warning
     }
 
     func subagents(for session: LiveSession) -> [Subagent] { subagents[session.id] ?? [] }
@@ -284,6 +286,7 @@ final class Store: ObservableObject {
         plan.onUpdate = { [weak self] in self?.checkLimits() }
         settings.refreshClaudeStatusLine()
         AntigravitySettings.shared.refresh()
+        OpenCodeSettings.shared.refresh()
         settings.$claudeLimits.removeDuplicates()
             .sink { [weak self] on in Task { @MainActor in self?.plan.setEndpointEnabled(on) } }
             .store(in: &subscriptions)
@@ -317,7 +320,8 @@ final class Store: ObservableObject {
         update(\.claudeDefaultLabel, claude.count > 1 ? claude.first?.label : nil)
         // Agent logs and session files change as agents work: react to that instead of polling.
         let paths = claude.flatMap { [$0.projectsDir.path, $0.sessionsDir.path] } + codex.map(\.sessionsDir.path)
-            + [GeminiUsageScanner.defaultRoot.path, AntigravityStatusLine.sessionsDir.path]   // skipped while missing
+            + [GeminiUsageScanner.defaultRoot.path, AntigravityStatusLine.sessionsDir.path,
+               OpenCodeBridge.statesDir.path]   // skipped while missing
         if paths != watchedPaths {   // renaming an account changes nothing on disk
             watchedPaths = paths
             watcher = FileWatcher(paths: paths, latency: 1.5, queue: .main) { [weak self] in
@@ -382,6 +386,7 @@ final class Store: ObservableObject {
             settings.refreshClaudeStatusLine()   // notices the status line being changed outside Dashbar
             settings.refreshClaudePermissions()  // …and the permission hook
             AntigravitySettings.shared.refresh() // …and the Antigravity CLI's status line
+            OpenCodeSettings.shared.refresh()    // …and opencode's plugin
             refreshClaudePlan()
         } else if minute {
             plan.statusLineChanged()
@@ -755,6 +760,7 @@ final class Store: ObservableObject {
         update(\.google, r.google)
         update(\.googleSources, r.googleSources)
         update(\.antigravityLimits, r.antigravityLimits)
+        update(\.opencode, r.opencode)
         codexLimitsAt = r.codexLimitsAt
         checkLimits()
     }
@@ -801,6 +807,7 @@ final class Worker: @unchecked Sendable {
         var google = UsageSummary.empty
         var googleSources: [SessionAgent] = []
         var antigravityLimits: AntigravityLimits?
+        var opencode = UsageSummary.empty
     }
 
     private let liveQueue = DispatchQueue(label: "dashbar.live", qos: .utility)
@@ -826,6 +833,9 @@ final class Worker: @unchecked Sendable {
     private let googleCollector = GoogleCollector()
     private var geminiScanner: GeminiUsageScanner?
     private var antigravityUsage: AntigravityUsageTracker?
+    /// opencode's live sessions (live queue only) and usage (usage queue only).
+    private let openCodeCollector = OpenCodeCollector()
+    private let openCodeUsage = OpenCodeUsage()
     private let sampler = SystemSampler()
     private let serverActivity = ServerActivity()
     private let workspaceSampler = WorkspaceSampler()
@@ -868,11 +878,12 @@ final class Worker: @unchecked Sendable {
         r.sessionsWarning = reading.warning
         r.contexts = contextReader.read(reading.sessions)
         // Closed, only which subagents run (a folder listing and changed metadata); open, their transcripts' new lines too.
-        // Claude Code sessions only: Google's agents have no subagent transcripts.
+        // Claude Code sessions only: Google's agents and opencode have no subagent transcripts.
         r.subagents = subagentReader.read(reading.sessions, transcript: { self.contextReader.transcript(for: $0) }, detail: req.panel)
         let google = googleCollector.read()
-        r.sessions = google.sessions.isEmpty ? reading.sessions
-            : (reading.sessions + google.sessions).sorted { ($0.urgency, $1.since) < ($1.urgency, $0.since) }
+        let others = google.sessions + openCodeCollector.read()
+        r.sessions = others.isEmpty ? reading.sessions
+            : (reading.sessions + others).sorted { ($0.urgency, $1.since) < ($1.urgency, $0.since) }
         r.googleWarning = google.warning
         if req.system { r.system = sampler.sample() }
         if req.servers {
@@ -934,6 +945,7 @@ final class Worker: @unchecked Sendable {
         }
         (result.google, result.googleSources) = scanGoogle()
         result.antigravityLimits = AntigravityStatusLine.readLimits()
+        result.opencode = openCodeUsage.scan()
         if lastSave.map({ Date().timeIntervalSince($0) > 30 }) ?? true { save() }
         let done = onUsage
         DispatchQueue.main.async { done?(result) }

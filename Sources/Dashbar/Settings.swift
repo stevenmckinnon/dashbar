@@ -685,6 +685,7 @@ private struct IntegrationSettings: View {
                 Text(permissionsExplanation).settingsFooter()
             }
             AntigravityLabsSection()
+            OpenCodeSection()
             CommandLineToolSection()
             // Last, and labelled: the one setting here that leans on something undocumented.
             Section {
@@ -701,6 +702,7 @@ private struct IntegrationSettings: View {
             settings.refreshClaudeStatusLine()
             settings.refreshClaudePermissions()
             AntigravitySettings.shared.refresh()
+            OpenCodeSettings.shared.refresh()
         }
     }
 
