@@ -3,7 +3,7 @@
 Dashbar is a native macOS menu bar app (SwiftUI, SwiftPM, macOS 14+) that shows Claude Code and Codex
 sessions, token usage, plan limits, local dev servers, system stats and a clean-up of rebuildable caches.
 It is open source (MIT) at `stevenmckinnon/dashbar`. The product site lives in `site/` and is deployed to
-GitHub Pages at https://usedashbar.com/ (domain at Cloudflare; `docs/images/CNAME`). Read `README.md` for what
+GitHub Pages at https://usedashbar.com/ (domain at Cloudflare, proxied with SSL/TLS mode Full, not strict, so GitHub's own certificate lapsing behind the proxy can't take the site down; `docs/images/CNAME`). Read `README.md` for what
 the app does; this file is how to work on it.
 
 ## Layout
@@ -128,7 +128,7 @@ images stay clean.
 **Privacy and safety (the product's promise: it sends nothing)**
 - Never add analytics, accounts or network calls to the app. The only allowed requests are Sparkle update checks to
   GitHub and the opt-in, experimental Claude plan limits request to `api.anthropic.com`.
-- The website (`site/`) counts visits with Cloudflare Web Analytics, which uses no cookies. Its snippet is in
+- The website (`site/`) is served through Cloudflare's proxy and counts visits with Cloudflare Web Analytics, which uses no cookies. Its snippet is in
   `site/index.html` (the dev server drops it). Add nothing else: no other trackers, no cookies. If that changes,
   update the line about it in the site's Privacy section, so the site never claims more than is true.
 - Claude plan limits come first from Claude Code's status line (`StatusLineBridge.swift`). Dashbar edits
@@ -186,7 +186,7 @@ images stay clean.
   (Instrument Sans). Respect `prefers-reduced-motion`. Every demo plays once and has a Replay pill.
 - Do not invent facts on the site: no user counts, quotes, star counts or prices. FAQ answers must state
   what the app really does today.
-- GitHub Pages can't add headers or negotiate content, so agents find the Markdown copy through `llms.txt` and the `<link rel="alternate">` in `index.html`. Keep `actions/upload-pages-artifact` at v3: v4 leaves out dotfolders, which would drop `/.well-known/`.
+- GitHub Pages can't add headers or negotiate content (Cloudflare's proxy could, with rules; none are set up yet), so agents find the Markdown copy through `llms.txt` and the `<link rel="alternate">` in `index.html`. Keep `actions/upload-pages-artifact` at v3: v4 leaves out dotfolders, which would drop `/.well-known/`.
 - Site demos mirror the app. When a visual in the app changes (tiles, header icons, card layout), update
   `site/src/demos/` to match, then re-render `docs/images/` (and `og.png` with `scripts/render-og.sh`) and re-check the demos' heights.
 

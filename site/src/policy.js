@@ -12,8 +12,8 @@ const GITHUB_PRIVACY = "https://docs.github.com/en/site-policy/privacy-policies/
 export const POLICY = {
   title: "Privacy policy",
   description: "What Dashbar, the Mac menu bar app, and its website do with your data: the app sends nothing about you, has no analytics and no account.",
-  updated: "2026-11-15",
-  updatedText: "15 November 2026",
+  updated: "2026-11-16",
+  updatedText: "16 November 2026",
   lede: "Dashbar runs on your Mac and collects nothing about you. This page sets out what the app reads and keeps on your Mac, the only two requests it can make, and what happens when you download it, visit this website or send an email.",
   sections: [
     {
@@ -82,7 +82,7 @@ export const POLICY = {
       heading: "This website",
       blocks: [
         { list: [
-          "usedashbar.com is a static site hosted on GitHub Pages. GitHub may log visitors’ IP addresses for security, as its [GitHub Pages documentation](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages#data-collection) explains.",
+          "usedashbar.com is a static site hosted on GitHub Pages and served through Cloudflare, which sits in front of it to deliver and cache pages. Cloudflare and GitHub may log visitors’ IP addresses for security, as [Cloudflare’s privacy policy](https://www.cloudflare.com/privacypolicy/) and the [GitHub Pages documentation](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages#data-collection) explain.",
           "It counts visits with [Cloudflare Web Analytics](https://www.cloudflare.com/web-analytics/), which loads a small script from Cloudflare and uses no cookies. It shows me totals such as page views and referring sites, not individual visitors.",
           "It sets no cookies, and has no other analytics, trackers or ads.",
           "Its typeface, Instrument Sans, is served from this site, not from Google Fonts.",
