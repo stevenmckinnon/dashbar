@@ -14,7 +14,7 @@ export const HERO = {
   // Under the install buttons. Each name links to the FAQ entry with this id (faq.js), which says what each tool gets.
   worksWith: {
     lead: "Works with",
-    tools: ["Claude Code", "Codex", "Gemini CLI", "Antigravity", "OpenCode"],
+    tools: ["Claude Code", "Codex", "Gemini CLI", "Antigravity", "OpenCode", "GitHub Copilot"],
     faq: "faq-agents",
   },
 };
@@ -82,6 +82,7 @@ export const PRIVACY = {
     "The same folders for any other Claude Code or Codex account you add in Settings",
     "If you use Google’s agents: Gemini CLI’s chat logs in `~/.gemini/tmp`, and only the status columns of the Antigravity app’s conversation list, opened read-only. If you add Dashbar to the Antigravity CLI’s status line, its plan quota and each session’s folder, model, token totals and state. Never titles, transcripts or your Google sign-in.",
     "If you use OpenCode: from its database, `~/.local/share/opencode/opencode.db`, opened read-only, only session ids, folders and times, and each reply’s model, token counts and cost. Never titles, prompts or replies. If you add Dashbar’s plugin to OpenCode, each session’s state (working, idle or waiting for you) and folder.",
+    "If you use GitHub Copilot, in the terminal or as VS Code’s agent: from each session’s folder in `~/.copilot/session-state`, the project folder, the type of each event to tell working, idle or asking permission, and the model and token counts of each reply. Never prompts, replies, tool arguments or results. If you add Dashbar’s hook to Copilot, each session’s state and folder.",
     "The listening ports on your Mac and the processes behind them, through the system’s own process API",
     "The folders you choose, to size the caches in clean-up",
     "If you add Dashbar to Claude Code’s status line: the plan usage Claude Code passes it after each reply. Dashbar changes only that one setting, keeps a backup, and puts your previous status line back when you remove it.",
@@ -105,7 +106,7 @@ export const INSTALL = {
 
 export const FOOTER = {
   about: "A menu bar app for your coding agents.",
-  independence: "Dashbar is an independent project, not affiliated with or endorsed by Anthropic, OpenAI, Google or Anomaly.",
+  independence: "Dashbar is an independent project, not affiliated with or endorsed by Anthropic, OpenAI, Google, Anomaly or GitHub.",
 };
 
 /** The text without Markdown marks, for meta tags and structured data. */
