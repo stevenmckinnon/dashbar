@@ -3,6 +3,16 @@
     <channel>
         <title>Dashbar</title>
         <item>
+            <title>0.8.0</title>
+            <pubDate>Mon, 16 Nov 2026 13:41:16 +0000</pubDate>
+            <sparkle:version>199</sparkle:version>
+            <sparkle:shortVersionString>0.8.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[- **Desktop widgets**: add Dashbar from the widget gallery (right-click the desktop, Edit Widgets). The small one shows Claude's 5-hour and weekly limits and when they reset, the medium one each tool's limits and how many agents are working. When Dashbar isn't running they dim and say since when
+]]></description>
+            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.8.0/Dashbar-0.8.0.dmg" length="9634805" type="application/octet-stream" sparkle:edSignature="MOwVViepKhQtPGBwKjIPZ0G86uuL1H0sHPyyiipFCUpGGaKvtzdkRqUYk2r7i4Rhv5WiLvEODjYORW6irF7KAA=="/>
+        </item>
+        <item>
             <title>0.7.2</title>
             <pubDate>Sun, 15 Nov 2026 19:49:16 +0000</pubDate>
             <sparkle:version>186</sparkle:version>
@@ -25,35 +35,6 @@
 - `brew uninstall --cask --zap dashbar` now also removes Dashbar's caches
 ]]></description>
             <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.7.1/Dashbar-0.7.1.dmg" length="8760060" type="application/octet-stream" sparkle:edSignature="NIO7phln4kA89RSzlDLF29ZNlsvYLhpj4CFmuzItrdsJrsM+DRjqTwga2fVD/655Wqzxfk8qz5/yg5hokEf1Dw=="/>
-        </item>
-        <item>
-            <title>0.7.0</title>
-            <pubDate>Sun, 15 Nov 2026 11:58:18 +0000</pubDate>
-            <sparkle:version>161</sparkle:version>
-            <sparkle:shortVersionString>0.7.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[- **Answer permission prompts from Dashbar**: turn it on in Settings → Integrations, and when Claude Code asks for permission, the panel, the window, the island and the notification show the whole request with Allow once and Deny. Dashbar never answers by itself, and the prompt in your terminal still works
-- **Dashbar Island**: on a Mac with a notch, a banner grows out of it when an agent finishes, needs you or asks for permission, then folds away. On other screens it sits below the menu bar. A small status beside the notch is optional
-- **A new Overview**: agents that need you come first, then the ones working. The Now card has labelled buttons for your editor, terminal, Finder and localhost, other workspaces follow, a strip shows the plan left on each account, and one line tells you how much rebuildable cache Clean-up can clear
-- **The Usage tab** (was Agents): one card per tool, the most urgent first, with its limits, tokens, estimated cost and chart. One period picker sets every card and is remembered, and with more than one tool a line gives the total
-- **History**: each past plan window and how much of it you used, plus 30 days of tokens and estimated cost by agent, project and model
-- **Gemini CLI and Antigravity**: Gemini CLI sessions and their tokens, the Antigravity app's conversations, and Antigravity CLI sessions. Add Dashbar to the Antigravity CLI's status line to see Antigravity's plan limits. All of it stays hidden if you don't use them
-- **Claude plan limits from Claude Code's status line**: Add to Status Line in Settings → Integrations reads your limits with no Keychain access and no network request. Remove puts your status line back as it was
-- **More than one account**: add other Claude Code and Codex accounts in Settings → Accounts
-- **Estimated cost** at API list prices, per day, model and project. You can hide it in Settings
-- Each Claude Code session shows its running subagents and their share of usage
-- The menu bar icon shows what's happening: it moves while agents work, turns amber with a count when one needs you, and says Done when one finishes. It can also show the plan left for the 5-hour window, the weekly one or both, for Claude, Codex and Antigravity
-- Clicking a session or its notification brings back the app it runs in, such as your terminal or editor
-- Limits read the same everywhere: 5-hour and Weekly for every tool, resets as "in 2h 10m" or "Thu 09:00", and a caption that says what's left ("At this rate, lasts until it resets"). A limit on course to run out turns amber
-- VoiceOver announces when an agent needs you, asks for permission or finishes, and reads names, headings and figures with their meaning. Keyboard focus is now visible
-- The panel fits what's in it instead of a fixed height
-- A welcome window on first run. Dashbar asks for notifications only when you choose to turn them on
-- Settings has shorter tabs in a resizable window, and it opens on the desktop you're looking at
-- Your Claude plan updates after an upgrade, instead of showing the old one
-- Fixed: on macOS 27, Open Dashbar in the welcome window did nothing
-- Fixed: the plan history file could grow until Dashbar hung at launch
-]]></description>
-            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.7.0/Dashbar-0.7.0.dmg" length="8068108" type="application/octet-stream" sparkle:edSignature="gH5kRedcxH/9N+tItJjd+mrmpD1TRiuFewxspDnXVbgQQ4DsQ8lBkx3R3FvPG84AmyadQ5GRYdsv/kaM7tYrCg=="/>
         </item>
     </channel>
 </rss>
