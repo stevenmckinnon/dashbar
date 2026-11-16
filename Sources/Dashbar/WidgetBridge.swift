@@ -64,8 +64,8 @@ final class WidgetBridge {
 
     /// Saves `snapshot`'s widget copy if it changed, then reloads the widgets (now, or once the minute is up).
     @discardableResult
-    func update(_ snapshot: StatusSnapshot, now: Date = Date()) -> Bool {
-        guard writer.write(snapshot.forWidget(), now: now) else { return false }
+    func update(_ snapshot: StatusSnapshot, showsCost: Bool = true, now: Date = Date()) -> Bool {
+        guard writer.write(snapshot.forWidget(showsCost: showsCost), now: now) else { return false }
         requestReload(now: now)
         return true
     }

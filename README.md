@@ -94,12 +94,13 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
 - **Tabs**: Overview · Usage · Servers · System · Clean-up (⌘1–⌘5). Overview puts what needs you first: waiting permission prompts, then the workspace whose agent is waiting, working or went idle in the last 10 minutes, the other workspaces, servers outside them, a strip with each account's tightest plan limit (click it for Usage) and, from 1 GB, a line to Clean-up. Usage has one card per tool, the one closest to running out of plan first: its plan limits with their pace, the period's tokens with the estimated cost, a chart and the in / out / cache split. One Today · 7d · 14d choice at the top drives every card and is kept between launches; with two or more tools in use, a line above the cards adds them up. A tool with no usage in the period and no limits folds to one line.
 - **Menu bar stats** (optional, in Settings): CPU, memory, download speed and, with Claude plan limits on, what's left
   of your Claude 5-hour or weekly limit, beside the icon.
-- **Desktop widgets**: add Dashbar from the widget gallery (right-click the desktop, Edit Widgets). The small widget
-  shows Claude's 5-hour and weekly limits and when they reset; the medium one each tool's limits (Claude, Codex,
-  Antigravity) and how many agents are working. They follow light, dark and tinted widgets. The widget reads a small
-  copy of the status that Dashbar saves in its own App Group container (`~/Library/Group Containers/<team>.fun.dashbar.app`,
-  readable only by you): plan percentages, reset times, plan names and agent counts, no project names, folders or
-  sessions. macOS decides how often widgets refresh, so they can lag a few minutes; when Dashbar isn't running they dim
+- **Desktop widgets**: add Dashbar from the widget gallery (right-click the desktop, Edit Widgets). Small widgets show
+  Claude's, Codex's or Antigravity's plan limits and when they reset, or OpenCode's or GitHub Copilot's tokens today; the
+  medium ones each tool's limits (Claude, Codex, Antigravity) and how many agents are working, or each tool's tokens today
+  with the estimated cost. A tool switched off in Show in Dashbar is left out, and its own widget says so. They follow
+  light, dark and tinted widgets. The widgets read a small copy of the status that Dashbar saves in its own App Group
+  container (`~/Library/Group Containers/<team>.fun.dashbar.app`, readable only by you): plan percentages, reset times,
+  plan names, agent counts and each tool's totals for today, no project names, folders or sessions. macOS decides how often widgets refresh, so they can lag a few minutes; when Dashbar isn't running they dim
   and say since when.
 
   <picture>

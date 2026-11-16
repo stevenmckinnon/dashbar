@@ -17,6 +17,9 @@ import DashbarStatus
         "port", "command", "title",
         // The widget's copy (`forWidget()`): how many agents there are (`total`) and how many are working.
         "agents", "working",
+        // Which Show in Dashbar switches are off; per tool today, the estimated cost, Copilot's premium requests and
+        // OpenCode's top model (in `usageToday`); and in the widget's copy only each tool's totals (`usageTotals`).
+        "hidden", "cost", "premiumRequests", "model", "usageTotals",
     ]
 
     static func keys(_ value: Any) -> Set<String> {

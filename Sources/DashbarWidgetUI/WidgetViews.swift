@@ -15,6 +15,8 @@ struct WidgetPalette {
     var claude: Color { pick(0xC2603F, 0xD97857) }
     var codex: Color { pick(0x0F8296, 0x40C8E0) }
     var google: Color { pick(0x4F4DD0, 0x9C9AFF) }
+    /// OpenCode and GitHub Copilot (`UI.neutralTool`): they run on other providers' models, so no colour of their own.
+    var neutralTool: Color { pick(0x5F6670, 0xA9AFB8) }
     var working: Color { pick(0x1A7F37, 0x3FD06A) }
     var attention: Color { pick(0xBF8700, 0xE3B341) }
     var danger: Color { pick(0xC4320A, 0xFF6B5E) }
@@ -24,7 +26,8 @@ struct WidgetPalette {
         switch id {
         case "claude": return claude
         case "codex": return codex
-        case "antigravity", "google": return google
+        case "antigravity", "google", "gemini-cli", "antigravity-cli": return google
+        case "opencode", "copilot": return neutralTool
         default: return dark ? Color.white.opacity(0.5) : Color.black.opacity(0.45)
         }
     }
@@ -52,6 +55,52 @@ enum WidgetType {
     static let body: CGFloat = 12
     static let title: CGFloat = 13
     static let figure: CGFloat = 15
+    /// A widget's one big figure (`UI.Size.numeral`).
+    static let numeral: CGFloat = 22
+}
+
+/// "Local" beside a widget's name in a local build's widgets, as the panel's header shows it. Never in offline renders.
+struct LocalPill: View {
+    var body: some View {
+        Text("Local").font(.system(size: WidgetType.micro, weight: .medium)).foregroundStyle(.secondary)
+            .lineLimit(1).fixedSize()
+            .padding(.horizontal, 5).padding(.vertical, 1)
+            .background(Capsule().fill(Color.primary.opacity(0.1)))
+            .accessibilityLabel("Local build")
+    }
+}
+
+/// A small widget's first line: the tool's dot and name, "Local" in a local build, and its plan on the right.
+struct ToolHeader: View {
+    let tool: WidgetTool
+    var name: String? = nil
+    var plan: String? = nil
+    let local: Bool
+
+    var body: some View {
+        if local {
+            // "Local" takes the room the plan would: the plan shows only when both fit whole.
+            ViewThatFits(in: .horizontal) {
+                line(plan: plan)
+                line(plan: nil)
+            }
+        } else {
+            line(plan: plan)
+        }
+    }
+
+    private func line(plan: String?) -> some View {
+        HStack(spacing: 5) {
+            ProviderDot(provider: tool.provider)
+            Text(name ?? tool.name).font(.system(size: WidgetType.title, weight: .semibold)).lineLimit(1)
+            if local { LocalPill() }
+            Spacer(minLength: 4)
+            if let plan {
+                Text(plan).font(.system(size: WidgetType.micro)).foregroundStyle(.secondary).lineLimit(1)
+                    .fixedSize(horizontal: local, vertical: false)
+            }
+        }
+    }
 }
 
 /// A plan limit's meter. In the tinted and vibrant renderings the fill joins the accent group and the track stays faint.
@@ -124,49 +173,103 @@ struct NoDataView: View {
     }
 }
 
-// MARK: - Small: Claude plan limits
+// MARK: - Small: one tool's plan limits
 
 /// Claude's 5-hour and weekly limits with their reset times.
 public struct LimitsWidgetView: View {
     let entry: DashbarWidgetEntry
-    @Environment(\.colorScheme) private var scheme
-
     public init(entry: DashbarWidgetEntry) { self.entry = entry }
-
-    public var body: some View {
-        let model = WidgetModel(entry: entry)
-        let row = model.claude
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 5) {
-                ProviderDot(provider: "claude")
-                Text(row?.name ?? "Claude").font(.system(size: WidgetType.title, weight: .semibold)).lineLimit(1)
-                Spacer(minLength: 4)
-                if let plan = row?.plan {
-                    Text(plan).font(.system(size: WidgetType.micro)).foregroundStyle(.secondary).lineLimit(1)
-                }
-            }
-            if model.availability == .noData {
-                NoDataView(text: "Open Dashbar to see your Claude plan limits here.")
-            } else if let row, let problem = row.problem {
-                NoDataView(text: problem)
-            } else if let row, !row.limits.isEmpty {
-                let shown = Array(row.limits.prefix(2))
-                let titles = WidgetModel.titles(shown, short: false)
-                ForEach(Array(shown.enumerated()), id: \.offset) { i, limit in
-                    LimitBlock(limit: limit, title: titles[i], provider: "claude", now: entry.date)
-                }
-            } else {
-                NoDataView(text: "No Claude plan limits. Dashbar shows them once they're set up in its Settings.")
-            }
-            Spacer(minLength: 0)
-            StatusFooter(model: model, now: entry.date)
-        }
-        .opacity(Self.dimmed(model) ? 0.6 : 1)
-    }
+    public var body: some View { ToolLimitsWidgetView(entry: entry, tool: .claude) }
 
     static func dimmed(_ model: WidgetModel) -> Bool {
         if case .notRunning = model.availability { return true }
         return false
+    }
+}
+
+/// One tool's two tightest plan limits with their reset times: Claude, Codex or Antigravity (whose limits are named by
+/// quota group). A tool switched off, never used or with no limits says so in words.
+public struct ToolLimitsWidgetView: View {
+    let entry: DashbarWidgetEntry
+    let tool: WidgetTool
+
+    public init(entry: DashbarWidgetEntry, tool: WidgetTool) {
+        self.entry = entry
+        self.tool = tool
+    }
+
+    public var body: some View {
+        let model = WidgetModel(entry: entry)
+        let row = model.hides(tool) ? nil : model.row(tool)
+        VStack(alignment: .leading, spacing: 8) {
+            ToolHeader(tool: tool, name: row?.name, plan: row?.plan, local: model.local)
+            if let message = model.message(tool) {
+                NoDataView(text: message)
+            } else if let row {
+                let shown = Array(row.limits.prefix(2))
+                let titles = tool == .antigravity ? WidgetModel.groupTitles(shown) : WidgetModel.titles(shown, short: false)
+                ForEach(Array(shown.enumerated()), id: \.offset) { i, limit in
+                    LimitBlock(limit: limit, title: titles[i], provider: tool.provider, now: entry.date)
+                }
+            }
+            Spacer(minLength: 0)
+            StatusFooter(model: model, now: entry.date)
+        }
+        .opacity(LimitsWidgetView.dimmed(model) ? 0.6 : 1)
+    }
+}
+
+// MARK: - Small: one tool's usage today
+
+/// OpenCode's or GitHub Copilot's tokens today, with OpenCode's estimated cost and top model, or Copilot's premium
+/// requests. Neither has plan limits Dashbar can read.
+public struct ToolUsageWidgetView: View {
+    let entry: DashbarWidgetEntry
+    let tool: WidgetTool
+
+    public init(entry: DashbarWidgetEntry, tool: WidgetTool) {
+        self.entry = entry
+        self.tool = tool
+    }
+
+    public var body: some View {
+        let model = WidgetModel(entry: entry)
+        VStack(alignment: .leading, spacing: 8) {
+            ToolHeader(tool: tool, local: model.local)
+            if let message = model.message(tool) {
+                NoDataView(text: message)
+            } else if let total = model.today(tool) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(WidgetModel.tokens(total.total))
+                        .font(.system(size: WidgetType.numeral, weight: .semibold, design: .rounded).monospacedDigit())
+                        .lineLimit(1)
+                    Text("tokens today").font(.system(size: WidgetType.caption, weight: .medium)).foregroundStyle(.secondary)
+                }
+                .accessibilityElement(children: .combine)
+                VStack(alignment: .leading, spacing: 3) {
+                    if let cost = total.cost, cost > 0 {
+                        Text("\u{2248} \(WidgetModel.usd(cost)) at API prices")
+                            .font(.system(size: WidgetType.micro)).foregroundStyle(.secondary).lineLimit(1)
+                            .minimumScaleFactor(0.85)
+                    }
+                    if let line = WidgetModel.premiumLine(total.premiumRequests) {
+                        Text(line).font(.system(size: WidgetType.micro)).foregroundStyle(.secondary).lineLimit(1)
+                            .minimumScaleFactor(0.85)
+                    }
+                    if let top = total.model {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("Top model").font(.system(size: WidgetType.micro)).foregroundStyle(.secondary)
+                            Text(top).font(.system(size: WidgetType.caption, weight: .medium)).lineLimit(1)
+                                .minimumScaleFactor(0.85).truncationMode(.middle)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+            }
+            Spacer(minLength: 0)
+            StatusFooter(model: model, now: entry.date)
+        }
+        .opacity(LimitsWidgetView.dimmed(model) ? 0.6 : 1)
     }
 }
 
@@ -219,7 +322,10 @@ public struct OverviewWidgetView: View {
         let model = WidgetModel(entry: entry)
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
-                Text("Dashbar").font(.system(size: WidgetType.title, weight: .semibold))
+                HStack(spacing: 5) {
+                    Text("Dashbar").font(.system(size: WidgetType.title, weight: .semibold))
+                    if model.local { LocalPill() }
+                }
                 Spacer(minLength: 4)
                 if let agents = model.agents { AgentCountsView(agents: agents) }
             }
@@ -343,17 +449,104 @@ struct CompactLimit: View {
     }
 }
 
+// MARK: - Medium: tokens today, per tool
+
+/// Today's tokens for each tool that shows and has used some, with the estimated cost where the app shows one (none for
+/// GitHub Copilot, which is billed by premium requests).
+public struct UsageWidgetView: View {
+    let entry: DashbarWidgetEntry
+
+    public init(entry: DashbarWidgetEntry) { self.entry = entry }
+
+    /// Rows that fit below the header.
+    static let maxRows = 5
+
+    public var body: some View {
+        let model = WidgetModel(entry: entry)
+        let rows = model.usageRows
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                HStack(spacing: 5) {
+                    Text("Tokens today").font(.system(size: WidgetType.title, weight: .semibold))
+                    if model.local { LocalPill() }
+                }
+                Spacer(minLength: 4)
+                if rows.count > 1 {
+                    Text(WidgetModel.tokens(rows.map(\.total).reduce(0, +)) + " in all")
+                        .font(.system(size: WidgetType.caption, weight: .medium).monospacedDigit()).foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            if model.availability == .noData {
+                NoDataView(text: "Open Dashbar to see today's tokens for each tool here.")
+            } else if rows.isEmpty {
+                NoDataView(text: model.usageTools.isEmpty ? "No usage yet from Claude Code or your other tools."
+                                                          : "No tokens used today yet.")
+            } else {
+                let costs = rows.contains { ($0.cost ?? 0) > 0 }
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(rows.prefix(Self.maxRows), id: \.tool) { total in
+                        UsageRow(total: total, costColumn: costs)
+                            .frame(maxHeight: .infinity)
+                    }
+                }
+                .frame(maxHeight: .infinity)
+            }
+            if model.availability == .noData || rows.isEmpty { Spacer(minLength: 0) }
+            StatusFooter(model: model, now: entry.date)
+        }
+        .opacity(LimitsWidgetView.dimmed(model) ? 0.6 : 1)
+    }
+}
+
+/// One tool in the usage widget: its dot and name, today's tokens, and the estimated cost in a column of its own.
+struct UsageRow: View {
+    let total: StatusSnapshot.ToolTotal
+    let costColumn: Bool
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 8) {
+            HStack(spacing: 5) {
+                ProviderDot(provider: total.tool)
+                Text(WidgetModel.usageName(total)).font(.system(size: WidgetType.body, weight: .medium)).lineLimit(1)
+                    .minimumScaleFactor(0.8).truncationMode(.tail)
+            }
+            Spacer(minLength: 4)
+            Text(WidgetModel.tokens(total.total))
+                .font(.system(size: WidgetType.title, weight: .semibold).monospacedDigit()).lineLimit(1).fixedSize()
+            if costColumn {
+                Text((total.cost ?? 0) > 0 ? "\u{2248} " + WidgetModel.usd(total.cost ?? 0) : "")
+                    .font(.system(size: WidgetType.caption).monospacedDigit()).foregroundStyle(.secondary).lineLimit(1)
+                    .frame(width: 62, alignment: .trailing)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
 // MARK: - Sizes, for the app's offline renders
 
+/// Each widget `--snapshot --widget` can draw: `small` is Claude's plan limits, `medium` the overview, `usage` tokens today.
 public enum DashbarWidgetSize: String, CaseIterable, Sendable {
-    case small, medium
+    case small, medium, codex, antigravity, opencode, copilot, usage
+
+    public var isMedium: Bool { self == .medium || self == .usage }
+
+    /// The tool a small widget is about; nil for the medium ones.
+    public var tool: WidgetTool? {
+        switch self {
+        case .small: return .claude
+        case .codex: return .codex
+        case .antigravity: return .antigravity
+        case .opencode: return .opencode
+        case .copilot: return .copilot
+        case .medium, .usage: return nil
+        }
+    }
 
     /// The desktop widget's size in points on macOS, as chronod reports it (macOS 27, default display).
     public var points: CGSize {
-        switch self {
-        case .small: return CGSize(width: 164, height: 164)
-        case .medium: return CGSize(width: 344, height: 164)
-        }
+        isMedium ? CGSize(width: 344, height: 164) : CGSize(width: 164, height: 164)
     }
 
     @MainActor @ViewBuilder
@@ -361,6 +554,11 @@ public enum DashbarWidgetSize: String, CaseIterable, Sendable {
         switch self {
         case .small: LimitsWidgetView(entry: entry)
         case .medium: OverviewWidgetView(entry: entry)
+        case .codex: ToolLimitsWidgetView(entry: entry, tool: .codex)
+        case .antigravity: ToolLimitsWidgetView(entry: entry, tool: .antigravity)
+        case .opencode: ToolUsageWidgetView(entry: entry, tool: .opencode)
+        case .copilot: ToolUsageWidgetView(entry: entry, tool: .copilot)
+        case .usage: UsageWidgetView(entry: entry)
         }
     }
 }

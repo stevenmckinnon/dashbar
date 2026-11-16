@@ -32,6 +32,8 @@ enum CLIStatus {
             store.$listeners.map { _ in () }.eraseToAnyPublisher(),
             store.$paused.map { _ in () }.eraseToAnyPublisher(),
             store.$sessionsWarning.map { _ in () }.eraseToAnyPublisher(),
+            // A tool switched off or on, even one with nothing showing, so the widgets can say it's off.
+            AppSettings.shared.$visibility.map { _ in () }.eraseToAnyPublisher(),
         ]
         // @Published sends before the value is stored, so the snapshot is built on a later turn of the run loop.
         return Publishers.MergeMany(changes)
@@ -41,26 +43,39 @@ enum CLIStatus {
                 guard let store else { return }
                 let status = snapshot(of: store, showsClaudeLimits: AppSettings.shared.showsClaudeLimits)
                 writer.write(status)
-                widgets?.update(status)
+                widgets?.update(status, showsCost: UserDefaults.standard.object(forKey: CostLine.showKey) as? Bool ?? true)
             }
     }
 
     /// What the store knows, in the tool's terms. Times are absolute, so the snapshot only changes when the state does.
-    static func snapshot(of store: Store, showsClaudeLimits: Bool, now: Date = Date()) -> StatusSnapshot {
-        StatusSnapshot(
+    /// A tool switched off (`visibility`, Settings' by default) is left out, though the store has already dropped what
+    /// it showed, and named in `hidden`.
+    static func snapshot(of store: Store, showsClaudeLimits: Bool, visibility: ToolVisibility? = nil,
+                         now: Date = Date()) -> StatusSnapshot {
+        let v = visibility ?? store.visibility
+        return StatusSnapshot(
             generatedAt: now,
             app: .init(name: BuildInfo.appName, version: BuildInfo.version, pid: getpid(), paused: store.paused),
             warning: store.formatWarning,
-            sessions: store.sessions.map { s in
+            sessions: v.filter(store.sessions).map { s in
                 StatusSnapshot.Session(tool: toolID(s.agent), account: s.account, workspace: s.project, folder: s.root,
                                        state: state(s), since: s.since, subagents: store.subagents(for: s).running.count)
             },
-            limits: limitGroups(store, showsClaudeLimits: showsClaudeLimits, now: now),
-            usageToday: usage(store, now: now),
+            limits: limitGroups(store, showsClaudeLimits: showsClaudeLimits, now: now).filter { shows($0.provider, v) },
+            usageToday: usage(store, now: now).flatMap { u in
+                let tools = u.tools.filter { shows($0.tool, v) }
+                return tools.isEmpty ? nil : .init(day: u.day, tools: tools)
+            },
             servers: store.devListeners.map {
                 StatusSnapshot.Server(workspace: $0.isDocker ? nil : $0.project, folder: $0.isDocker ? nil : $0.root,
                                       port: $0.port, command: $0.command, pid: $0.pid, title: $0.title)
-            })
+            },
+            hidden: v.hidden.isEmpty ? nil : v.ids)
+    }
+
+    /// Whether a provider or tool id in the snapshot ("codex", "antigravity", "google", …) belongs to a tool that shows.
+    nonisolated static func shows(_ id: String, _ v: ToolVisibility) -> Bool {
+        HideableTool(rawValue: StatusSnapshot.switchID(id)).map(v.shows) ?? true
     }
 
     nonisolated static func toolID(_ agent: SessionAgent) -> String {
@@ -111,17 +126,24 @@ enum CLIStatus {
         return out
     }
 
-    /// Today's tokens for each tool that has logs. Nil when none has.
+    /// Today's tokens for each tool that has logs, with the estimated cost the Usage tab shows (none for Copilot, which
+    /// is billed by premium requests: those instead). Nil when no tool has logs.
     static func usage(_ store: Store, now: Date) -> StatusSnapshot.UsageToday? {
-        func tokens(_ id: String, _ name: String, _ s: UsageSummary) -> StatusSnapshot.ToolTokens? {
+        func tokens(_ id: String, _ name: String, _ s: UsageSummary, priced: Bool = true, premium: Double? = nil,
+                    model: Bool = false) -> StatusSnapshot.ToolTokens? {
             guard s.found else { return nil }
+            let today = s.period(.today)
+            let cost = priced && today.cost > 0 ? today.cost : nil
+            let top = model ? RankList.shortModels(today.models).max { $0.value < $1.value }.map(\.name) : nil
             return .init(tool: id, name: name, input: s.today.input, output: s.today.output,
-                         cacheRead: s.today.cacheRead, cacheWrite: s.today.cacheWrite)
+                         cacheRead: s.today.cacheRead, cacheWrite: s.today.cacheWrite,
+                         cost: cost, premiumRequests: premium, model: top)
         }
         let tools = [tokens("claude", "Claude", store.claude), tokens("codex", "Codex", store.codex),
                      tokens("google", GoogleUsage.title(store.googleSources), store.google),
-                     tokens("opencode", "OpenCode", store.opencode),
-                     tokens("copilot", CopilotCLI.displayName, store.copilot.summary)].compactMap { $0 }
+                     tokens("opencode", "OpenCode", store.opencode, model: true),
+                     tokens("copilot", CopilotCLI.displayName, store.copilot.summary, priced: false,
+                            premium: store.copilot.premium(.today, now: now))].compactMap { $0 }
         return tools.isEmpty ? nil : .init(day: StatusSnapshot.dayKey(now), tools: tools)
     }
 }

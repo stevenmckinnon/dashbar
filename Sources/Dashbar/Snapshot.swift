@@ -39,7 +39,7 @@ enum Snapshot {
                 exit(0)
             }
             if let flag = CommandLine.arguments.firstIndex(of: "--widget") {
-                // A desktop widget (small or medium) from the demo data, drawn by the same views the extension uses.
+                // A desktop widget from the demo data, drawn by the same views the extension uses.
                 let size = CommandLine.arguments.dropFirst(flag + 1).first.flatMap(DashbarWidgetSize.init(rawValue:)) ?? .small
                 WidgetSnapshot.render(size, store: store, dark: dark, to: path)
                 exit(0)
@@ -453,22 +453,33 @@ enum MenuBarSnapshot {
     }
 }
 
-/// `--widget small|medium`: one desktop widget at its real size, its own rounded shape and fill on a transparent background
-/// (the README's pictures and the reference for the site's HTML widgets, `docs/images/widget-*-{light,dark}.png`, at
-/// `DASHBAR_SNAPSHOT_SCALE=4`), from the
-/// store's snapshot as the widget would read it.
+/// `--widget small|medium|codex|antigravity|opencode|copilot|usage`: one desktop widget at its real size, its own rounded
+/// shape and fill on a transparent background (the README's pictures and the reference for the site's HTML widgets,
+/// `docs/images/widget-*-{light,dark}.png`, at `DASHBAR_SNAPSHOT_SCALE=4`), from the store's snapshot as the widget would
+/// read it. `small` is Claude's plan limits, `medium` the overview, `usage` tokens today; the demo flags
+/// (`DASHBAR_DEMO_GOOGLE`, `DASHBAR_DEMO_OPENCODE`, `DASHBAR_DEMO_COPILOT`, `DASHBAR_DEMO_HIDDEN`) fill in the rest.
 /// `DASHBAR_WIDGET_STATE=nodata|notrunning` shows the widget before the app has saved anything, or after it has quit;
+/// `=hidden` with the widget's own tool switched off in Dashbar, `=unused` with that tool never used.
 /// `DASHBAR_WIDGET_TOOLS=1` keeps only the first N tools' limits, to see the medium widget with fewer rows.
+/// `DASHBAR_WIDGET_LOCAL=1` draws the "Local" marker a local build's widgets carry (left out otherwise, as everywhere offline).
 @MainActor
 enum WidgetSnapshot {
     static func render(_ size: DashbarWidgetSize, store: Store, dark: Bool, to path: String) {
         let now = Date()
         let state = ProcessInfo.processInfo.environment["DASHBAR_WIDGET_STATE"]
-        var snapshot = CLIStatus.snapshot(of: store, showsClaudeLimits: true, now: now).forWidget()
+        var full = CLIStatus.snapshot(of: store, showsClaudeLimits: true, now: now)
+        if let tool = size.tool, state == "hidden" || state == "unused" {
+            // As the app would save it: a tool switched off (or never used) has no limits or usage in the snapshot.
+            full.limits.removeAll { $0.provider == tool.provider }
+            full.usageToday?.tools.removeAll { $0.tool == tool.usageID }
+            if state == "hidden" { full.hidden = ((full.hidden ?? []) + [StatusSnapshot.switchID(tool.provider)]).sorted() }
+        }
+        var snapshot = full.forWidget()
         if let tools = ProcessInfo.processInfo.environment["DASHBAR_WIDGET_TOOLS"].flatMap(Int.init) {
             snapshot.limits = Array(snapshot.limits.prefix(tools))
         }
-        let entry = DashbarWidgetEntry(date: now, snapshot: state == "nodata" ? nil : snapshot, running: state != "notrunning")
+        let entry = DashbarWidgetEntry(date: now, snapshot: state == "nodata" ? nil : snapshot, running: state != "notrunning",
+                                       local: ProcessInfo.processInfo.environment["DASHBAR_WIDGET_LOCAL"] == "1")
         let content = size.view(entry)
             .padding(16)
             .frame(width: size.points.width, height: size.points.height, alignment: .topLeading)

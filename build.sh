@@ -128,10 +128,10 @@ sed -i '' -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD_NUMBER/" \
 APPEX="$APP/Contents/PlugIns/DashbarWidgets.appex"
 mkdir -p "$APPEX/Contents/MacOS"
 cp "$(dirname "$BINARY")/DashbarWidgets" "$APPEX/Contents/MacOS/DashbarWidgets"
-python3 - "$APPEX/Contents/Info.plist" "$APP_NAME" "$BUNDLE_ID.widgets" "$VERSION" "$BUILD_NUMBER" "$APP_GROUP" \
+python3 - "$APPEX/Contents/Info.plist" "$APP_NAME" "$BUNDLE_ID.widgets" "$VERSION" "$BUILD_NUMBER" "$APP_GROUP" "$LOCAL" \
   "$(xcrun --sdk macosx --show-sdk-version)" "$(xcrun --sdk macosx --show-sdk-build-version)" <<'PY'
 import plistlib, sys
-path, name, bundle_id, version, build, group, sdk, sdk_build = sys.argv[1:]
+path, name, bundle_id, version, build, group, local, sdk, sdk_build = sys.argv[1:]
 info = {
     # What Xcode writes into every bundle it builds; WidgetKit's daemon records the platform and SDK of each widget.
     "CFBundleSupportedPlatforms": ["MacOSX"],
@@ -151,6 +151,9 @@ info = {
     "LSMinimumSystemVersion": "14.0",
     "NSExtension": {"NSExtensionPointIdentifier": "com.apple.widgetkit-extension"},
 }
+# A local build's widgets say "Local" (WidgetStatus.localInfoKey), as its app does.
+if local == "1":
+    info["DashbarLocalBuild"] = True
 if group:
     info["DashbarAppGroup"] = group
 with open(path, "wb") as f:
