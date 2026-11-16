@@ -164,7 +164,7 @@ struct Monogram: View {
         .compositingGroup()
         .overlay(alignment: .bottomTrailing) {
             if active || waiting {
-                Circle().fill(waiting ? UI.attention : Color.green).frame(width: dot, height: dot).offset(x: 1, y: 1)
+                Circle().fill(waiting ? UI.attention : UI.working).frame(width: dot, height: dot).offset(x: 1, y: 1)
             }
         }
         .frame(width: size, height: size)
@@ -190,12 +190,12 @@ struct StatusDot: View {
             if active {
                 if reduceMotion {
                     // Static halo: same cue, no motion.
-                    Circle().fill(Color.green.opacity(0.25)).frame(width: size * 1.8, height: size * 1.8)
+                    Circle().fill(UI.working.opacity(0.25)).frame(width: size * 1.8, height: size * 1.8)
                 } else {
                     // Scoped animation: only scale and opacity loop, so the halo can never drift with
                     // layout (the bug with a plain repeatForever), and it renders without re-laying out
                     // the panel each frame (the cost of a TimelineView clock).
-                    Circle().fill(Color.green.opacity(0.35))
+                    Circle().fill(UI.working.opacity(0.35))
                         .frame(width: size * 2, height: size * 2)
                         .animation(.easeOut(duration: 1.4).repeatForever(autoreverses: false)) { content in
                             content
@@ -207,7 +207,7 @@ struct StatusDot: View {
             if waiting {
                 Circle().fill(UI.attention.opacity(0.25)).frame(width: size * 1.8, height: size * 1.8)
             }
-            Circle().fill(waiting ? UI.attention : active ? Color.green : Color.secondary.opacity(0.5)).frame(width: size, height: size)
+            Circle().fill(waiting ? UI.attention : active ? UI.working : Color.secondary.opacity(0.5)).frame(width: size, height: size)
         }
         .frame(width: size * 2, height: size * 2)
         .accessibilityHidden(true)
