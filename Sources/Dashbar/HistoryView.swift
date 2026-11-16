@@ -31,17 +31,23 @@ struct HistoryPage: View {
         if store.codex.found || !store.codexLimits.isEmpty {
             PlanHistoryCard(provider: .codex, label: store.defaultAccountLabel(.codex), current: store.codexLimits)
         }
-        ForEach(store.historyAccounts(.codex)) { a in
-            PlanHistoryCard(provider: .codex, account: a.key, label: a.label, current: a.limits)
+        if settings.visibility.shows(.codex) {
+            ForEach(store.historyAccounts(.codex)) { a in
+                PlanHistoryCard(provider: .codex, account: a.key, label: a.label, current: a.limits)
+            }
         }
-        // Antigravity: a card per model group ("Antigravity · Gemini"), only once its CLI's status line has reported.
-        ForEach(store.historyAccounts(.antigravity)) { a in
-            PlanHistoryCard(provider: .antigravity, account: a.key, label: a.label, current: a.limits)
+        // Antigravity: a card per model group ("Antigravity · Gemini"), only once its CLI's status line has reported, and
+        // not while Google's tools are switched off (its saved history stays for when they're back).
+        if settings.visibility.shows(.google) {
+            ForEach(store.historyAccounts(.antigravity)) { a in
+                PlanHistoryCard(provider: .antigravity, account: a.key, label: a.label, current: a.limits)
+            }
         }
         HistoryHeading(text: "Usage, last 30 days").padding(.top, 10)
         UsageHistorySection(claude: store.claude.history, codex: store.codex.found ? store.codex.history : nil,
                             google: store.google.found ? store.google.history : nil, googleName: GoogleUsage.title(store.googleSources),
                             opencode: store.opencode.found ? store.opencode.history : nil,
+                            copilot: store.copilot.summary.found ? store.copilot.summary.history : nil,
                             loading: store.usageLoading)
     }
 }
@@ -347,6 +353,8 @@ private struct UsageHistorySection: View {
     var google: UsageHistory? = nil
     var googleName = "Gemini CLI"
     var opencode: UsageHistory? = nil
+    /// Billed by its plan: tokens only, never a cost.
+    var copilot: UsageHistory? = nil
     let loading: Bool
     @State private var selected: Date?
 
@@ -364,6 +372,7 @@ private struct UsageHistorySection: View {
         if let codex { out += codex.days.map { Bar(key: $0.key, date: $0.date, agent: "Codex", tokens: $0.tokens, cost: $0.cost) } }
         if let google { out += google.days.map { Bar(key: $0.key, date: $0.date, agent: googleName, tokens: $0.tokens, cost: $0.cost) } }
         if let opencode { out += opencode.days.map { Bar(key: $0.key, date: $0.date, agent: "OpenCode", tokens: $0.tokens, cost: $0.cost) } }
+        if let copilot { out += copilot.days.map { Bar(key: $0.key, date: $0.date, agent: CopilotCLI.displayName, tokens: $0.tokens, cost: 0) } }
         return out
     }
 
@@ -371,6 +380,7 @@ private struct UsageHistorySection: View {
     private var agents: [(String, Color)] {
         [("Claude Code", UI.claude)] + (codex == nil ? [] : [("Codex", UI.codex)]) + (google == nil ? [] : [(googleName, UI.google)])
             + (opencode == nil ? [] : [("OpenCode", UI.neutralTool)])
+            + (copilot == nil ? [] : [(CopilotCLI.displayName, UI.copilotHistory)])
     }
 
     var body: some View {
@@ -378,7 +388,7 @@ private struct UsageHistorySection: View {
             HStack { ProgressView().controlSize(.small); Text("Scanning transcripts…").font(.caption).foregroundStyle(UI.textSecondary) }
                 .padding(UI.cardPadding).frame(maxWidth: .infinity, alignment: .leading).surface()
         } else if claude.totals.total == 0 && (codex?.totals.total ?? 0) == 0 && (google?.totals.total ?? 0) == 0
-                    && (opencode?.totals.total ?? 0) == 0 {
+                    && (opencode?.totals.total ?? 0) == 0 && (copilot?.totals.total ?? 0) == 0 {
             EmptyRow(text: "No Claude Code or Codex usage in the last 30 days.").padding(UI.cardPadding).surface()
         } else {
             let bars = bars
@@ -396,10 +406,10 @@ private struct UsageHistorySection: View {
             }
             HStack(alignment: .top, spacing: UI.gap) {
                 Card(title: "Projects", icon: "folder", count: nil, trailing: "tokens · est. cost") {
-                    ProjectRanks(claude: claude, codex: codex, google: google, opencode: opencode)
+                    ProjectRanks(claude: claude, codex: codex, google: google, opencode: opencode, copilot: copilot)
                 }
                     .frame(maxHeight: .infinity, alignment: .top)
-                Card(title: "Models", icon: "cpu", count: nil, trailing: "tokens · est. cost") { ModelRanks(claude: claude, codex: codex, google: google, opencode: opencode) }
+                Card(title: "Models", icon: "cpu", count: nil, trailing: "tokens · est. cost") { ModelRanks(claude: claude, codex: codex, google: google, opencode: opencode, copilot: copilot) }
                     .frame(maxHeight: .infinity, alignment: .top)
             }
             .fixedSize(horizontal: false, vertical: true)
@@ -407,6 +417,7 @@ private struct UsageHistorySection: View {
                  + "On a Claude, ChatGPT or Google AI plan you pay the plan's price, not this."
                  + (google == nil ? "" : " Antigravity CLI costs are its own estimates.")
                  + (opencode == nil ? "" : " OpenCode's own costs are used where it recorded them.")
+                 + (copilot == nil ? "" : " GitHub Copilot is billed by your plan's premium requests, not by token, so its tokens carry no cost here.")
                  + (unpriced.isEmpty ? "" : " No price is known for \(unpriced.joined(separator: ", ")), so its tokens are left out of the cost.")
                  + " Dashbar reads the last 30 days of logs and keeps totals by day, project and model, not by session.")
                 .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
@@ -421,6 +432,7 @@ private struct UsageHistorySection: View {
     }
 
     private var unpriced: [String] {
+        // Copilot's models aren't unpriced, they're plan-billed: the footnote says so on its own.
         Array(Set(claude.unpriced + (codex?.unpriced ?? []) + (google?.unpriced ?? []) + (opencode?.unpriced ?? []))).sorted()
     }
 
@@ -435,7 +447,8 @@ private struct UsageHistorySection: View {
         let busiestDate = busiest.flatMap { b in bars.first { $0.key == b.key }?.date }
         let active = totalsByDay.values.filter { $0 > 0 }.count
         let claudeShare = Double(claude.totals.total)
-            / Double(max(1, claude.totals.total + (codex?.totals.total ?? 0) + (google?.totals.total ?? 0) + (opencode?.totals.total ?? 0)))
+            / Double(max(1, claude.totals.total + (codex?.totals.total ?? 0) + (google?.totals.total ?? 0) + (opencode?.totals.total ?? 0)
+                         + (copilot?.totals.total ?? 0)))
         return HStack(alignment: .top, spacing: 22) {
             figure(day.map { $0.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)) } ?? "Tokens, 30 days", Fmt.tokens(tokens))
             figure("Estimated cost", "\u{2248} " + Fmt.usd(cost))
@@ -444,9 +457,11 @@ private struct UsageHistorySection: View {
                     (busiestDate?.formatted(.dateTime.day().month(.abbreviated)) ?? "") + " · " + Fmt.tokens(b.value)
                 } ?? "–")
                 figure("Days with use", "\(active) of \(UsageHistory.days)")
-                if codex != nil || google != nil || opencode != nil { figure("Claude Code share", "\(Int((claudeShare * 100).rounded()))%") }
+                if codex != nil || google != nil || opencode != nil || copilot != nil { figure("Claude Code share", "\(Int((claudeShare * 100).rounded()))%") }
             } else {
-                ForEach(shown) { b in figure(b.agent, Fmt.tokens(b.tokens) + " · " + Fmt.usd(b.cost)) }
+                ForEach(shown) { b in
+                    figure(b.agent, Fmt.tokens(b.tokens) + (b.agent == CopilotCLI.displayName ? "" : " · " + Fmt.usd(b.cost)))
+                }
             }
             Spacer(minLength: 0)
         }
@@ -493,6 +508,7 @@ private struct ProjectRanks: View {
     let codex: UsageHistory?
     var google: UsageHistory? = nil
     var opencode: UsageHistory? = nil
+    var copilot: UsageHistory? = nil
 
     private struct Row: Identifiable {
         var id: String { name }
@@ -501,8 +517,9 @@ private struct ProjectRanks: View {
         var codex = 0
         var google = 0
         var opencode = 0
+        var copilot = 0
         var cost: Double?
-        var total: Int { claude + codex + google + opencode }
+        var total: Int { claude + codex + google + opencode + copilot }
     }
 
     private var rows: [Row] {
@@ -531,6 +548,11 @@ private struct ProjectRanks: View {
             if let c = p.cost { r.cost = (r.cost ?? 0) + c }
             byName[p.name] = r
         }
+        for p in copilot?.projects ?? [] {   // no cost: billed by its plan
+            var r = byName[p.name] ?? Row(name: p.name)
+            r.copilot += p.value
+            byName[p.name] = r
+        }
         return byName.values.sorted { ($0.total, $1.name) > ($1.total, $0.name) }.prefix(6).map { $0 }
     }
 
@@ -545,6 +567,7 @@ private struct ProjectRanks: View {
                         if r.codex > 0 { Rectangle().fill(UI.codex.opacity(0.7)).frame(width: width * Double(r.codex) / top) }
                         if r.google > 0 { Rectangle().fill(UI.google.opacity(0.7)).frame(width: width * Double(r.google) / top) }
                         if r.opencode > 0 { Rectangle().fill(UI.neutralTool.opacity(0.7)).frame(width: width * Double(r.opencode) / top) }
+                        if r.copilot > 0 { Rectangle().fill(UI.copilotHistory.opacity(0.7)).frame(width: width * Double(r.copilot) / top) }
                     }
                     .frame(width: max(3, width * Double(r.total) / max(top, 1)), alignment: .leading)
                     .clipShape(Capsule())
@@ -559,15 +582,18 @@ private struct ModelRanks: View {
     let codex: UsageHistory?
     var google: UsageHistory? = nil
     var opencode: UsageHistory? = nil
+    var copilot: UsageHistory? = nil
 
     var body: some View {
         let rows = (claude.models.map { ($0, UI.claude) } + (codex?.models ?? []).map { ($0, UI.codex) }
-                    + (google?.models ?? []).map { ($0, UI.google) } + (opencode?.models ?? []).map { ($0, UI.neutralTool) })
+                    + (google?.models ?? []).map { ($0, UI.google) } + (opencode?.models ?? []).map { ($0, UI.neutralTool) }
+                    + (copilot?.models ?? []).map { ($0, UI.copilotHistory) })
             .sorted { $0.0.value > $1.0.value }.prefix(6)
         let top = Double(rows.first?.0.value ?? 1)
         VStack(alignment: .leading, spacing: 8) {
             ForEach(Array(rows), id: \.0.id) { m, tint in
-                RankRow(name: m.name, value: Fmt.tokens(m.value) + (m.cost.map { " · " + Fmt.usd($0) } ?? " · no price")) { width in
+                let unpriced = tint == UI.copilotHistory ? " · by plan" : " · no price"
+                RankRow(name: m.name, value: Fmt.tokens(m.value) + (m.cost.map { " · " + Fmt.usd($0) } ?? unpriced)) { width in
                     Capsule().fill(tint.opacity(0.7)).frame(width: max(3, width * Double(m.value) / max(top, 1)))
                 }
             }

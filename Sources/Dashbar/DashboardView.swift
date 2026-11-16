@@ -371,7 +371,7 @@ struct LiveControls: View {
                 .padding(.horizontal, 8).padding(.vertical, 3)
                 .background(Capsule().fill(UI.attention.opacity(0.14)))
                 .fixedSize()
-                .help("Claude has stopped to ask for permission or an answer")
+                .help("An agent has stopped to ask for permission or an answer")
             }
             if !store.paused, store.busyCount > 0 {
                 HStack(spacing: 5) {
@@ -381,7 +381,7 @@ struct LiveControls: View {
                 .font(.system(size: UI.Size.caption, weight: .medium))
                 .foregroundStyle(UI.textSecondary)
                 .padding(.horizontal, 8).padding(.vertical, 3)
-                .background(Capsule().fill(Color.green.opacity(0.12)))
+                .background(Capsule().fill(UI.working.opacity(0.12)))
                 .fixedSize()   // with two status pills, the title gives way rather than a pill wrapping
             }
             if buttons { LiveButtons() }

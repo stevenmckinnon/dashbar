@@ -100,24 +100,31 @@ final class AntigravitySettings: ObservableObject {
     }
 }
 
-/// Integrations → Antigravity: add or remove the status line bridge. Shown only when the Antigravity CLI is installed (its
-/// settings folder exists) or the bridge is in.
+/// Integrations → Gemini CLI and Antigravity: whether Google's tools show (one switch for all three, as they share a Usage
+/// card), then, for the Antigravity CLI, add or remove the status line bridge. Shown only when one of them is on this Mac,
+/// the bridge is in, or they're switched off (so they can be switched back on).
 struct AntigravityLabsSection: View {
     @ObservedObject private var settings = AntigravitySettings.shared
+    @ObservedObject private var app = AppSettings.shared
+    @ObservedObject private var presence = ToolPresence.shared
     @State private var problem: String?
 
     var body: some View {
-        if settings.status != .absent {
+        let shown = app.visibility.shows(.google)
+        if settings.status != .absent || presence.found.contains(.google) || !shown {
             Section {
-                row
-                if let problem {
-                    Label(problem, systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption).foregroundStyle(.red)
-                        .fixedSize(horizontal: false, vertical: true)
+                ShowInDashbarToggle(tool: .google)
+                if shown && settings.status != .absent {
+                    row
+                    if let problem {
+                        Label(problem, systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption).foregroundStyle(.red)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    IntegrationDetails(text: explanation)
                 }
-                IntegrationDetails(text: explanation)
             } header: {
-                Text("Antigravity CLI")
+                Text(HideableTool.google.title)
             }
         }
     }

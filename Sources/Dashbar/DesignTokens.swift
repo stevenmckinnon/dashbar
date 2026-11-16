@@ -46,6 +46,8 @@ enum UI {
     static let textInfo = Color(light: .init(hex: 0x0B5CD5), dark: .init(hex: 0x80BBFF))      // 5.0 / 5.2 — links and interactive text only
     static let textDanger = Color(light: .init(hex: 0xC4320A), dark: .init(hex: 0xFF6B5E))    // 5.5 / 5.1 — context nearly full, errors
     static let textAttention = Color(light: .init(hex: 0x8A5C00), dark: .init(hex: 0xE3B341)) // 5.2 / 7.4 — needs attention soon
+    /// Green: an agent is working (status dots, the "working" pill and its tint).
+    static let working = Color.green
     /// Amber: something needs your attention soon (an agent waiting for you, a limit on course to run out).
     /// Kept apart from Claude's coral and the problem red.
     static let attention = Color(light: .init(hex: 0xBF8700), dark: .init(hex: 0xE3B341))

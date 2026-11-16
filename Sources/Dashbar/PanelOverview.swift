@@ -82,7 +82,7 @@ struct StatusPill: View {
             .font(.system(size: UI.Size.caption, weight: .medium).monospacedDigit())
             .padding(.horizontal, 8).padding(.vertical, 4)
             .background(Capsule().fill(waiting != nil ? UI.attention.opacity(0.14)
-                                       : (busy != nil ? Color.green : Color.primary).opacity(busy != nil ? 0.12 : 0.06)))
+                                       : (busy != nil ? UI.working : Color.primary).opacity(busy != nil ? 0.12 : 0.06)))
             .accessibilityElement(children: .combine)   // "Working, 4m" as one, not a bare time
         }
     }

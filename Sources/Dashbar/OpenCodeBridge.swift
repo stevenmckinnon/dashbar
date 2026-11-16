@@ -312,22 +312,27 @@ final class OpenCodeSettings: ObservableObject {
     }
 }
 
-/// Integrations → opencode: add or remove the plugin. Shown only when opencode is installed (its config folder or
-/// database exists) or the plugin is in.
+/// Integrations → opencode: whether it shows, then add or remove the plugin. Shown only when opencode is installed (its
+/// config folder or database exists), the plugin is in, or it's switched off.
 struct OpenCodeSection: View {
     @ObservedObject private var settings = OpenCodeSettings.shared
+    @ObservedObject private var app = AppSettings.shared
     @State private var problem: String?
 
     var body: some View {
-        if settings.status != .absent {
+        let shown = app.visibility.shows(.opencode)
+        if settings.status != .absent || !shown {
             Section {
-                row
-                if let problem {
-                    Label(problem, systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption).foregroundStyle(.red)
-                        .fixedSize(horizontal: false, vertical: true)
+                ShowInDashbarToggle(tool: .opencode)
+                if shown {
+                    row
+                    if let problem {
+                        Label(problem, systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption).foregroundStyle(.red)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    IntegrationDetails(text: explanation)
                 }
-                IntegrationDetails(text: explanation)
             } header: {
                 Text("OpenCode")
             }

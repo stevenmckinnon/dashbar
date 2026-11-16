@@ -26,6 +26,14 @@ struct ServiceUsage: Identifiable {
     var hasNotice = false
     /// A small label after the title: "Experimental" for Claude's plan limits read from the endpoint.
     var badge: String? = nil
+    /// Billed by a plan, not by token (Copilot): no cost is shown or estimated, and no "no price for" line.
+    var planBilled = false
+    /// Premium requests in each period, for a tool that counts them (Copilot), by `UsagePeriod.rawValue`.
+    var premiumRequests: [Double]? = nil
+    /// A line under the figures saying when they arrive ("Updated when a session ends").
+    var caption: String? = nil
+    /// Why some usage can't be known (sessions with no log), shown instead of a quiet zero.
+    var unknownNote: String? = nil
     /// Plan limits are loading.
     var busy = false
 
@@ -37,9 +45,10 @@ struct ServiceUsage: Identifiable {
 }
 
 extension Store {
-    /// The tools the Usage tab has a card for, in Claude Code, Codex, Google, opencode order (`UsageRules.order` sorts
-    /// them). Claude Code always has one; the others only for someone who uses them.
+    /// The tools the Usage tab has a card for, in Claude Code, Codex, Google, opencode, Copilot order (`UsageRules.order`
+    /// sorts them). Claude Code always has one; the others only for someone who uses them and hasn't switched them off.
     func usageServices(settings: AppSettings, antigravityInstalled: Bool) -> [ServiceUsage] {
+        let shows = settings.visibility
         let oneAccount = claudePlanLabel == nil && claudeAccountLimits.isEmpty
         let experimental = claudePlan.map { $0.source == .endpoint } ?? (!settings.claudeStatusLine && settings.claudeLimits)
         var out = [ServiceUsage(
@@ -53,7 +62,7 @@ extension Store {
                 || claudePlan?.problem != nil || claudeAccountLimits.contains { $0.problem != nil },
             badge: oneAccount && settings.showsClaudeLimits && experimental ? "Experimental" : nil,
             busy: oneAccount && settings.claudeLimits && claudePlanLoading)]
-        if codex.found || !codexAccountLimits.isEmpty {
+        if shows.shows(.codex), codex.found || !codexAccountLimits.isEmpty {
             out.append(ServiceUsage(
                 service: .codex, title: "Codex", icon: "chevron.left.forwardslash.chevron.right", tint: UI.codex, fill: UI.codex,
                 summary: codex, accounts: codexAccountUsage,
@@ -61,7 +70,7 @@ extension Store {
                 hasNotice: codex.warning != nil))
         }
         // Only for someone with Google's tools: their transcripts, or the Antigravity CLI's bridge or a reading it left.
-        if google.found || antigravityLimits != nil || antigravityInstalled {
+        if shows.shows(.google), google.found || antigravityLimits != nil || antigravityInstalled {
             let name = google.found ? GoogleUsage.title(googleSources) : "Antigravity CLI"
             // The plan tier names Antigravity's plan, so it joins the title only when the card is Antigravity's alone.
             let tier = name.hasPrefix("Antigravity") ? antigravityLimits?.planTier : nil
@@ -73,10 +82,20 @@ extension Store {
                 hasNotice: google.warning != nil || antigravityLimits?.problem != nil))
         }
         // Only for someone with opencode's database. No limits: it runs on the user's own providers.
-        if opencode.found {
+        if shows.shows(.opencode), opencode.found {
             out.append(ServiceUsage(
                 service: .opencode, title: "OpenCode", icon: UI.openCodeSymbol, tint: UI.neutralTool, fill: UI.neutralTool,
                 summary: opencode, costNote: OpenCodeUsageText.costNote, hasNotice: opencode.warning != nil))
+        }
+        // Only for someone with Copilot's session logs (the CLI, its agent in VS Code, the Copilot app). No limits: its premium-request allowance lives on GitHub,
+        // which Dashbar never asks. Tokens arrive when a session ends, as Copilot writes them only then.
+        if shows.shows(.copilot), copilot.shows {
+            out.append(ServiceUsage(
+                service: .copilot, title: CopilotCLI.displayName, icon: UI.copilotSymbol, tint: UI.neutralTool,
+                fill: UI.neutralTool, summary: copilot.summary, costNote: CopilotUsageText.costNote,
+                hasNotice: copilot.summary.warning != nil || copilot.unknownSessions > 0,
+                planBilled: true, premiumRequests: UsagePeriod.allCases.map { copilot.premium($0) },
+                caption: CopilotUsageText.caption, unknownNote: CopilotUsageText.unknown(copilot.unknownSessions)))
         }
         return out
     }
@@ -177,7 +196,8 @@ struct ServiceUsageCard: View {
                 // The limits and the tokens are two groups: more space between them than inside either.
                 VStack(alignment: .leading, spacing: 18) {
                     ServiceLimits(service: service)
-                    if service.service == .claude || service.summary.found || service.summary.warning != nil { tokens }
+                    if service.service == .claude || service.summary.found || service.summary.warning != nil
+                        || service.unknownNote != nil { tokens }
                 }
             }
         }
@@ -228,7 +248,7 @@ struct ServiceUsageCard: View {
             .accessibilityElement(children: .combine)
             .accessibilityHint(warning)
         } else if !summary.found {
-            EmptyRow(text: "No transcripts found")
+            if let note = service.unknownNote { UnknownUsageNote(text: note) } else { EmptyRow(text: "No transcripts found") }
         } else {
             let usage = summary.period(period)
             VStack(alignment: .leading, spacing: 8) {
@@ -247,7 +267,18 @@ struct ServiceUsageCard: View {
                     .font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
                     .lineLimit(1).minimumScaleFactor(0.9)
                     .help("Input, output, and cache reads and writes, which together make the total")
-                if showCost && usage.totals.total > 0 && !usage.unpriced.isEmpty {
+                if let premium = service.premiumRequests, premium.indices.contains(period.rawValue),
+                   let line = CopilotUsageText.premiumLine(premium[period.rawValue], period: period) {
+                    Text(line)
+                        .font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
+                        .help(service.costNote ?? "")
+                }
+                if let caption = service.caption {
+                    Text(caption).font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if let note = service.unknownNote { UnknownUsageNote(text: note) }
+                if showCost && !service.planBilled && usage.totals.total > 0 && !usage.unpriced.isEmpty {
                     Text("No price for \(usage.unpriced.joined(separator: ", ")), so it's left out of the cost")
                         .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -281,7 +312,7 @@ struct ServiceUsageCard: View {
                 Text("at API prices").font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary).fixedSize()
             }
         }
-        .help(showCost ? CostLine.help(note: service.costNote, missing: usage.unpriced) : "")
+        .help(service.planBilled ? service.costNote ?? "" : showCost ? CostLine.help(note: service.costNote, missing: usage.unpriced) : "")
         .accessibilityElement(children: .combine)
     }
 
@@ -617,6 +648,8 @@ struct ServiceLimits: View {
             }
         case .opencode:
             EmptyView()   // no plan limits: opencode runs on the user's own providers
+        case .copilot:
+            EmptyView()   // its premium-request allowance is only on GitHub, which Dashbar doesn't ask
         }
     }
 }
@@ -790,6 +823,43 @@ struct ClaudeAccountLimitsView: View {
                 }
             }
         }
+    }
+}
+
+/// Wording for GitHub Copilot CLI's Usage card.
+enum CopilotUsageText {
+    static let caption = "Updated as Copilot works; totals are confirmed when a session ends."
+    static let costNote = "GitHub Copilot is billed by your plan's premium requests, not by token, so Dashbar shows no cost "
+        + "for it. Tokens come from each model call as Copilot logs it, replaced by the session's own totals when it ends. Premium requests are Copilot's own count, saved when each session ends. Your plan's allowance is only on GitHub."
+
+    /// "12 premium requests today", "1 premium request in 7 days", "2.5 premium requests …". Nil for none: Copilot
+    /// saves the count only when a session ends, so mid-session a zero means "not known yet", never "none used".
+    static func premiumLine(_ n: Double, period: UsagePeriod) -> String? {
+        guard n > 0 else { return nil }
+        let figure = n == n.rounded() ? String(Int(n)) : String(format: "%.1f", n)
+        return "\(figure) premium request\(n == 1 ? "" : "s") \(period.span)"
+    }
+
+    /// Nil with none.
+    static func unknown(_ sessions: Int) -> String? {
+        guard sessions > 0 else { return nil }
+        return sessions == 1
+            ? "Usage unknown for 1 session: Copilot saved no event log for it."
+            : "Usage unknown for \(sessions) sessions: Copilot saved no event log for them."
+    }
+}
+
+/// A line saying some usage can't be known, never a quiet zero.
+struct UnknownUsageNote: View {
+    let text: String
+    var body: some View {
+        HStack(alignment: .top, spacing: 6) {
+            Image(systemName: "questionmark.circle").foregroundStyle(UI.textSecondary).accessibilityHidden(true)
+            Text(text).fixedSize(horizontal: false, vertical: true)
+        }
+        .font(.system(size: UI.Size.caption))
+        .foregroundStyle(UI.textSecondary)
+        .accessibilityElement(children: .combine)
     }
 }
 

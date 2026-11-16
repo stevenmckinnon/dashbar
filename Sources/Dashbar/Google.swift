@@ -3,11 +3,11 @@ import AppKit
 
 // MARK: - Google's agents: Gemini CLI, Antigravity CLI (agy) and the Antigravity app
 
-/// Which agent a live session belongs to. Claude Code's sessions are the default; the rest come from Google's tools and
-/// opencode, each read from what that tool already keeps on this Mac (see `GeminiCLI`, `AntigravityStatusLine`,
-/// `AntigravityApp`, `OpenCode`).
+/// Which agent a live session belongs to. Claude Code's sessions are the default; the rest come from Google's tools,
+/// opencode and GitHub Copilot CLI, each read from what that tool already keeps on this Mac (see `GeminiCLI`,
+/// `AntigravityStatusLine`, `AntigravityApp`, `OpenCode`, `CopilotCLI`).
 enum SessionAgent: String, Equatable, CaseIterable {
-    case claude, geminiCLI, antigravityCLI, antigravity, opencode
+    case claude, geminiCLI, antigravityCLI, antigravity, opencode, copilot
 
     /// "Claude", "Gemini CLI", "Antigravity CLI", "Antigravity": the subject of "… is working".
     var name: String {
@@ -17,6 +17,7 @@ enum SessionAgent: String, Equatable, CaseIterable {
         case .antigravityCLI: return "Antigravity CLI"
         case .antigravity: return "Antigravity"
         case .opencode: return "OpenCode"   // as its brand page writes it (opencode.ai/brand); the command is `opencode`
+        case .copilot: return CopilotCLI.shortName   // "GitHub Copilot CLI" in headings (`CopilotCLI.displayName`)
         }
     }
 
@@ -27,6 +28,7 @@ enum SessionAgent: String, Equatable, CaseIterable {
         switch self {
         case .claude: return "asterisk"
         case .opencode: return UI.openCodeSymbol
+        case .copilot: return UI.copilotSymbol
         default: return UI.googleSymbol
         }
     }
@@ -34,7 +36,7 @@ enum SessionAgent: String, Equatable, CaseIterable {
     var tint: Color {
         switch self {
         case .claude: return UI.claude
-        case .opencode: return UI.neutralTool
+        case .opencode, .copilot: return UI.neutralTool
         default: return UI.google
         }
     }

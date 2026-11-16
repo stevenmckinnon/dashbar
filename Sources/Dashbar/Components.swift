@@ -114,11 +114,11 @@ struct Card<Content: View>: View {
 }
 
 /// The symbol leading a card's title. Plain, in secondary ink; only the agents' own symbols (Claude's asterisk, Codex's
-/// brackets, Google's sparkle, opencode's square) keep their colour, because there it names the agent.
+/// brackets, Google's sparkle, opencode's square, Copilot's goggles) keep their colour, because there it names the agent.
 struct IconChip: View {
     let symbol: String
     let tint: Color
-    private var namesAnAgent: Bool { symbol == "asterisk" || symbol.hasPrefix("chevron.left.forwardslash") || symbol == UI.googleSymbol || symbol == UI.openCodeSymbol }
+    private var namesAnAgent: Bool { symbol == "asterisk" || symbol.hasPrefix("chevron.left.forwardslash") || symbol == UI.googleSymbol || symbol == UI.openCodeSymbol || symbol == UI.copilotSymbol }
     var body: some View {
         Image(systemName: symbol)
             .font(.system(size: UI.Size.body, weight: .semibold))
@@ -164,7 +164,7 @@ struct Monogram: View {
         .compositingGroup()
         .overlay(alignment: .bottomTrailing) {
             if active || waiting {
-                Circle().fill(waiting ? UI.attention : Color.green).frame(width: dot, height: dot).offset(x: 1, y: 1)
+                Circle().fill(waiting ? UI.attention : UI.working).frame(width: dot, height: dot).offset(x: 1, y: 1)
             }
         }
         .frame(width: size, height: size)
@@ -190,12 +190,12 @@ struct StatusDot: View {
             if active {
                 if reduceMotion {
                     // Static halo: same cue, no motion.
-                    Circle().fill(Color.green.opacity(0.25)).frame(width: size * 1.8, height: size * 1.8)
+                    Circle().fill(UI.working.opacity(0.25)).frame(width: size * 1.8, height: size * 1.8)
                 } else {
                     // Scoped animation: only scale and opacity loop, so the halo can never drift with
                     // layout (the bug with a plain repeatForever), and it renders without re-laying out
                     // the panel each frame (the cost of a TimelineView clock).
-                    Circle().fill(Color.green.opacity(0.35))
+                    Circle().fill(UI.working.opacity(0.35))
                         .frame(width: size * 2, height: size * 2)
                         .animation(.easeOut(duration: 1.4).repeatForever(autoreverses: false)) { content in
                             content
@@ -207,7 +207,7 @@ struct StatusDot: View {
             if waiting {
                 Circle().fill(UI.attention.opacity(0.25)).frame(width: size * 1.8, height: size * 1.8)
             }
-            Circle().fill(waiting ? UI.attention : active ? Color.green : Color.secondary.opacity(0.5)).frame(width: size, height: size)
+            Circle().fill(waiting ? UI.attention : active ? UI.working : Color.secondary.opacity(0.5)).frame(width: size, height: size)
         }
         .frame(width: size * 2, height: size * 2)
         .accessibilityHidden(true)
@@ -326,5 +326,24 @@ enum Meter {
     static func width(_ fraction: Double, in length: CGFloat, minimum: CGFloat = 3) -> CGFloat {
         guard fraction > 0, length > 0 else { return 0 }
         return min(length, max(minimum, length * CGFloat(min(fraction, 1))))
+    }
+}
+
+/// The pointing hand over text that navigates somewhere (Apple's HIG keeps it for links). Buttons, rows and other
+/// controls keep the arrow, as in Apple's own apps.
+extension View {
+    func linkPointer() -> some View { modifier(LinkPointer()) }
+}
+
+/// Pops the hand when the link disappears under the pointer too (clicking "Usage" switches tab), so it never sticks.
+private struct LinkPointer: ViewModifier {
+    @State private var pushed = false
+    func body(content: Content) -> some View {
+        content
+            .onHover { inside in
+                if inside, !pushed { NSCursor.pointingHand.push(); pushed = true }
+                else if !inside, pushed { NSCursor.pop(); pushed = false }
+            }
+            .onDisappear { if pushed { NSCursor.pop(); pushed = false } }
     }
 }

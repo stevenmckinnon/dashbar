@@ -434,6 +434,7 @@ private struct GoneWorkspace: View {
             Button("Back to Overview", action: back)
                 .buttonStyle(PressStyle())
                 .font(.system(size: UI.Size.caption, weight: .medium)).foregroundStyle(UI.textInfo)
+                .linkPointer()
         }
         .padding(UI.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)

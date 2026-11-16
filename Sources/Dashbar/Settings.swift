@@ -75,6 +75,18 @@ final class AppSettings: ObservableObject {
     @Published var accounts: [AgentAccount] {
         didSet { if !CommandLine.arguments.contains("--demo") { Self.saveAccounts(accounts, to: defaults) } }
     }
+    /// Which tools are switched off in Integrations ("Show in Dashbar"). Claude Code can't be. Like `accounts`, never
+    /// saved from a `--demo` run, which takes its own from `DASHBAR_DEMO_HIDDEN` in memory instead.
+    @Published private(set) var visibility = ToolVisibility.initial() {
+        didSet { if !CommandLine.arguments.contains("--demo") { visibility.save(to: defaults) } }
+    }
+
+    func setShown(_ tool: HideableTool, _ shown: Bool) {
+        var v = visibility
+        v.set(tool, shown: shown)
+        if v != visibility { visibility = v }
+    }
+
     /// Whether Dashbar's bridge is in each added Claude account's status line, by folder. The default account's is
     /// `claudeStatusLineStatus`.
     @Published private(set) var accountStatusLines: [String: StatusLineBridge.Status] = [:]
@@ -415,6 +427,28 @@ extension View {
     }
 }
 
+/// Integrations → Codex: whether it shows. Codex needs nothing added: Dashbar reads its session logs. Shown only when
+/// Codex is on this Mac, or it's switched off (so it can be switched back on).
+struct CodexSection: View {
+    @ObservedObject private var settings = AppSettings.shared
+    @ObservedObject private var presence = ToolPresence.shared
+
+    var body: some View {
+        if presence.found.contains(.codex) || !settings.visibility.shows(.codex) {
+            Section {
+                ShowInDashbarToggle(tool: .codex)
+                if settings.visibility.shows(.codex) {
+                    IntegrationDetails(text: "Dashbar reads Codex's session logs in each Codex folder (Settings → Accounts) for "
+                        + "tokens and plan limits. Nothing is added to Codex. Switched off, the Overview's limits, the Usage card, "
+                        + "History and the menu bar leave Codex out, and its logs aren't read.", label: "How it works")
+                }
+            } header: {
+                Text("Codex")
+            }
+        }
+    }
+}
+
 /// The long explanation of an integration (what it changes, what it saves, what Remove does), folded under its row and
 /// closed by default, so a tool's section stays a few compact rows. The wording is the explanation's own, moved here.
 struct IntegrationDetails: View {
@@ -709,8 +743,11 @@ private struct IntegrationSettings: View {
             } header: {
                 Text("Claude Code")
             }
+            // Every other tool's section starts with "Show in Dashbar"; switched off, it folds to that row.
+            CodexSection()
             AntigravityLabsSection()
             OpenCodeSection()
+            CopilotSection()
             CommandLineToolSection()
         }
         .formStyle(.grouped)
@@ -719,6 +756,8 @@ private struct IntegrationSettings: View {
             settings.refreshClaudePermissions()
             AntigravitySettings.shared.refresh()
             OpenCodeSettings.shared.refresh()
+            CopilotSettings.shared.refresh()
+            ToolPresence.shared.refresh()
         }
     }
 

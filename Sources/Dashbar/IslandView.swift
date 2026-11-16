@@ -212,7 +212,7 @@ struct IslandContent: View {
                 Image(systemName: "hand.raised.fill").font(.system(size: 9, weight: .semibold)).foregroundStyle(UI.attention)
                     .frame(width: IslandMetrics.glyph)
             case .working:
-                Circle().fill(Color.green).frame(width: 6, height: 6).frame(width: IslandMetrics.glyph)
+                Circle().fill(UI.working).frame(width: 6, height: 6).frame(width: IslandMetrics.glyph)
             case .idle:
                 EmptyView()
             }
