@@ -294,8 +294,10 @@ struct OverviewRow: View {
                 Spacer(minLength: 0)
             } else {
                 let titles = WidgetModel.titles(row.limits, short: true)
+                // Named by group ("Claude and GPT"), a title needs the line to itself: the reset time goes under the meter.
+                let named = titles != row.limits.map(StatusFormat.shortWindow)
                 ForEach(Array(row.limits.enumerated()), id: \.offset) { i, limit in
-                    CompactLimit(limit: limit, title: titles[i], provider: row.provider, now: now)
+                    CompactLimit(limit: limit, title: titles[i], resetBelow: named, provider: row.provider, now: now)
                 }
                 if row.limits.count == 1 { Spacer(minLength: 0).frame(maxWidth: .infinity) }
             }
@@ -303,11 +305,12 @@ struct OverviewRow: View {
     }
 }
 
-/// A limit in the medium widget: "5h 14:20  55%" over its meter, or "Gemini Sat 23:24  61%" where the window alone
-/// wouldn't tell two limits apart (`WidgetModel.titles`).
+/// A limit in the medium widget: "5h 14:20  55%" over its meter. Where the window alone wouldn't tell two limits apart
+/// (`WidgetModel.titles`), "Gemini  58%" over the meter, with the reset time under it (`resetBelow`).
 struct CompactLimit: View {
     let limit: StatusSnapshot.Limit
     let title: String
+    var resetBelow = false
     let provider: String
     let now: Date
     @Environment(\.colorScheme) private var scheme
@@ -318,11 +321,8 @@ struct CompactLimit: View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(title).font(.system(size: WidgetType.micro, weight: .medium)).lineLimit(1)
-                    .truncationMode(.tail).layoutPriority(-1)
-                if let r = limit.resetsAt {
-                    Text(WidgetModel.resetText(r, now: now)).font(.system(size: WidgetType.micro)).foregroundStyle(.secondary)
-                        .lineLimit(1).fixedSize()
-                }
+                    .minimumScaleFactor(0.8).truncationMode(.tail).layoutPriority(-1)
+                if !resetBelow, let r = limit.resetsAt { resetText(r) }
                 Spacer(minLength: 2)
                 Text(reset ? "–" : WidgetModel.percent(limit))
                     .font(.system(size: WidgetType.caption, weight: .semibold).monospacedDigit())
@@ -330,10 +330,16 @@ struct CompactLimit: View {
             }
             LimitMeter(limit: reset ? StatusSnapshot.Limit(label: limit.label, usedPercent: 0) : limit,
                        color: palette.fill(limit, provider: provider))
+            if resetBelow, let r = limit.resetsAt { resetText(r) }
         }
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(limit.label) limit, " + (reset ? "reset since the last reading" : "\(WidgetModel.percent(limit)) used"))
+    }
+
+    private func resetText(_ date: Date) -> some View {
+        Text(WidgetModel.resetText(date, now: now)).font(.system(size: WidgetType.micro)).foregroundStyle(.secondary)
+            .lineLimit(1).fixedSize()
     }
 }
 
@@ -342,11 +348,11 @@ struct CompactLimit: View {
 public enum DashbarWidgetSize: String, CaseIterable, Sendable {
     case small, medium
 
-    /// The desktop widget's size in points on macOS.
+    /// The desktop widget's size in points on macOS, as chronod reports it (macOS 27, default display).
     public var points: CGSize {
         switch self {
-        case .small: return CGSize(width: 170, height: 170)
-        case .medium: return CGSize(width: 364, height: 170)
+        case .small: return CGSize(width: 164, height: 164)
+        case .medium: return CGSize(width: 344, height: 164)
         }
     }
 

@@ -454,20 +454,24 @@ enum MenuBarSnapshot {
 }
 
 /// `--widget small|medium`: a desktop widget on a plain backdrop, from the store's snapshot as the widget would read it.
-/// `DASHBAR_WIDGET_STATE=nodata|notrunning` shows the widget before the app has saved anything, or after it has quit.
+/// `DASHBAR_WIDGET_STATE=nodata|notrunning` shows the widget before the app has saved anything, or after it has quit;
+/// `DASHBAR_WIDGET_TOOLS=1` keeps only the first N tools' limits, to see the medium widget with fewer rows.
 @MainActor
 enum WidgetSnapshot {
     static func render(_ size: DashbarWidgetSize, store: Store, dark: Bool, to path: String) {
         let now = Date()
         let state = ProcessInfo.processInfo.environment["DASHBAR_WIDGET_STATE"]
-        let snapshot = CLIStatus.snapshot(of: store, showsClaudeLimits: true, now: now).forWidget()
+        var snapshot = CLIStatus.snapshot(of: store, showsClaudeLimits: true, now: now).forWidget()
+        if let tools = ProcessInfo.processInfo.environment["DASHBAR_WIDGET_TOOLS"].flatMap(Int.init) {
+            snapshot.limits = Array(snapshot.limits.prefix(tools))
+        }
         let entry = DashbarWidgetEntry(date: now, snapshot: state == "nodata" ? nil : snapshot, running: state != "notrunning")
         let points = size.points
         let content = size.view(entry)
             .padding(16)
             .frame(width: points.width, height: points.height, alignment: .topLeading)
             .background(dark ? Color(white: 0.17) : Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))   // chronod: 27.88
             .padding(24)
             .background(dark ? Color(white: 0.08) : Color(white: 0.88))
             .environment(\.colorScheme, dark ? .dark : .light)
