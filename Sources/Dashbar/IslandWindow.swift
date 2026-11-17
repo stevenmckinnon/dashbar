@@ -175,7 +175,7 @@ final class IslandController {
         presenter.dismiss()
         presenter.closeList()
         update()
-        HostApp.open(HostApp.info(for: session)?.bundle, root: session.root)
+        HostApp.open(session)
     }
 
     /// Recomputes the mode from the store and the presenter, then re-places the panel if anything changed.
