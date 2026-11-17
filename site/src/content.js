@@ -9,8 +9,8 @@ export const BREW = "brew install --cask stevenmckinnon/tap/dashbar";
 
 export const HERO = {
   headline: "Your agents, in the menu bar",
-  lede: "Dashbar shows which **Claude Code** and **Codex** sessions are working, how much of your plan is left, and which dev servers are idling. Free and open source.",
-  note: "Needs macOS 14 or later. Notarised by Apple. MIT licence.",
+  lede: "See which coding agents are working, how much of your plan is left, and which dev servers are idling. Free and open source.",
+  note: "Needs macOS 14 or later. Notarised by Apple.",
   // Under the install buttons. Each name links to the FAQ entry with this id (faq.js), which says what each tool gets.
   worksWith: {
     lead: "Works with",
@@ -108,7 +108,7 @@ export const INSTALL = {
 // sheet or their own email. The site sends nothing and keeps no address.
 export const SEND_TO_MAC = {
   button: "Send to my Mac",
-  note: "Dashbar runs on your Mac. Send yourself the link for later.",
+  note: "AirDrop or email yourself the link for your Mac.",
   subject: "Dashbar for my Mac",
   body: "Dashbar, a menu bar app for your coding agents:",
 };

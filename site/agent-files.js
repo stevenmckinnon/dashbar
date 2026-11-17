@@ -5,7 +5,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { FAQ } from "./src/faq.js";
-import { SITE, REPO, BREW, HERO, FEATURES_INTRO, FEATURES, WINDOW, WIDGETS, PACE, PRIVACY, INSTALL, FOOTER, plain, worksWithText } from "./src/content.js";
+import { SITE, REPO, BREW, HERO, FEATURES_INTRO, FEATURES, WINDOW, WIDGETS, PACE, PRIVACY, INSTALL, FOOTER, plain, worksWithText, listOf } from "./src/content.js";
 
 const root = new URL("../", import.meta.url);
 const byVersion = (a, b) => b.version.localeCompare(a.version, undefined, { numeric: true });
@@ -177,7 +177,7 @@ export function llmsTxt(all) {
   return [
     `# Dashbar`,
     `> ${plain(HERO.lede)}`,
-    `Dashbar is a native menu bar app for macOS 14 or later, on Apple silicon and Intel. It reads what Claude Code, Codex, Gemini CLI, Antigravity and OpenCode record about their sessions on the Mac, the listening ports and processes, and the folders you choose. It is free and open source under the MIT licence. The app has no account and no analytics.${version ? ` The current version is ${version}.` : ""}`,
+    `Dashbar is a native menu bar app for macOS 14 or later, on Apple silicon and Intel. It reads what ${listOf(HERO.worksWith.tools)} record about their sessions on the Mac, the listening ports and processes, and the folders you choose. It is free and open source under the MIT licence. The app has no account and no analytics.${version ? ` The current version is ${version}.` : ""}`,
     `## Docs`,
     [
       `- [Homepage as Markdown](${SITE}index.md): features, what it reads and sends, what’s new, the FAQ and how to install`,
