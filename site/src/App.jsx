@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowDownToLine, Check, Copy, Play, RotateCw, Star } from "lucide-react";
+import { ArrowDownToLine, Check, Copy, Play, RotateCw, Send, Star } from "lucide-react";
 import { FAQ } from "./faq";
 import { RELEASE_NOTES, LATEST_VERSION, inline } from "./releases";
 import { DashbarDemo } from "./demos/DashbarDemo";
 import { AgentsDemo, LimitsDemo, UsageDemo, ServersDemo, SystemDemo, CleanupDemo } from "./demos/FeatureDemos";
 import { WindowDemo } from "./demos/WindowDemo";
 import { SmallWidget, MediumWidget } from "./demos/Widgets";
-import { REPO, BREW, HERO, TOUR, FEATURES_INTRO, FEATURES, WINDOW, WIDGETS, PACE, PRIVACY, INSTALL } from "./content";
+import { SITE, REPO, BREW, HERO, TOUR, FEATURES_INTRO, FEATURES, WINDOW, WIDGETS, PACE, PRIVACY, INSTALL, SEND_TO_MAC } from "./content";
 import { Mark, Footer } from "./Chrome";
 
 // The DMG itself, so the button downloads straight away. The version comes from the update feed at build time;
@@ -63,11 +63,46 @@ function BrewCommand({ className = "" }) {
   );
 }
 
+// Phones and tablets can't run a Mac app, so there the button sends the link on instead. Touch with no hover
+// catches iPads too, which call themselves Macs; a Mac never matches, trackpad or not.
+const TOUCH_ONLY = "(hover: none) and (pointer: coarse)";
+
 function DownloadButton({ className = "" }) {
+  const touchOnly = useMedia(TOUCH_ONLY);
+  if (touchOnly) return <SendToMac className={className} />;
   return (
     <a className={`btn ${className}`} href={DOWNLOAD}>
       <ArrowDownToLine size={19} strokeWidth={2} aria-hidden="true" />Download for macOS
     </a>
+  );
+}
+
+const SEND_URL = `${SITE}#install`;
+const MAILTO = `mailto:?subject=${encodeURIComponent(SEND_TO_MAC.subject)}&body=${encodeURIComponent(`${SEND_TO_MAC.body} ${SEND_URL}`)}`;
+
+/** The share sheet (email, AirDrop, Notes, Messages) where there is one, else a new email to yourself. Sends nothing itself. */
+function SendToMac({ className = "" }) {
+  const [copied, copy] = useCopy(SEND_URL);
+  const send = async () => {
+    if (navigator.share) {
+      try { await navigator.share({ title: "Dashbar", text: SEND_TO_MAC.body, url: SEND_URL }); return; }
+      catch (e) { if (e?.name === "AbortError") return; /* no share sheet after all: fall through to email */ }
+    }
+    window.location.href = MAILTO;
+  };
+  return (
+    <div className="send-to-mac">
+      <button type="button" className={`btn ${className}`} onClick={send}>
+        <Send size={18} strokeWidth={2} aria-hidden="true" />{SEND_TO_MAC.button}
+      </button>
+      <p className="send-note">
+        {SEND_TO_MAC.note}{" "}
+        <button type="button" className="text-btn" onClick={copy}>{copied ? "Link copied" : "Copy the link"}</button>
+        {" · "}
+        <a href={DOWNLOAD}>Download the DMG</a>
+      </p>
+      <span className="sr" role="status">{copied ? "Link copied" : ""}</span>
+    </div>
   );
 }
 
