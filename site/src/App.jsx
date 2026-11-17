@@ -82,7 +82,6 @@ const MAILTO = `mailto:?subject=${encodeURIComponent(SEND_TO_MAC.subject)}&body=
 
 /** The share sheet (email, AirDrop, Notes, Messages) where there is one, else a new email to yourself. Sends nothing itself. */
 function SendToMac({ className = "" }) {
-  const [copied, copy] = useCopy(SEND_URL);
   const send = async () => {
     if (navigator.share) {
       try { await navigator.share({ title: "Dashbar", text: SEND_TO_MAC.body, url: SEND_URL }); return; }
@@ -95,13 +94,7 @@ function SendToMac({ className = "" }) {
       <button type="button" className={`btn ${className}`} onClick={send}>
         <Send size={18} strokeWidth={2} aria-hidden="true" />{SEND_TO_MAC.button}
       </button>
-      <p className="send-note">
-        {SEND_TO_MAC.note}{" "}
-        <button type="button" className="text-btn" onClick={copy}>{copied ? "Link copied" : "Copy the link"}</button>
-        {" · "}
-        <a href={DOWNLOAD}>Download the DMG</a>
-      </p>
-      <span className="sr" role="status">{copied ? "Link copied" : ""}</span>
+      <p className="send-note">{SEND_TO_MAC.note}</p>
     </div>
   );
 }
@@ -160,6 +153,7 @@ function WorksWith() {
 
 function Hero() {
   const dark = useDark();
+  const touchOnly = useMedia(TOUCH_ONLY);
   const [run, setRun] = useState(0);
   return (
     <header className="wrap hero">
@@ -168,7 +162,8 @@ function Hero() {
         <p className="lede"><Inline text={HERO.lede} /></p>
         <div className="actions">
           <DownloadButton />
-          <BrewCommand />
+          {/* A Terminal command is no use on a phone; the Install section still has it for later. */}
+          {touchOnly ? null : <BrewCommand />}
         </div>
         <WorksWith />
         <p className="note">{LATEST_VERSION ? <>Version {LATEST_VERSION}. </> : null}{HERO.note}</p>
