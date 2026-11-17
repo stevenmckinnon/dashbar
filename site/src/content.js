@@ -108,7 +108,7 @@ export const INSTALL = {
 // sheet or their own email. The site sends nothing and keeps no address.
 export const SEND_TO_MAC = {
   button: "Send to my Mac",
-  note: "Dashbar is a Mac app. Send yourself the link, then install it there.",
+  note: "Dashbar runs on your Mac. Send yourself the link for later.",
   subject: "Dashbar for my Mac",
   body: "Dashbar, a menu bar app for your coding agents:",
 };
