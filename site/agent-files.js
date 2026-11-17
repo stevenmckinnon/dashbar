@@ -45,9 +45,12 @@ const faqById = (id) => {
   return hit;
 };
 
-/** The date of the last commit, for the sitemap's lastmod. The site deploys only when its sources change. */
-export function lastCommitDay() {
-  try { return execFileSync("git", ["log", "-1", "--format=%cs"], { encoding: "utf8" }).trim() || null; } catch { return null; }
+/** The day of the last commit touching these paths (relative to the repository root), for the sitemap's lastmod.
+ * Needs the full history: site.yml checks out with fetch-depth 0, or every page would get the one commit's date. */
+export function lastCommitDay(paths) {
+  try {
+    return execFileSync("git", ["log", "-1", "--format=%cs", "--", ...paths], { encoding: "utf8", cwd: new URL("..", import.meta.url) }).trim() || null;
+  } catch { return null; }
 }
 
 const releaseSection = (list) =>
@@ -207,13 +210,22 @@ export function llmsTxt(all) {
 
 /** sitemap.xml. index.md is left out so search engines don't index it as a copy of the page; llms.txt and
  * the <link rel="alternate"> in index.html point agents to it. */
-export function sitemap(lastmod) {
-  const urls = ["", "privacy", "llms.txt", "llms-full.txt"];
-  const mod = lastmod ? `<lastmod>${lastmod}</lastmod>` : "";
+export function sitemap() {
+  // Each page with what its content is made from, so lastmod moves only when that page changes.
+  const page = ["site/index.html", "site/src", "release-notes", "appcast.xml"];
+  const urls = [
+    ["", page],
+    ["privacy", ["site/privacy.html", "site/src/policy.js"]],
+    ["llms.txt", ["site/agent-files.js", "site/src/content.js", "site/src/faq.js", "release-notes", "appcast.xml"]],
+    ["llms-full.txt", ["site/agent-files.js", "site/src/content.js", "site/src/faq.js", "release-notes", "appcast.xml"]],
+  ];
   return [
     `<?xml version="1.0" encoding="UTF-8"?>`,
     `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`,
-    ...urls.map((u) => `  <url><loc>${SITE}${u}</loc>${mod}</url>`),
+    ...urls.map(([u, paths]) => {
+      const day = lastCommitDay(paths);
+      return `  <url><loc>${SITE}${u}</loc>${day ? `<lastmod>${day}</lastmod>` : ""}</url>`;
+    }),
     `</urlset>`,
   ].join("\n") + "\n";
 }

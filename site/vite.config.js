@@ -50,6 +50,10 @@ const seo = {
       license: `${REPO}/blob/main/LICENSE`,
       codeRepository: REPO,
       sameAs: [REPO],
+      image: `${SITE}icon.png`,
+      screenshot: [`${SITE}overview-light.png`, `${SITE}agents-light.png`, `${SITE}window-light.png`],
+      author: { "@type": "Person", name: "Steve McKinnon", url: "https://steve.mn" },
+      featureList: FEATURES.map((f) => f.name),
     };
     const fallback = [
       `<div class="seo-fallback">`,
@@ -108,7 +112,7 @@ const agentFiles = {
       "index.md": agent.indexMd(all),
       "llms.txt": agent.llmsTxt(all),
       "llms-full.txt": agent.llmsFullTxt(all),
-      "sitemap.xml": agent.sitemap(agent.lastCommitDay()),
+      "sitemap.xml": agent.sitemap(),
       [agent.SKILL_PATH]: skill,
       ".well-known/agent-skills/index.json": agent.skillsIndex(skill),
       ".well-known/ai-catalog.json": agent.aiCatalog(),
