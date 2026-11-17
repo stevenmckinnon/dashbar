@@ -232,6 +232,8 @@ final class Store: ObservableObject {
             AppWindow.shared.toggle(store: self)
         }
         GlobalShortcut.shared.setEnabled(GlobalShortcut.isEnabled)
+        JumpShortcut.shared.action = { [weak self] in self?.jumpToAgent() }
+        JumpShortcut.shared.apply()
         notifier.openLimits = { [weak self] in
             guard let self else { return }
             AppWindow.shared.show(store: self, page: .tab(.agents))   // the plan limits live there
@@ -760,6 +762,17 @@ final class Store: ObservableObject {
         HostApp.open(session.flatMap { HostApp.info(for: $0)?.bundle }, root: root)
     }
 
+    /// The jump shortcut: brings forward the app of the agent that has waited longest for you, else the one that finished
+    /// last (`JumpTarget`). With neither it does nothing on screen and makes no sound; VoiceOver hears why.
+    func jumpToAgent() {
+        guard let choice = JumpTarget.choose(sessions: sessions, waitingSince: transitions.waitingSince,
+                                             finishedAt: transitions.finishedAt, visibility: settings.visibility) else {
+            Announcement.post("No agent needs you.", high: false)
+            return
+        }
+        HostApp.open(choice.session)
+    }
+
     /// `panel` adds what only the open panel shows (other agent processes, busiest apps) and implies `system`.
     /// `system` samples CPU, memory, network, GPU and battery, which the menu bar stats also need.
     /// Live data and the usage scan run separately, so a long scan never holds up sessions and servers.
@@ -1163,7 +1176,11 @@ struct SessionTransitions {
     static let notifyAfter: TimeInterval = 20
 
     private var busySince: [String: Date] = [:]
-    private var waiting = Set<String>()
+    /// When each waiting session started waiting (as first seen), so the jump shortcut picks the longest wait.
+    private(set) var waitingSince: [String: Date] = [:]
+    /// When each live session last finished a stretch of work: the jump shortcut's fallback. Kept while the session
+    /// lives, even once it starts again (`JumpTarget` skips a busy one).
+    private(set) var finishedAt: [String: Date] = [:]
     private var primed = false
 
     mutating func update(_ sessions: [LiveSession], now: Date) -> [Event] {
@@ -1171,19 +1188,24 @@ struct SessionTransitions {
         for s in sessions {
             if s.isWaiting {
                 // Asking isn't finishing: the work it started carries on once someone replies.
-                if waiting.insert(s.id).inserted, primed { events.append(.waiting(id: s.id)) }
+                if waitingSince[s.id] == nil {
+                    waitingSince[s.id] = now
+                    if primed { events.append(.waiting(id: s.id)) }
+                }
                 continue
             }
-            waiting.remove(s.id)
+            waitingSince[s.id] = nil
             if s.isBusy {
                 if busySince[s.id] == nil { busySince[s.id] = now }
             } else if let start = busySince.removeValue(forKey: s.id), now.timeIntervalSince(start) >= Self.minimumWork {
                 events.append(.finished(id: s.id, after: now.timeIntervalSince(start)))
+                finishedAt[s.id] = now
             }
         }
         let live = Set(sessions.map(\.id))
         busySince = busySince.filter { live.contains($0.key) }
-        waiting = waiting.filter { live.contains($0) }
+        waitingSince = waitingSince.filter { live.contains($0.key) }
+        finishedAt = finishedAt.filter { live.contains($0.key) }
         primed = true   // the first reading is a baseline: sessions already waiting at launch don't notify
         return events
     }

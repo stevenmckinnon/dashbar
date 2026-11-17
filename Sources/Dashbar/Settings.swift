@@ -547,6 +547,8 @@ private struct GeneralSettings: View {
     @AppStorage(CostLine.showKey) private var showCost = true
     @State private var shortcutUnavailable = GlobalShortcut.shared.unavailable
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @ObservedObject private var jump = JumpShortcut.shared
+    @State private var jumpNote: String?
 
     var body: some View {
         Form {
@@ -560,10 +562,22 @@ private struct GeneralSettings: View {
                     .onChange(of: shortcut) { _, on in
                         GlobalShortcut.shared.setEnabled(on)
                         shortcutUnavailable = GlobalShortcut.shared.unavailable
+                        JumpShortcut.shared.apply()   // a jump shortcut of ⌃⌥D works only while this is off
                     }
                 if shortcut && shortcutUnavailable {
                     Text("Another app is using \(GlobalShortcut.display), so it won't open Dashbar.")
                         .font(.caption).foregroundStyle(.secondary)
+                }
+                LabeledContent("Jump to the agent that needs you") {
+                    ShortcutRecorder(label: "Jump to the agent that needs you", combo: jump.combo,
+                                     onChange: { jump.set($0) }, note: $jumpNote)
+                }
+                .help("Brings forward the app of the agent that has waited longest for you, or else the one that finished last. When no agent is waiting or has finished, it does nothing.")
+                .onAppear { jump.apply() }   // the other copy of Dashbar may have changed its own since
+                if let jumpNote {
+                    Text(jumpNote).font(.caption).foregroundStyle(.secondary)
+                } else if let problem = jump.problem, let combo = jump.combo {
+                    Text(JumpShortcut.message(problem, combo: combo)).font(.caption).foregroundStyle(.secondary)
                 }
             }
             Section {
