@@ -104,6 +104,15 @@ export const INSTALL = {
   brew: "One command. `brew upgrade` keeps it current.",
 };
 
+// On a phone or tablet, in place of Download for macOS: the link goes to the visitor's own Mac by their share
+// sheet or their own email. The site sends nothing and keeps no address.
+export const SEND_TO_MAC = {
+  button: "Send to my Mac",
+  note: "Dashbar is a Mac app. Send yourself the link, then install it there.",
+  subject: "Dashbar for my Mac",
+  body: "Dashbar, a menu bar app for your coding agents:",
+};
+
 export const FOOTER = {
   about: "A menu bar app for your coding agents.",
   independence: "Dashbar is an independent project, not affiliated with or endorsed by Anthropic, OpenAI, Google, Anomaly or GitHub.",
