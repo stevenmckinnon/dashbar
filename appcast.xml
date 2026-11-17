@@ -3,6 +3,17 @@
     <channel>
         <title>Dashbar</title>
         <item>
+            <title>0.11.0</title>
+            <pubDate>Tue, 17 Nov 2026 20:02:31 +0000</pubDate>
+            <sparkle:version>250</sparkle:version>
+            <sparkle:shortVersionString>0.11.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[- A new keyboard shortcut jumps to the agent that needs you: it brings forward the app of the session that has waited longest for you, or, if none is waiting, the one that finished last. Set it in Settings → General (there's none until you pick one). Tools switched off in Show in Dashbar are skipped.
+- Settings → About has Copy Diagnostics: a short summary for a bug report (Dashbar's and macOS's versions, which tools and integrations Dashbar found, any format warnings, the widgets' state, how many extra accounts and where Claude's plan limits come from). It never includes project names, folders, sessions or account names, Show Diagnostics lets you read it before you copy, and nothing is sent.
+]]></description>
+            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.11.0/Dashbar-0.11.0.dmg" length="10724830" type="application/octet-stream" sparkle:edSignature="8rJfM+jQ7Bsuv7Xh9ytPMheXd8S2qkhsId5u8CtOgs00DPP2iA2HG3KxISAacq39u38smPtu/b9kaQJEWwbADg=="/>
+        </item>
+        <item>
             <title>0.10.2</title>
             <pubDate>Tue, 17 Nov 2026 19:18:03 +0000</pubDate>
             <sparkle:version>243</sparkle:version>
@@ -24,17 +35,6 @@
             <description sparkle:format="markdown"><![CDATA[- Desktop widgets no longer go blank after an update: Dashbar now restarts its widget when it launches as a new version.
 ]]></description>
             <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.10.1/Dashbar-0.10.1.dmg" length="10181601" type="application/octet-stream" sparkle:edSignature="6rFL3tBLzPZgKegFgs0bUezpxnwjcetUyKMSoLP7adxeJVblCKngBMP+6prZcLH2YgzXAEAc8a5q2fCQ+wa0Cw=="/>
-        </item>
-        <item>
-            <title>0.10.0</title>
-            <pubDate>Mon, 16 Nov 2026 21:08:04 +0000</pubDate>
-            <sparkle:version>227</sparkle:version>
-            <sparkle:shortVersionString>0.10.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[- GitHub Copilot support, in the terminal and as VS Code's agent: its sessions show in your workspaces as working, idle or asking permission, with notifications, the island and the menu bar like any agent. A Usage card and History show its tokens, models and premium requests, updated as Copilot works. Add Dashbar's hook in Settings → Integrations to see when a session needs you the moment it asks.
-- A Show in Dashbar switch for each tool in Settings → Integrations: Codex, Gemini CLI and Antigravity, OpenCode and GitHub Copilot. Switched off, a tool is hidden everywhere and Dashbar stops reading its files; switch it back on and everything returns.
-]]></description>
-            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.10.0/Dashbar-0.10.0.dmg" length="10178297" type="application/octet-stream" sparkle:edSignature="GvY98JpVpIadxQFsVIqaui/HW7WIfvp8O3CaCKDlWSQxd0L0e6m0EpOmJsjfhUBCkSu9in4cW0qwRmJpjslODw=="/>
         </item>
     </channel>
 </rss>
