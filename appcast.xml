@@ -3,6 +3,19 @@
     <channel>
         <title>Dashbar</title>
         <item>
+            <title>0.10.2</title>
+            <pubDate>Tue, 17 Nov 2026 19:18:03 +0000</pubDate>
+            <sparkle:version>243</sparkle:version>
+            <sparkle:shortVersionString>0.10.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[- On a Mac with a touch display (the MacBook Pro with a Dynamic Island), Dashbar's island now starts off for new installs, so it stays out of the way of the Dynamic Island. Settings → Notifications says why, and you can turn it on anyway. A choice you've already made is kept.
+- On a touch display, the panel shows the open and stop buttons on servers and the Trash button on clean-up folders without waiting for a hover, and its small buttons are easier to tap. Nothing changes on other Macs.
+- New desktop widgets: small ones for Codex's and Antigravity's plan limits, OpenCode's and GitHub Copilot's tokens today, and a medium "Tokens today" with each tool's tokens and estimated cost. Add them from the widget gallery.
+- A tool switched off in Show in Dashbar is left out of every widget, and its own widget says it's switched off instead of going blank.
+]]></description>
+            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.10.2/Dashbar-0.10.2.dmg" length="10530753" type="application/octet-stream" sparkle:edSignature="1+ARJroC3AG/rxl8G8shqSxqkrCMG/OaeqwflJcGKmFVdnKxTuTGHV4uw3c3TCtuOMCGYO8hxacFr2J+J2vsCg=="/>
+        </item>
+        <item>
             <title>0.10.1</title>
             <pubDate>Mon, 16 Nov 2026 21:35:32 +0000</pubDate>
             <sparkle:version>230</sparkle:version>
@@ -22,17 +35,6 @@
 - A Show in Dashbar switch for each tool in Settings → Integrations: Codex, Gemini CLI and Antigravity, OpenCode and GitHub Copilot. Switched off, a tool is hidden everywhere and Dashbar stops reading its files; switch it back on and everything returns.
 ]]></description>
             <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.10.0/Dashbar-0.10.0.dmg" length="10178297" type="application/octet-stream" sparkle:edSignature="GvY98JpVpIadxQFsVIqaui/HW7WIfvp8O3CaCKDlWSQxd0L0e6m0EpOmJsjfhUBCkSu9in4cW0qwRmJpjslODw=="/>
-        </item>
-        <item>
-            <title>0.9.0</title>
-            <pubDate>Mon, 16 Nov 2026 19:36:16 +0000</pubDate>
-            <sparkle:version>215</sparkle:version>
-            <sparkle:shortVersionString>0.9.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[- OpenCode support: its sessions show in your workspaces as working or idle, with a Usage card for its tokens, models and estimated cost. Add Dashbar's plugin in Settings → Integrations to also see when a session is waiting for you.
-- Settings → Integrations is shorter: one section per tool, each with its Add or Remove button, and the details of what Dashbar changes folded underneath.
-]]></description>
-            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.9.0/Dashbar-0.9.0.dmg" length="9816593" type="application/octet-stream" sparkle:edSignature="tB2ogp37TrTahyNJSQqhK6TcOiHPN1UwyFfTGKHvfU3r8w9GnQPMzhiRo5LDNaBDDfRh3QpmZtZSa1FcFGWgCQ=="/>
         </item>
     </channel>
 </rss>
