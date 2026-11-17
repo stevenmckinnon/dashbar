@@ -4,10 +4,6 @@ A free, open-source Mac menu bar app that shows which Claude Code and Codex agen
 
 **[Website](https://usedashbar.com/)** · [Download](https://github.com/stevenmckinnon/dashbar/releases/latest) · [Homebrew](#install) · [What's new](https://github.com/stevenmckinnon/dashbar/releases)
 
-<a href="https://kittylaunch.com/p/dashbar?utm_source=badge" target="_blank" rel="noopener">
-  <img src="https://kittylaunch.com/api/public/badges/launch_badge.svg?style=pill&theme=light" width="296" alt="Dashbar, Verified by KittyLaunch" data-kittylaunch-badge="1" />
-</a>
-
 https://github.com/user-attachments/assets/e2f3b494-7473-4e81-be36-fe026a8cdb00
 
 <p align="center">
@@ -280,3 +276,7 @@ Claude Code's settings, so this opens nothing new to it. Nothing about the reque
 ## Licence
 
 MIT. See `LICENSE`. Not affiliated with Anthropic, OpenAI or Google.
+
+<a href="https://kittylaunch.com/p/dashbar?utm_source=badge" target="_blank" rel="noopener">
+  <img src="https://kittylaunch.com/api/public/badges/launch_badge.svg?style=chip&theme=light" width="196" alt="Dashbar, Verified by KittyLaunch" data-kittylaunch-badge="1" />
+</a>
