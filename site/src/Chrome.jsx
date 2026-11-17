@@ -19,6 +19,13 @@ export function Footer({ home = "" }) {
         <div className="who">
           <a className="brand" href={`${home}#top`}><Mark /> Dashbar</a>
           <p>{`${FOOTER.about} Made by `}<a href="https://steve.mn">Steve McKinnon</a>.</p>
+          {/* KittyLaunch's badge, copied here (docs/images/badges/) so the page asks nothing of another site. */}
+          <a className="badge" href="https://kittylaunch.com/p/dashbar?utm_source=badge" target="_blank" rel="noopener">
+            <picture>
+              <source srcSet="/badges/kittylaunch-dark.svg" media="(prefers-color-scheme: dark)" />
+              <img src="/badges/kittylaunch-light.svg" width="120" height="120" alt="Dashbar, Verified by KittyLaunch" data-kittylaunch-badge="1" />
+            </picture>
+          </a>
         </div>
         <ul className="links" aria-label={home ? "Homepage" : "On this page"}>
           <li><a href={`${home}#features`}>Features</a></li>

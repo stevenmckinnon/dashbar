@@ -258,6 +258,8 @@ section[id], [id="top"] { scroll-margin-top: 88px; }
 .footer { border-top: 1px solid var(--line); font-size: var(--step-ui); }
 .footer-inner { display: grid; grid-template-columns: repeat(12, 1fr); gap: var(--gap); padding-block: 56px 40px; }
 .footer .who { grid-column: 1 / span 6; display: grid; gap: 12px; align-content: start; color: var(--muted); }
+.footer .badge { justify-self: start; margin-top: 4px; line-height: 0; }
+.footer .badge img { display: block; }
 .footer .links { grid-column: span 3; display: grid; gap: 10px; list-style: none; margin: 0; padding: 0; align-content: start; }
 .footer .links a { color: var(--ink); text-decoration: none; }
 @media (hover: hover) { .footer .links a:hover { color: var(--accent); } }
