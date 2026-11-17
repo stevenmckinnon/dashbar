@@ -255,7 +255,7 @@ swift test              # tests
 ./build.sh --run        # build "Dashbar Local.app" and launch it
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for local builds, releasing and the rules for changes. Bugs and ideas go in [issues](https://github.com/stevenmckinnon/dashbar/issues); security reports are described in [SECURITY.md](SECURITY.md). For anything else, email [hello@usedashbar.com](mailto:hello@usedashbar.com).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for local builds, releasing and the rules for changes. Bugs and ideas go in [issues](https://github.com/stevenmckinnon/dashbar/issues); for a bug, Settings → About → Copy Diagnostics gives you a block to paste in (Dashbar's and macOS's versions, which tools and integrations it found, any format warnings, the widgets' state, how many extra accounts and where Claude's plan limits come from: no project names, folders, sessions or account names; press Show Diagnostics to read it first, and nothing is sent). security reports are described in [SECURITY.md](SECURITY.md). For anything else, email [hello@usedashbar.com](mailto:hello@usedashbar.com).
 
 ## Privacy
 

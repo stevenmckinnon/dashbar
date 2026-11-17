@@ -18,6 +18,11 @@ final class WidgetBridge {
     private let reload: () -> Void
     private var lastReload: Date = .distantPast
     private var pendingReload = false
+    /// When this bridge last wrote the widgets' file, for Settings → About → Copy Diagnostics. Nil until it has.
+    private(set) var lastWritten: Date?
+
+    /// The bridge `CLIStatus` is feeding, or nil before it starts or in a build without an App Group.
+    static weak var active: WidgetBridge?
 
     init(url: URL, reload: @escaping () -> Void = { WidgetStatus.Kind.all.forEach { WidgetCenter.shared.reloadTimelines(ofKind: $0) } }) {
         writer = StatusSnapshotWriter(url: url)
@@ -66,6 +71,7 @@ final class WidgetBridge {
     @discardableResult
     func update(_ snapshot: StatusSnapshot, showsCost: Bool = true, now: Date = Date()) -> Bool {
         guard writer.write(snapshot.forWidget(showsCost: showsCost), now: now) else { return false }
+        lastWritten = now
         requestReload(now: now)
         return true
     }

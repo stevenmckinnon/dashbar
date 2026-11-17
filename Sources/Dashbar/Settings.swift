@@ -499,12 +499,18 @@ struct SettingsView: View {
         return max(minHeight, min(640, visible - 80))
     }
 
-    init() { SettingsTab.migrateSaved() }
+    /// The app's store, for About's diagnostics. Nil only where there's none to hand.
+    let store: Store?
+
+    init(store: Store? = nil) {
+        self.store = store
+        SettingsTab.migrateSaved()
+    }
 
     var body: some View {
         TabView(selection: $tab) {
             ForEach(SettingsTab.allCases, id: \.self) { tab in
-                Self.content(tab).tabItem { Label(tab.title, systemImage: tab.symbol) }.tag(tab)
+                Self.content(tab, store: store).tabItem { Label(tab.title, systemImage: tab.symbol) }.tag(tab)
             }
         }
         .frame(width: Self.width)
@@ -516,7 +522,7 @@ struct SettingsView: View {
         }
     }
 
-    @ViewBuilder private static func content(_ tab: SettingsTab) -> some View {
+    @ViewBuilder private static func content(_ tab: SettingsTab, store: Store?) -> some View {
         switch tab {
         case .general: GeneralSettings()
         case .notifications: NotificationSettings()
@@ -524,14 +530,14 @@ struct SettingsView: View {
         case .folders: FolderSettings()
         case .accounts: AccountSettings()
         case .integrations: IntegrationSettings()
-        case .about: AboutSettings()
+        case .about: AboutSettings(store: store)
         }
     }
 
     /// One tab's page on its own, at the window's opening size, for `--snapshot … --settings <tab>` (offline renders of
     /// the TabView only ever draw its first tab). `height` overrides the opening height.
-    @MainActor static func page(_ tab: SettingsTab, height: CGFloat? = nil) -> some View {
-        content(tab).frame(width: width, height: height ?? idealHeight)
+    @MainActor static func page(_ tab: SettingsTab, store: Store? = nil, height: CGFloat? = nil) -> some View {
+        content(tab, store: store).frame(width: width, height: height ?? idealHeight)
     }
 }
 
@@ -1073,30 +1079,34 @@ private struct AccountSettings: View {
 }
 
 private struct AboutSettings: View {
+    let store: Store?
     @ObservedObject private var updater = Updater.shared
 
     var body: some View {
-        VStack(spacing: 10) {
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .frame(width: 80, height: 80)
-                .accessibilityHidden(true)
-            Text(BuildInfo.appName).font(.title2.weight(.semibold))
-            Text("Version \(BuildInfo.version)" + (BuildInfo.isLocal ? " (local build)" : ""))
-                .foregroundStyle(.secondary)
-            if updater.isAvailable {
-                Button("Check for Updates…") { updater.checkForUpdates() }.disabled(!updater.canCheck)
+        ScrollView {
+            VStack(spacing: 10) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 80, height: 80)
+                    .accessibilityHidden(true)
+                Text(BuildInfo.appName).font(.title2.weight(.semibold))
+                Text("Version \(BuildInfo.version)" + (BuildInfo.isLocal ? " (local build)" : ""))
+                    .foregroundStyle(.secondary)
+                if updater.isAvailable {
+                    Button("Check for Updates…") { updater.checkForUpdates() }.disabled(!updater.canCheck)
+                }
+                Text("Everything stays on your Mac. Dashbar reads Claude Code and Codex logs, lists listening ports and measures cache folders. It sends nothing anywhere.")
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 4)
+                Text("Not affiliated with Anthropic or OpenAI.")
+                    .font(.footnote).foregroundStyle(.secondary)
+                Button("Welcome…") { OnboardingWindow.shared.show(store: nil) }
+                    .padding(.top, 4)
+                if let store { DiagnosticsSection(store: store).padding(.top, 12) }
             }
-            Text("Everything stays on your Mac. Dashbar reads Claude Code and Codex logs, lists listening ports and measures cache folders. It sends nothing anywhere.")
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 4)
-            Text("Not affiliated with Anthropic or OpenAI.")
-                .font(.footnote).foregroundStyle(.secondary)
-            Button("Welcome…") { OnboardingWindow.shared.show(store: nil) }
-                .padding(.top, 4)
+            .padding(24)
+            .frame(maxWidth: .infinity)
         }
-        .padding(24)
-        .frame(maxWidth: .infinity)
     }
 }

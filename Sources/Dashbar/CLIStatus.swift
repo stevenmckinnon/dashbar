@@ -16,6 +16,7 @@ enum CLIStatus {
     static func follow(_ store: Store) -> AnyCancellable {
         let writer = StatusSnapshotWriter(url: StatusSnapshot.fileURL(appName: BuildInfo.appName))
         let widgets = WidgetBridge.forThisBuild()
+        WidgetBridge.active = widgets
         let changes: [AnyPublisher<Void, Never>] = [
             store.$sessions.map { _ in () }.eraseToAnyPublisher(),
             store.$subagents.map { _ in () }.eraseToAnyPublisher(),

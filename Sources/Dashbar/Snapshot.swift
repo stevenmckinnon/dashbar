@@ -98,7 +98,7 @@ enum Snapshot {
                 // DASHBAR_SETTINGS_HEIGHT; without one it is the whole window, which offline shows General.
                 let next = CommandLine.arguments.dropFirst(flag + 1).first
                 let height = ProcessInfo.processInfo.environment["DASHBAR_SETTINGS_HEIGHT"].flatMap(Double.init).map { CGFloat($0) }
-                let root: AnyView = next.flatMap(SettingsTab.init(name:)).map { AnyView(SettingsView.page($0, height: height)) } ?? AnyView(SettingsView())
+                let root: AnyView = next.flatMap(SettingsTab.init(name:)).map { AnyView(SettingsView.page($0, store: store, height: height)) } ?? AnyView(SettingsView(store: store))
                 let host = NSHostingView(rootView: root.environment(\.colorScheme, dark ? .dark : .light)
                     .background(Color(nsColor: .windowBackgroundColor)))
                 let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 480, height: 600), styleMask: [.titled], backing: .buffered, defer: false)
