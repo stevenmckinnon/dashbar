@@ -1109,11 +1109,11 @@ private struct AboutSettings: View {
                 if updater.isAvailable {
                     Button("Check for Updates…") { updater.checkForUpdates() }.disabled(!updater.canCheck)
                 }
-                Text("Everything stays on your Mac. Dashbar reads Claude Code and Codex logs, lists listening ports and measures cache folders. It sends nothing anywhere.")
+                Text("Everything stays on your Mac. Dashbar reads what your coding agents record about their sessions, lists listening ports and measures cache folders. It sends nothing anywhere.")
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 4)
-                Text("Not affiliated with Anthropic or OpenAI.")
+                Text("Not affiliated with Anthropic, OpenAI, Google, Anomaly or GitHub.")
                     .font(.footnote).foregroundStyle(.secondary)
                 Button("Welcome…") { OnboardingWindow.shared.show(store: nil) }
                     .padding(.top, 4)
