@@ -61,6 +61,8 @@ const seo = {
       `<h2>Questions</h2>`,
       ...FAQ.map(({ q, a }) => `<h3>${esc(q)}</h3><p>${esc(a)}</p>`),
       `<p><a href="${REPO}/releases/latest">Download</a> · <a href="${REPO}">Source on GitHub</a></p>`,
+      // KittyLaunch's checker reads the page without running it, so the footer's badge is here too.
+      `<p><a href="https://kittylaunch.com/p/dashbar?utm_source=badge" target="_blank" rel="noopener"><img src="/badges/kittylaunch-light.svg" width="120" height="120" alt="Dashbar, Verified by KittyLaunch" data-kittylaunch-badge="1" /></a></p>`,
       `<p>For AI agents: this page is also at <a href="/index.md">/index.md</a> as Markdown, and <a href="/llms.txt">/llms.txt</a> lists the useful links.</p>`,
       `</div>`,
     ].join("\n");
