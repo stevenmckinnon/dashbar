@@ -4,6 +4,8 @@ name: Save download stats
 # them to CSV files on the `stats` branch (kept off `main` so its history and your pushes stay clean).
 # Views and clones also need a TRAFFIC_TOKEN secret: a fine-grained token for this repo with
 # "Administration: read" (GITHUB_TOKEN cannot read traffic). Without it, only downloads are saved.
+# With a NOTION_TOKEN secret (a Notion integration connected to the "Dashbar stats" database), each day is
+# also copied there, where its chart views show downloads and visitors over time.
 on:
   schedule:
     - cron: "17 6 * * *"
@@ -35,6 +37,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TRAFFIC_TOKEN: ${{ secrets.TRAFFIC_TOKEN }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_STATS_DB: 41b57909f88a813888def2e7cfea079d
         run: python3 scripts/stats.py stats-data
 
       - name: Save them

@@ -9,6 +9,8 @@ daily by .github/workflows/stats.yml and the results kept on the `stats` branch.
 Environment:
     GH_TOKEN           any token that can read the repo's releases (the workflow's GITHUB_TOKEN is enough)
     TRAFFIC_TOKEN      optional: a token with push access, needed for views and clones
+    NOTION_TOKEN       optional: a Notion integration's secret, to copy one row per day into the
+                       "Dashbar stats" database (NOTION_STATS_DB, its id), which draws the charts
     GITHUB_REPOSITORY  owner/name, default stevenmckinnon/dashbar
     GITHUB_STEP_SUMMARY  if set, a short table is written there for the Actions run page
 
@@ -102,6 +104,50 @@ def save_traffic(folder, token):
     return rows
 
 
+NOTION_API = "https://api.notion.com/v1"
+
+
+def notion(method, path, token, body=None):
+    req = urllib.request.Request(NOTION_API + path, method=method, data=json.dumps(body).encode() if body else None, headers={
+        "Authorization": f"Bearer {token}",
+        "Notion-Version": "2022-06-28",
+        "Content-Type": "application/json",
+    })
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.load(resp)
+
+
+def daily_rows(folder):
+    """{day: {property: number}} from the CSVs: new and total downloads, and the repo's traffic."""
+    totals = {}
+    for r in read_csv(os.path.join(folder, "downloads.csv")):
+        totals[r["date"]] = totals.get(r["date"], 0) + int(r["downloads"])
+    days, prev = {}, None
+    for day in sorted(totals):
+        days[day] = {"Downloads total": totals[day], **({"Downloads": totals[day] - prev} if prev is not None else {})}
+        prev = totals[day]
+    for r in read_csv(os.path.join(folder, "traffic.csv")):
+        days.setdefault(r["date"], {}).update({
+            "Repo views": int(r["views"]), "Repo visitors": int(r["unique_views"]), "Clones": int(r["clones"])})
+    return days
+
+
+def sync_notion(folder, token, database, latest):
+    """Upserts the last 15 days (traffic for earlier days can still change for 14 days), one page per day."""
+    days = daily_rows(folder)
+    for day in sorted(days)[-15:]:
+        props = {k: {"number": v} for k, v in days[day].items()}
+        props["Date"] = {"date": {"start": day}}
+        found = notion("POST", f"/databases/{database}/query", token,
+                       {"filter": {"property": "Day", "title": {"equals": day}}, "page_size": 1})["results"]
+        if found:
+            notion("PATCH", f"/pages/{found[0]['id']}", token, {"properties": props})
+        else:
+            props["Day"] = {"title": [{"text": {"content": day}}]}
+            props["Latest release"] = {"rich_text": [{"text": {"content": latest}}]}
+            notion("POST", "/pages", token, {"parent": {"database_id": database}, "properties": props})
+
+
 README = """# Dashbar stats
 
 Written daily by `.github/workflows/stats.yml` on `main` (the script is `scripts/stats.py`).
@@ -136,6 +182,15 @@ def main():
         except urllib.error.HTTPError as e:
             traffic_note = f"Traffic skipped: GitHub said {e.code} (the token needs push access to the repo)."
 
+    notion_note = ""
+    notion_token, notion_db = os.environ.get("NOTION_TOKEN"), os.environ.get("NOTION_STATS_DB")
+    if notion_token and notion_db:
+        try:
+            sync_notion(folder, notion_token, notion_db, max(counts, key=version_key) if counts else "")
+            notion_note = "Copied to Notion."
+        except urllib.error.HTTPError as e:
+            notion_note = f"Notion skipped: it said {e.code} (is the database shared with the integration?)."
+
     readme = os.path.join(folder, "README.md")
     if not os.path.exists(readme):
         with open(readme, "w") as f:
@@ -148,7 +203,7 @@ def main():
     for tag in sorted(counts, key=version_key, reverse=True):
         new = counts[tag] - previous.get(tag, 0) if previous else 0
         lines.append(f"| {tag} | {counts[tag]} | {'+' + str(new) if new else ''} |")
-    lines += ["", traffic_note, ""]
+    lines += ["", traffic_note, *([notion_note] if notion_note else []), ""]
     summary = "\n".join(lines)
     print(summary)
     if os.environ.get("GITHUB_STEP_SUMMARY"):
