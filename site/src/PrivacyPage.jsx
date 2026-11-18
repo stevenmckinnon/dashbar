@@ -1,10 +1,5 @@
-import { Mark, Footer } from "./Chrome";
-import { POLICY, rich } from "./policy";
-
-function Rich({ text }) {
-  return rich(text).map(({ key, tag: Tag, text: t, href }) =>
-    Tag === "a" ? <a key={key} href={href}>{t}</a> : Tag ? <Tag key={key}>{t}</Tag> : t);
-}
+import { Mark, Footer, Rich } from "./Chrome";
+import { POLICY } from "./policy";
 
 export default function PrivacyPage() {
   return (

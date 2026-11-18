@@ -5,6 +5,7 @@ import react from "@vitejs/plugin-react";
 import { FAQ } from "./src/faq.js";
 import { SITE, REPO, HERO, FEATURES, plain, worksWithText } from "./src/content.js";
 import { POLICY, policyHtml } from "./src/policy.js";
+import { DOCS, docsHtml } from "./src/docs.js";
 import * as agent from "./agent-files.js";
 
 const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -100,6 +101,25 @@ const privacyPage = {
   },
 };
 
+// The docs (docs.html, from src/docs.js): the dashbar command and the integrations. Built like the privacy policy, with
+// its text in the HTML and a copy at docs/index.html so /docs/ works too.
+const docsPage = {
+  name: "docs-page",
+  transformIndexHtml(html, ctx) {
+    if (ctx.path !== "/docs.html") return html;
+    return html
+      .replaceAll("{{docs-description}}", esc(DOCS.description).replace(/"/g, "&quot;"))
+      .replace("</head>", hideFallback)
+      .replace('<div id="root"></div>', () => `<div id="root">\n<div class="seo-fallback">\n${docsHtml()}\n</div>\n</div>`);
+  },
+  writeBundle(options, bundle) {
+    const page = bundle["docs.html"];
+    if (!page) throw new Error("docs-page: docs.html missing from the build");
+    mkdirSync(`${options.dir}/docs`, { recursive: true });
+    writeFileSync(`${options.dir}/docs/index.html`, page.source);
+  },
+};
+
 // The files for agents and crawlers (see agent-files.js), written next to index.html. robots.txt is static, in
 // docs/images. index.md is linked from index.html, and site/worker serves it to agents that ask for text/markdown.
 const agentFiles = {
@@ -110,6 +130,7 @@ const agentFiles = {
     const skill = agent.skillMd();
     const files = {
       "index.md": agent.indexMd(all),
+      "docs.md": agent.docsMarkdown(),
       "llms.txt": agent.llmsTxt(all),
       "llms-full.txt": agent.llmsFullTxt(all),
       "sitemap.xml": agent.sitemap(),
@@ -133,7 +154,7 @@ const noAnalyticsInDev = {
 // Pictures live in docs/images (the README uses them too); Vite copies them to the site root.
 export default defineConfig({
   base: "/",
-  plugins: [react(), faqSchema, seo, privacyPage, agentFiles, noAnalyticsInDev],
+  plugins: [react(), faqSchema, seo, privacyPage, docsPage, agentFiles, noAnalyticsInDev],
   publicDir: "../docs/images",
   // "What's new" reads release-notes/ and appcast.xml from the repository root.
   server: { fs: { allow: [".."] } },
@@ -142,6 +163,7 @@ export default defineConfig({
       input: {
         main: fileURLToPath(new URL("index.html", import.meta.url)),
         privacy: fileURLToPath(new URL("privacy.html", import.meta.url)),
+        docs: fileURLToPath(new URL("docs.html", import.meta.url)),
         notFound: fileURLToPath(new URL("404.html", import.meta.url)),
       },
     },

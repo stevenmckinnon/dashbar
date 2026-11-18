@@ -84,6 +84,8 @@ code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.88em
 .btn.ghost:focus-visible { border-radius: 999px; }
 .nav ul li.nav-star { margin-left: 8px; }
 @media (hover: hover) { .btn.ghost:hover { opacity: 1; background: var(--surface-2); } }
+/* Docs leaves the bar first, so the links never touch the name; it stays in the footer. */
+@media (max-width: 960px) { .nav ul li.nav-wide { display: none; } }
 @media (max-width: 860px) {
   .nav ul li:not(:last-child):not(.nav-star) { display: none; }
   /* Icon only on narrow screens; the label stays for screen readers. */
@@ -375,6 +377,16 @@ section[id], [id="top"] { scroll-margin-top: 88px; }
 .not-found .not-found-actions { margin-top: 36px; }
 .policy strong { font-weight: 600; }
 @media (max-width: 760px) { .policy { padding-block: 32px 88px; } .policy section { margin-top: 44px; } }
+
+/* ---------- Docs (/docs): the policy's column, plus sub-headings, code blocks and a contents list ---------- */
+.docs h3 { margin-top: 36px; font-size: var(--step-body); font-weight: 600; letter-spacing: -0.01em; scroll-margin-top: 88px; }
+.docs h3 + p, .docs h3 + pre, .docs h3 + ul { margin-top: 10px; }
+.docs pre { margin-top: 16px; padding: 16px 18px; background: var(--surface); border-radius: 12px; overflow-x: auto; font-size: var(--step-ui); line-height: 1.5; }
+.docs pre code { background: none; padding: 0; font-size: 0.875rem; overflow-wrap: normal; white-space: pre; }
+.docs-toc { margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--line); }
+.docs-toc ul { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.docs-toc a { display: block; padding: 6px 14px; border-radius: 999px; background: var(--surface); color: var(--ink); text-decoration: none; font-size: var(--step-ui); }
+@media (hover: hover) { .docs-toc a:hover { background: var(--surface-2); } }
 
 /* ---------- The launch film ---------- */
 .tour { display: grid; grid-template-columns: repeat(12, 1fr); gap: var(--gap); padding-block: var(--section); }

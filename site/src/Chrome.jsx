@@ -1,5 +1,12 @@
-// The logo and the footer, shared by the homepage and the privacy policy.
+// The logo, the footer and rich text, shared by the homepage, the docs and the privacy policy.
 import { REPO, FOOTER } from "./content";
+import { rich } from "./policy";
+
+/** Text with **bold**, `code` and [links](url). */
+export function Rich({ text }) {
+  return rich(text).map(({ key, tag: Tag, text: t, href }) =>
+    Tag === "a" ? <a key={key} href={href}>{t}</a> : Tag ? <Tag key={key}>{t}</Tag> : t);
+}
 
 export function Mark({ size = 28 }) {
   return (
@@ -37,6 +44,7 @@ export function Footer({ home = "" }) {
           <li><a href={`${home}#install`}>Install</a></li>
         </ul>
         <ul className="links" aria-label="Project">
+          <li><a href="/docs">Docs</a></li>
           <li><a href={REPO}>GitHub</a></li>
           <li><a href={`${REPO}/releases`}>Releases</a></li>
           <li><a href={`${REPO}/issues`}>Issues</a></li>
