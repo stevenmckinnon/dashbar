@@ -147,7 +147,7 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
 ## Command-line tool
 
 Dashbar comes with `dashbar`, a small command that prints what Dashbar knows, for tmux status bars, shell prompts and
-scripts. It reads a status file the running app keeps up to date and never reads agent logs itself, so it costs nothing
+scripts. This section and the integrations in Settings are also on the site's [docs page](https://usedashbar.com/docs). It reads a status file the running app keeps up to date and never reads agent logs itself, so it costs nothing
 and Dashbar has to be running.
 
 ```console

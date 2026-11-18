@@ -117,6 +117,7 @@ function NavBar() {
           <li><a href="#pace">Pace</a></li>
           <li><a href="#privacy">Privacy</a></li>
           <li><a href="#faq">FAQ</a></li>
+          <li className="nav-wide"><a href="/docs">Docs</a></li>
           <li className="nav-star">
             <a className="btn small ghost" href={REPO}>
               <Star size={16} strokeWidth={1.75} aria-hidden="true" /><span className="label">Star on GitHub</span>

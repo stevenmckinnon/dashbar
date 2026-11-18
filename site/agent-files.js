@@ -5,6 +5,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { FAQ } from "./src/faq.js";
+import { docsMd } from "./src/docs.js";
 import { SITE, REPO, BREW, HERO, FEATURES_INTRO, FEATURES, WINDOW, WIDGETS, PACE, PRIVACY, INSTALL, FOOTER, plain, worksWithText } from "./src/content.js";
 
 const root = new URL("../", import.meta.url);
@@ -96,9 +97,12 @@ export function indexMd(all) {
   ].join("\n\n") + "\n";
 }
 
-/** Everything in index.md, plus the notes for every release. */
+/** The docs page as Markdown, at /docs.md. */
+export const docsMarkdown = () => docsMd(1);
+
+/** Everything in index.md, the docs, and the notes for every release. */
 export function llmsFullTxt(all) {
-  const page = indexMd(all);
+  const page = `${indexMd(all)}\n${docsMd(2)}`;
   if (!all.length) return page;
   return `${page}\n## Every release\n\n${releaseSection(all)}\n`;
 }
@@ -129,6 +133,7 @@ export function skillMd() {
     `## More`,
     [
       `- What it does, what it reads and sends, and the FAQ: ${SITE}index.md`,
+      `- The dashbar command and what each integration changes: ${SITE}docs.md`,
       `- Source and README: ${REPO}`,
     ].join("\n"),
   ].join("\n\n") + "\n";
@@ -181,7 +186,8 @@ export function llmsTxt(all) {
     `## Docs`,
     [
       `- [Homepage as Markdown](${SITE}index.md): features, what it reads and sends, what’s new, the FAQ and how to install`,
-      `- [Full text](${SITE}llms-full.txt): the homepage plus the notes for every release`,
+      `- [Docs](${SITE}docs.md): the dashbar command for tmux, shell prompts and scripts, and what each integration in Settings changes, saves and puts back`,
+      `- [Full text](${SITE}llms-full.txt): the homepage, the docs and the notes for every release`,
       `- [README](${REPO}/blob/main/README.md): features, settings, privacy and building from source`,
       `- [FAQ](${SITE}#faq): supported agents, Claude plan limits, widgets, privacy, updating and uninstalling`,
       `- [Privacy](${SITE}#privacy): every file it reads and the only two requests it can make`,
@@ -208,7 +214,7 @@ export function llmsTxt(all) {
 /** sitemap.xml. index.md is left out so search engines don't index it as a copy of the page; llms.txt and
  * the <link rel="alternate"> in index.html point agents to it. */
 export function sitemap(lastmod) {
-  const urls = ["", "privacy", "llms.txt", "llms-full.txt"];
+  const urls = ["", "docs", "privacy", "llms.txt", "llms-full.txt"];
   const mod = lastmod ? `<lastmod>${lastmod}</lastmod>` : "";
   return [
     `<?xml version="1.0" encoding="UTF-8"?>`,
