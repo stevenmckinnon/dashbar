@@ -51,6 +51,10 @@ const seo = {
       license: `${REPO}/blob/main/LICENSE`,
       codeRepository: REPO,
       sameAs: [REPO],
+      image: `${SITE}icon.png`,
+      screenshot: [`${SITE}overview-light.png`, `${SITE}agents-light.png`, `${SITE}window-light.png`],
+      author: { "@type": "Person", name: "Steve McKinnon", url: "https://steve.mn" },
+      featureList: FEATURES.map((f) => f.name),
     };
     const fallback = [
       `<div class="seo-fallback">`,
@@ -62,6 +66,8 @@ const seo = {
       `<h2>Questions</h2>`,
       ...FAQ.map(({ q, a }) => `<h3>${esc(q)}</h3><p>${esc(a)}</p>`),
       `<p><a href="${REPO}/releases/latest">Download</a> · <a href="${REPO}">Source on GitHub</a></p>`,
+      // KittyLaunch's checker reads the page without running it, so the footer's badge is here too.
+      `<p><a href="https://kittylaunch.com/p/dashbar?utm_source=badge" target="_blank" rel="noopener"><img src="/badges/kittylaunch-light.svg" width="120" height="120" alt="Dashbar, Verified by KittyLaunch" data-kittylaunch-badge="1" /></a></p>`,
       `<p>For AI agents: this page is also at <a href="/index.md">/index.md</a> as Markdown, and <a href="/llms.txt">/llms.txt</a> lists the useful links.</p>`,
       `</div>`,
     ].join("\n");
@@ -127,7 +133,7 @@ const agentFiles = {
       "docs.md": agent.docsMarkdown(),
       "llms.txt": agent.llmsTxt(all),
       "llms-full.txt": agent.llmsFullTxt(all),
-      "sitemap.xml": agent.sitemap(agent.lastCommitDay()),
+      "sitemap.xml": agent.sitemap(),
       [agent.SKILL_PATH]: skill,
       ".well-known/agent-skills/index.json": agent.skillsIndex(skill),
       ".well-known/ai-catalog.json": agent.aiCatalog(),

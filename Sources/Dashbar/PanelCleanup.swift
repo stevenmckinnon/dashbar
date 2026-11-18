@@ -55,8 +55,9 @@ struct CleanupRow: View {
     @FocusState private var focusedAction: Int?
 
     @Environment(\.inWindow) private var inWindow
-    /// The window always shows the Trash button; the panel shows it on hover or focus.
-    private var revealed: Bool { inWindow || hover || confirm || focusedAction != nil }
+    @Environment(\.touchFriendly) private var touch
+    /// The window and touch Macs always show the Trash button; otherwise the panel shows it on hover or focus.
+    private var revealed: Bool { inWindow || touch || hover || confirm || focusedAction != nil }
 
     var body: some View {
         HStack(spacing: 8) {

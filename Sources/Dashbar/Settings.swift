@@ -499,12 +499,18 @@ struct SettingsView: View {
         return max(minHeight, min(640, visible - 80))
     }
 
-    init() { SettingsTab.migrateSaved() }
+    /// The app's store, for About's diagnostics. Nil only where there's none to hand.
+    let store: Store?
+
+    init(store: Store? = nil) {
+        self.store = store
+        SettingsTab.migrateSaved()
+    }
 
     var body: some View {
         TabView(selection: $tab) {
             ForEach(SettingsTab.allCases, id: \.self) { tab in
-                Self.content(tab).tabItem { Label(tab.title, systemImage: tab.symbol) }.tag(tab)
+                Self.content(tab, store: store).tabItem { Label(tab.title, systemImage: tab.symbol) }.tag(tab)
             }
         }
         .frame(width: Self.width)
@@ -516,7 +522,7 @@ struct SettingsView: View {
         }
     }
 
-    @ViewBuilder private static func content(_ tab: SettingsTab) -> some View {
+    @ViewBuilder private static func content(_ tab: SettingsTab, store: Store?) -> some View {
         switch tab {
         case .general: GeneralSettings()
         case .notifications: NotificationSettings()
@@ -524,14 +530,14 @@ struct SettingsView: View {
         case .folders: FolderSettings()
         case .accounts: AccountSettings()
         case .integrations: IntegrationSettings()
-        case .about: AboutSettings()
+        case .about: AboutSettings(store: store)
         }
     }
 
     /// One tab's page on its own, at the window's opening size, for `--snapshot … --settings <tab>` (offline renders of
     /// the TabView only ever draw its first tab). `height` overrides the opening height.
-    @MainActor static func page(_ tab: SettingsTab, height: CGFloat? = nil) -> some View {
-        content(tab).frame(width: width, height: height ?? idealHeight)
+    @MainActor static func page(_ tab: SettingsTab, store: Store? = nil, height: CGFloat? = nil) -> some View {
+        content(tab, store: store).frame(width: width, height: height ?? idealHeight)
     }
 }
 
@@ -541,6 +547,8 @@ private struct GeneralSettings: View {
     @AppStorage(CostLine.showKey) private var showCost = true
     @State private var shortcutUnavailable = GlobalShortcut.shared.unavailable
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @ObservedObject private var jump = JumpShortcut.shared
+    @State private var jumpNote: String?
 
     var body: some View {
         Form {
@@ -554,10 +562,22 @@ private struct GeneralSettings: View {
                     .onChange(of: shortcut) { _, on in
                         GlobalShortcut.shared.setEnabled(on)
                         shortcutUnavailable = GlobalShortcut.shared.unavailable
+                        JumpShortcut.shared.apply()   // a jump shortcut of ⌃⌥D works only while this is off
                     }
                 if shortcut && shortcutUnavailable {
                     Text("Another app is using \(GlobalShortcut.display), so it won't open Dashbar.")
                         .font(.caption).foregroundStyle(.secondary)
+                }
+                LabeledContent("Jump to the agent that needs you") {
+                    ShortcutRecorder(label: "Jump to the agent that needs you", combo: jump.combo,
+                                     onChange: { jump.set($0) }, note: $jumpNote)
+                }
+                .help("Brings forward the app of the agent that has waited longest for you, or else the one that finished last. When no agent is waiting or has finished, it does nothing.")
+                .onAppear { jump.apply() }   // the other copy of Dashbar may have changed its own since
+                if let jumpNote {
+                    Text(jumpNote).font(.caption).foregroundStyle(.secondary)
+                } else if let problem = jump.problem, let combo = jump.combo {
+                    Text(JumpShortcut.message(problem, combo: combo)).font(.caption).foregroundStyle(.secondary)
                 }
             }
             Section {
@@ -600,6 +620,7 @@ private struct NotificationSettings: View {
     @AppStorage(IslandSettings.expandOnNeedsYouKey) private var islandNeedsYou = true
     @AppStorage(IslandSettings.replacesNotificationsKey) private var islandInstead = false
     @AppStorage(IslandSettings.showsPillKey) private var islandPill = false
+    private let touchMac = TouchDisplay.present
 
     var body: some View {
         Form {
@@ -616,6 +637,11 @@ private struct NotificationSettings: View {
             Section {
                 Toggle("Show the island when something happens", isOn: $island)
                     .help("A small black pill on the notch (or below the menu bar) with your agents' status. It opens briefly when something happens, and on hover lists your sessions.")
+                if touchMac && !island {
+                    // macOS has no way to ask for the Dynamic Island itself; today every Mac with a touch display has one.
+                    Text("Off by default on a Mac with a touch display, to stay out of the way of its Dynamic Island. Turn it on to use it anyway.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 if island {
                     Picker("Position", selection: $islandPosition) {
                         Text("Automatic").tag(IslandPosition.automatic.rawValue)
@@ -1067,30 +1093,34 @@ private struct AccountSettings: View {
 }
 
 private struct AboutSettings: View {
+    let store: Store?
     @ObservedObject private var updater = Updater.shared
 
     var body: some View {
-        VStack(spacing: 10) {
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .frame(width: 80, height: 80)
-                .accessibilityHidden(true)
-            Text(BuildInfo.appName).font(.title2.weight(.semibold))
-            Text("Version \(BuildInfo.version)" + (BuildInfo.isLocal ? " (local build)" : ""))
-                .foregroundStyle(.secondary)
-            if updater.isAvailable {
-                Button("Check for Updates…") { updater.checkForUpdates() }.disabled(!updater.canCheck)
+        ScrollView {
+            VStack(spacing: 10) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 80, height: 80)
+                    .accessibilityHidden(true)
+                Text(BuildInfo.appName).font(.title2.weight(.semibold))
+                Text("Version \(BuildInfo.version)" + (BuildInfo.isLocal ? " (local build)" : ""))
+                    .foregroundStyle(.secondary)
+                if updater.isAvailable {
+                    Button("Check for Updates…") { updater.checkForUpdates() }.disabled(!updater.canCheck)
+                }
+                Text("Everything stays on your Mac. Dashbar reads what your coding agents record about their sessions, lists listening ports and measures cache folders. It sends nothing anywhere.")
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 4)
+                Text("Not affiliated with Anthropic, OpenAI, Google, Anomaly or GitHub.")
+                    .font(.footnote).foregroundStyle(.secondary)
+                Button("Welcome…") { OnboardingWindow.shared.show(store: nil) }
+                    .padding(.top, 4)
+                if let store { DiagnosticsSection(store: store).padding(.top, 12) }
             }
-            Text("Everything stays on your Mac. Dashbar reads Claude Code and Codex logs, lists listening ports and measures cache folders. It sends nothing anywhere.")
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 4)
-            Text("Not affiliated with Anthropic or OpenAI.")
-                .font(.footnote).foregroundStyle(.secondary)
-            Button("Welcome…") { OnboardingWindow.shared.show(store: nil) }
-                .padding(.top, 4)
+            .padding(24)
+            .frame(maxWidth: .infinity)
         }
-        .padding(24)
-        .frame(maxWidth: .infinity)
     }
 }

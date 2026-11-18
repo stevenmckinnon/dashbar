@@ -226,6 +226,7 @@ struct IconButton: View {
                 .frame(width: 22, height: 22)
                 .background(RoundedRectangle(cornerRadius: UI.innerRadius, style: .continuous)
                     .fill(Color.primary.opacity(hover ? UI.buttonHover : 0)))
+                .touchTarget()   // a 30-point hit area on a touch Mac; the drawn button stays 22
                 .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
@@ -251,6 +252,7 @@ struct ConfirmButton: View {
                 .padding(.horizontal, 9).padding(.vertical, 4)
                 .background(RoundedRectangle(cornerRadius: UI.innerRadius, style: .continuous)
                     .fill(UI.textDanger.opacity(hover ? 0.2 : 0.12)))
+                .touchTarget()
                 .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())

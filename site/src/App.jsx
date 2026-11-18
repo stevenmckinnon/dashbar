@@ -167,7 +167,8 @@ function Hero() {
           {touchOnly ? null : <BrewCommand />}
         </div>
         <WorksWith />
-        <p className="note">{LATEST_VERSION ? <>Version {LATEST_VERSION}. </> : null}{HERO.note}</p>
+        {/* What the Mac needs is for the Mac; on a phone the Install section still says it. */}
+        {touchOnly ? null : <p className="note">{LATEST_VERSION ? <>Version {LATEST_VERSION}. </> : null}{HERO.note}</p>}
       </div>
       <div className="demo" data-ss-fill="">
         <div role="img" aria-label="A short animation of Dashbar's panel, opened from the menu bar. Overview shows the workspace where Claude is working, the other workspaces, the tightest plan limits and 7 GB of rebuildable caches. Then the dev servers, two of them marked barely used, and the Usage tab, with a card for Claude Code and one for Codex, where the plan limits fill, today’s hours rise and Claude’s 5-hour limit lasts until it resets at this rate.">

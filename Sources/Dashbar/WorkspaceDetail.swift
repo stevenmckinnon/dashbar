@@ -180,7 +180,7 @@ struct ProcessRow: View {
                 if quittable {
                     IconButton(symbol: "xmark.circle", help: "Quit \(group.name)…") { confirm = true }
                 } else {
-                    Color.clear.frame(width: 22, height: 22)
+                    Color.clear.frame(width: 22, height: 22).touchTarget()   // keeps the columns lined up with the buttons
                 }
             }
         }

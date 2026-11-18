@@ -20,10 +20,15 @@ public struct StatusSnapshot: Codable, Equatable, Sendable {
     public var servers: [Server]
     /// How many agents are in each state. Only in the widget's copy (`forWidget()`), which has no sessions.
     public var agents: AgentCounts?
+    /// The tools switched off in Settings → Integrations → Show in Dashbar ("codex", "google", "opencode", "copilot"),
+    /// whose sessions, limits and usage the snapshot leaves out. Nil when every tool shows.
+    public var hidden: [String]?
+    /// Today's totals for each tool, only in the widget's copy (`forWidget()`), in place of `usageToday`.
+    public var usageTotals: UsageTotals?
 
     public init(schema: Int = StatusSnapshot.currentSchema, generatedAt: Date, app: App, warning: String? = nil,
                 sessions: [Session] = [], limits: [LimitGroup] = [], usageToday: UsageToday? = nil, servers: [Server] = [],
-                agents: AgentCounts? = nil) {
+                agents: AgentCounts? = nil, hidden: [String]? = nil, usageTotals: UsageTotals? = nil) {
         self.schema = schema
         self.generatedAt = generatedAt
         self.app = app
@@ -33,6 +38,20 @@ public struct StatusSnapshot: Codable, Equatable, Sendable {
         self.usageToday = usageToday
         self.servers = servers
         self.agents = agents
+        self.hidden = hidden
+        self.usageTotals = usageTotals
+    }
+
+    /// Whether `tool` is switched off in Dashbar. `tool` is a switch's id ("codex", "google", "opencode", "copilot"),
+    /// or a provider or tool id that one of them covers ("antigravity", "gemini-cli", "antigravity-cli").
+    public func hides(_ tool: String) -> Bool {
+        guard let hidden, !hidden.isEmpty else { return false }
+        return hidden.contains(Self.switchID(tool))
+    }
+
+    /// The Show in Dashbar switch that covers `tool`: Google's tools share one.
+    public static func switchID(_ tool: String) -> String {
+        ["antigravity", "antigravity-cli", "gemini-cli"].contains(tool) ? "google" : tool
     }
 
     public struct App: Codable, Equatable, Sendable {
@@ -170,8 +189,16 @@ public struct StatusSnapshot: Codable, Equatable, Sendable {
         public var cacheRead: Int
         public var cacheWrite: Int
         public var total: Int
+        /// Estimated cost at API list prices, US dollars, as the Usage tab shows it. Nil for a tool billed by its plan
+        /// (Copilot) and in snapshots from before it was added.
+        public var cost: Double?
+        /// Copilot's premium requests today (saved when each of its sessions ends). Nil for other tools.
+        public var premiumRequests: Double?
+        /// The model with the most tokens today, short name. Only for OpenCode, whose small widget names it.
+        public var model: String?
 
-        public init(tool: String, name: String, input: Int, output: Int, cacheRead: Int, cacheWrite: Int) {
+        public init(tool: String, name: String, input: Int, output: Int, cacheRead: Int, cacheWrite: Int,
+                    cost: Double? = nil, premiumRequests: Double? = nil, model: String? = nil) {
             self.tool = tool
             self.name = name
             self.input = input
@@ -179,6 +206,41 @@ public struct StatusSnapshot: Codable, Equatable, Sendable {
             self.cacheRead = cacheRead
             self.cacheWrite = cacheWrite
             self.total = input + output + cacheRead + cacheWrite
+            self.cost = cost
+            self.premiumRequests = premiumRequests
+            self.model = model
+        }
+    }
+
+    /// Today's figures for the widgets: per tool, only the total, the estimated cost, Copilot's premium requests and
+    /// OpenCode's top model. No split by token kind, workspace or session.
+    public struct UsageTotals: Codable, Equatable, Sendable {
+        /// "2026-11-15", the app's local calendar day when it counted, so a widget never shows yesterday's as today's.
+        public var day: String
+        public var tools: [ToolTotal]
+
+        public init(day: String, tools: [ToolTotal]) {
+            self.day = day
+            self.tools = tools
+        }
+    }
+
+    public struct ToolTotal: Codable, Equatable, Sendable {
+        /// As in `ToolTokens.tool`.
+        public var tool: String
+        public var name: String
+        public var total: Int
+        public var cost: Double?
+        public var premiumRequests: Double?
+        public var model: String?
+
+        public init(tool: String, name: String, total: Int, cost: Double? = nil, premiumRequests: Double? = nil, model: String? = nil) {
+            self.tool = tool
+            self.name = name
+            self.total = total
+            self.cost = cost
+            self.premiumRequests = premiumRequests
+            self.model = model
         }
     }
 

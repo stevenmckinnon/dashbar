@@ -6,7 +6,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { FAQ } from "./src/faq.js";
 import { docsMd } from "./src/docs.js";
-import { SITE, REPO, BREW, HERO, FEATURES_INTRO, FEATURES, WINDOW, WIDGETS, PACE, PRIVACY, INSTALL, FOOTER, plain, worksWithText } from "./src/content.js";
+import { SITE, REPO, BREW, HERO, FEATURES_INTRO, FEATURES, WINDOW, WIDGETS, PACE, PRIVACY, INSTALL, FOOTER, plain, worksWithText, listOf } from "./src/content.js";
 
 const root = new URL("../", import.meta.url);
 const byVersion = (a, b) => b.version.localeCompare(a.version, undefined, { numeric: true });
@@ -46,9 +46,12 @@ const faqById = (id) => {
   return hit;
 };
 
-/** The date of the last commit, for the sitemap's lastmod. The site deploys only when its sources change. */
-export function lastCommitDay() {
-  try { return execFileSync("git", ["log", "-1", "--format=%cs"], { encoding: "utf8" }).trim() || null; } catch { return null; }
+/** The day of the last commit touching these paths (relative to the repository root), for the sitemap's lastmod.
+ * Needs the full history: site.yml checks out with fetch-depth 0, or every page would get the one commit's date. */
+export function lastCommitDay(paths) {
+  try {
+    return execFileSync("git", ["log", "-1", "--format=%cs", "--", ...paths], { encoding: "utf8", cwd: new URL("..", import.meta.url) }).trim() || null;
+  } catch { return null; }
 }
 
 const releaseSection = (list) =>
@@ -182,7 +185,7 @@ export function llmsTxt(all) {
   return [
     `# Dashbar`,
     `> ${plain(HERO.lede)}`,
-    `Dashbar is a native menu bar app for macOS 14 or later, on Apple silicon and Intel. It reads what Claude Code, Codex, Gemini CLI, Antigravity and OpenCode record about their sessions on the Mac, the listening ports and processes, and the folders you choose. It is free and open source under the MIT licence. The app has no account and no analytics.${version ? ` The current version is ${version}.` : ""}`,
+    `Dashbar is a native menu bar app for macOS 14 or later, on Apple silicon and Intel. It reads what ${listOf(HERO.worksWith.tools)} record about their sessions on the Mac, the listening ports and processes, and the folders you choose. It is free and open source under the MIT licence. The app has no account and no analytics.${version ? ` The current version is ${version}.` : ""}`,
     `## Docs`,
     [
       `- [Homepage as Markdown](${SITE}index.md): features, what it reads and sends, what’s new, the FAQ and how to install`,
@@ -213,13 +216,23 @@ export function llmsTxt(all) {
 
 /** sitemap.xml. index.md is left out so search engines don't index it as a copy of the page; llms.txt and
  * the <link rel="alternate"> in index.html point agents to it. */
-export function sitemap(lastmod) {
-  const urls = ["", "docs", "privacy", "llms.txt", "llms-full.txt"];
-  const mod = lastmod ? `<lastmod>${lastmod}</lastmod>` : "";
+export function sitemap() {
+  // Each page with what its content is made from, so lastmod moves only when that page changes.
+  const page = ["site/index.html", "site/src", "release-notes", "appcast.xml"];
+  const urls = [
+    ["", page],
+    ["docs", ["site/docs.html", "site/src/docs.js", "site/src/faq.js"]],
+    ["privacy", ["site/privacy.html", "site/src/policy.js"]],
+    ["llms.txt", ["site/agent-files.js", "site/src/content.js", "site/src/faq.js", "release-notes", "appcast.xml"]],
+    ["llms-full.txt", ["site/agent-files.js", "site/src/content.js", "site/src/faq.js", "site/src/docs.js", "release-notes", "appcast.xml"]],
+  ];
   return [
     `<?xml version="1.0" encoding="UTF-8"?>`,
     `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`,
-    ...urls.map((u) => `  <url><loc>${SITE}${u}</loc>${mod}</url>`),
+    ...urls.map(([u, paths]) => {
+      const day = lastCommitDay(paths);
+      return `  <url><loc>${SITE}${u}</loc>${day ? `<lastmod>${day}</lastmod>` : ""}</url>`;
+    }),
     `</urlset>`,
   ].join("\n") + "\n";
 }

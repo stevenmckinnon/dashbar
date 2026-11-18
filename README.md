@@ -88,18 +88,20 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
   pressure), network up/down, GPU utilisation, disk, battery with time remaining, and the busiest apps right
   now with their icons. Recent samples show as small bar charts.
 - **Dashbar window**: the arrow button in the panel header, or ⌃⌥D from anywhere, opens Dashbar as a full window: the panel's pages and every running workspace in a sidebar. A workspace's page shows its uptime, CPU, memory and energy (its servers, agents, what they started and anything else working in its folder), its dev servers and agents, and the processes behind the numbers. There's a pin to keep it on top; ⌃⌥D again closes it.
-- **Island** (Settings → Notifications; on for new installs): when an agent finishes or stops for you, a black banner grows out of the MacBook notch (or just below the middle of the menu bar on other screens) with the session's title and project, then folds back into the notch after a few seconds (hover holds it open). Click it to go back to the session; with answering permission prompts on, Allow once and Deny work right there. Between moments it draws nothing, so the notch and the menus around it are untouched. Optionally it keeps a small status beside the notch (amber "needs you", else green "working") that lists your sessions on hover; that can cover the last menus of a menu-heavy app. If another app already draws at the notch, it sits just below that app's (or choose left or right of the notch), and it can stand in for the matching notifications.
+- **Jump to the agent that needs you** (Settings → General; no shortcut until you record one): a shortcut you pick that, from anywhere, brings forward the app of the session that has waited longest for you (a permission prompt or a question, from any tool Dashbar shows), or, with none waiting, the one that finished last, as clicking its row does. With neither it does nothing. Tools switched off in Show in Dashbar never count. The release and a local build each keep their own, and Settings says when the shortcut can't work (macOS or ⌃⌥D already uses it, or the other copy has the same one).
+- **Island** (Settings → Notifications; on for new installs, except on a Mac with a touch display, where it starts off to stay out of the way of the Dynamic Island): when an agent finishes or stops for you, a black banner grows out of the MacBook notch (or just below the middle of the menu bar on other screens) with the session's title and project, then folds back into the notch after a few seconds (hover holds it open). Click it to go back to the session; with answering permission prompts on, Allow once and Deny work right there. Between moments it draws nothing, so the notch and the menus around it are untouched. Optionally it keeps a small status beside the notch (amber "needs you", else green "working") that lists your sessions on hover; that can cover the last menus of a menu-heavy app. If another app already draws at the notch, it sits just below that app's (or choose left or right of the notch), and it can stand in for the matching notifications.
 - **First run**: a short welcome window says what Dashbar reads and lets you turn on notifications, open at login and Claude plan limits. macOS asks about notifications only when you turn one on. It's in the gear menu as Welcome… later.
 - **Notifications** (each can be turned off in Settings): when an agent finishes a stretch of work, when it needs you, and when a plan limit runs low: at 80%, when it's on course to run out before it resets, when it's used up, and when a used-up limit resets, once per window.
 - **Tabs**: Overview · Usage · Servers · System · Clean-up (⌘1–⌘5). Overview puts what needs you first: waiting permission prompts, then the workspace whose agent is waiting, working or went idle in the last 10 minutes, the other workspaces, servers outside them, a strip with each account's tightest plan limit (click it for Usage) and, from 1 GB, a line to Clean-up. Usage has one card per tool, the one closest to running out of plan first: its plan limits with their pace, the period's tokens with the estimated cost, a chart and the in / out / cache split. One Today · 7d · 14d choice at the top drives every card and is kept between launches; with two or more tools in use, a line above the cards adds them up. A tool with no usage in the period and no limits folds to one line.
 - **Menu bar stats** (optional, in Settings): CPU, memory, download speed and, with Claude plan limits on, what's left
   of your Claude 5-hour or weekly limit, beside the icon.
-- **Desktop widgets**: add Dashbar from the widget gallery (right-click the desktop, Edit Widgets). The small widget
-  shows Claude's 5-hour and weekly limits and when they reset; the medium one each tool's limits (Claude, Codex,
-  Antigravity) and how many agents are working. They follow light, dark and tinted widgets. The widget reads a small
-  copy of the status that Dashbar saves in its own App Group container (`~/Library/Group Containers/<team>.fun.dashbar.app`,
-  readable only by you): plan percentages, reset times, plan names and agent counts, no project names, folders or
-  sessions. macOS decides how often widgets refresh, so they can lag a few minutes; when Dashbar isn't running they dim
+- **Desktop widgets**: add Dashbar from the widget gallery (right-click the desktop, Edit Widgets). Small widgets show
+  Claude's, Codex's or Antigravity's plan limits and when they reset, or OpenCode's or GitHub Copilot's tokens today; the
+  medium ones each tool's limits (Claude, Codex, Antigravity) and how many agents are working, or each tool's tokens today
+  with the estimated cost. A tool switched off in Show in Dashbar is left out, and its own widget says so. They follow
+  light, dark and tinted widgets. The widgets read a small copy of the status that Dashbar saves in its own App Group
+  container (`~/Library/Group Containers/<team>.fun.dashbar.app`, readable only by you): plan percentages, reset times,
+  plan names, agent counts and each tool's totals for today, no project names, folders or sessions. macOS decides how often widgets refresh, so they can lag a few minutes; when Dashbar isn't running they dim
   and say since when.
 
   <picture>
@@ -254,7 +256,7 @@ swift test              # tests
 ./build.sh --run        # build "Dashbar Local.app" and launch it
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for local builds, releasing and the rules for changes. Bugs and ideas go in [issues](https://github.com/stevenmckinnon/dashbar/issues); security reports are described in [SECURITY.md](SECURITY.md). For anything else, email [hello@usedashbar.com](mailto:hello@usedashbar.com).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for local builds, releasing and the rules for changes. Bugs and ideas go in [issues](https://github.com/stevenmckinnon/dashbar/issues); for a bug, Settings → About → Copy Diagnostics gives you a block to paste in (Dashbar's and macOS's versions, which tools and integrations it found, any format warnings, the widgets' state, how many extra accounts and where Claude's plan limits come from: no project names, folders, sessions or account names; press Show Diagnostics to read it first, and nothing is sent). security reports are described in [SECURITY.md](SECURITY.md). For anything else, email [hello@usedashbar.com](mailto:hello@usedashbar.com).
 
 ## Privacy
 
@@ -276,3 +278,7 @@ Claude Code's settings, so this opens nothing new to it. Nothing about the reque
 ## Licence
 
 MIT. See `LICENSE`. Not affiliated with Anthropic, OpenAI or Google.
+
+<a href="https://kittylaunch.com/p/dashbar?utm_source=badge" target="_blank" rel="noopener">
+  <img src="https://kittylaunch.com/api/public/badges/launch_badge.svg?style=chip&theme=light" width="196" alt="Dashbar, Verified by KittyLaunch" data-kittylaunch-badge="1" />
+</a>

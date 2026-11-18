@@ -90,6 +90,8 @@ struct DashboardView: View {
                       showsFilter: (forcedTab ?? tab).hasFilter)
         }
         .frame(width: UI.panelWidth)
+        // On a touch Mac: row actions always shown, 30-point hit areas. Off, nothing changes.
+        .environment(\.touchFriendly, TouchDisplay.present)
         // With Keyboard navigation on, a waiting prompt on Overview is where focus starts (see `PermissionPrompt`).
         .focusScope(focusScope)
         .environment(\.promptFocusScope, (forcedTab ?? tab) == .overview ? focusScope : nil)
@@ -392,18 +394,23 @@ struct LiveControls: View {
 /// Pause or resume live updates, and refresh now.
 struct LiveButtons: View {
     @EnvironmentObject var store: Store
+    @Environment(\.touchFriendly) private var touch
     var body: some View {
-        IconButton(symbol: store.paused ? "play.fill" : "pause.fill",
-                   help: store.paused ? "Resume live updates" : "Pause live updates") {
-            store.paused.toggle()
-            if !store.paused { store.refreshNow() }
+        // On a touch Mac each button's 30-point hit area already holds the gap, so they sit edge to edge.
+        HStack(spacing: touch ? 0 : 7) {
+            IconButton(symbol: store.paused ? "play.fill" : "pause.fill",
+                       help: store.paused ? "Resume live updates" : "Pause live updates") {
+                store.paused.toggle()
+                if !store.paused { store.refreshNow() }
+            }
+            IconButton(symbol: "arrow.clockwise", help: "Refresh now") { store.refreshNow() }
         }
-        IconButton(symbol: "arrow.clockwise", help: "Refresh now") { store.refreshNow() }
     }
 }
 
 struct Header: View {
     @EnvironmentObject var store: Store
+    @Environment(\.touchFriendly) private var touch
     var body: some View {
         HStack(spacing: 7) {
             BrandMarkView(size: 18)
@@ -422,6 +429,7 @@ struct Header: View {
                 AppWindow.shared.show(store: store)
                 panel?.orderOut(nil)          // the window takes over from it
             }
+            .padding(.leading, touch ? -7 : 0)   // as in LiveButtons: its hit area holds the gap
         }
         .padding(.horizontal, 14)
         .padding(.top, 12)
@@ -456,6 +464,7 @@ struct BottomBar: View {
                         .buttonStyle(PressStyle())
                         .help("Clear filter")
                         .accessibilityLabel("Clear filter")
+                        .touchTarget()
                 }
             }
             .padding(.horizontal, 10).padding(.vertical, 7)
@@ -490,6 +499,7 @@ struct BottomBar: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
+            .touchTarget()
             .foregroundStyle(UI.textSecondary)
         }
         .padding(.horizontal, UI.gutter)

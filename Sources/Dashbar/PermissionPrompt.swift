@@ -166,6 +166,7 @@ private struct PromptButton: View {
                 .padding(.horizontal, 10).padding(.vertical, 5)
                 .background(Capsule().fill(prominent ? Color.primary.opacity(hover ? 0.75 : 0.88)
                                                       : Color.primary.opacity(hover ? 0.14 : 0.08)))
+                .touchTarget()
                 .contentShape(Capsule())
         }
         .buttonStyle(PressStyle())

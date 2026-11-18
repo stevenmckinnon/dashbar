@@ -9,8 +9,8 @@ export const BREW = "brew install --cask stevenmckinnon/tap/dashbar";
 
 export const HERO = {
   headline: "Your agents, in the menu bar",
-  lede: "Dashbar shows which **Claude Code** and **Codex** sessions are working, how much of your plan is left, and which dev servers are idling. Free and open source.",
-  note: "Needs macOS 14 or later. Notarised by Apple. MIT licence.",
+  lede: "See which coding agents are working, how much of your plan is left, and which dev servers are idling. Free and open source.",
+  note: "Needs macOS 14 or later. Notarised by Apple.",
   // Under the install buttons. Each name links to the FAQ entry with this id (faq.js), which says what each tool gets.
   worksWith: {
     lead: "Works with",
@@ -63,7 +63,7 @@ export const WINDOW = {
 // SnapshotProvider). Keep "every few minutes, not live" true if that changes.
 export const WIDGETS = {
   heading: "On your desktop",
-  text: "Two widgets keep your plan limits in sight. The small one shows Claude’s limits and when they reset. The medium one shows every tool’s limits and how many agents are working. They refresh every few minutes, not live, and dim when Dashbar isn’t running.",
+  text: "Widgets keep your plan limits in sight. Small ones show one tool’s limits or tokens today. Medium ones show every tool’s limits and how many agents are working, or each tool’s tokens today. They refresh every few minutes, not live, and dim when Dashbar isn’t running.",
   altSmall: "The small Dashbar widget: Claude on Max 5x, 5-hour limit 55% used, weekly limit 38% used, each with its reset time.",
   altMedium: "The medium Dashbar widget: 2 working, and the 5-hour and weekly limits for Claude (55% and 38%), Codex (21% and 34%) and Antigravity (42% and 61%).",
 };
@@ -108,7 +108,7 @@ export const INSTALL = {
 // sheet or their own email. The site sends nothing and keeps no address.
 export const SEND_TO_MAC = {
   button: "Send to my Mac",
-  note: "Dashbar runs on your Mac. Send yourself the link for later.",
+  note: "AirDrop or email yourself the link for your Mac.",
   subject: "Dashbar for my Mac",
   body: "Dashbar, a menu bar app for your coding agents:",
 };

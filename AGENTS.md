@@ -10,9 +10,9 @@ the app does; this file is how to work on it.
 
 | Path | What it is |
 |---|---|
-| `Sources/Dashbar/` | The app. The panel UI is split by area: `DashboardView.swift` (root, tab bar, header and bottom bar), `DesignTokens.swift` (`UI` colours and sizes), `Tiles.swift`, `Components.swift` (cards, chips, buttons and other shared building blocks), and one file per tab: `PanelOverview.swift` (Now card, widgets), `PanelPlanStrip.swift` (Overview's plan limits strip and clean-up line), `OverviewRules.swift` (what Overview shows and when, tested), `PanelWorkspaces.swift` (workspace rows, session lines, quick actions), `WorkspaceDetail.swift` (usage tiles, sparkbars, process list), `PanelAgents.swift` (the Usage tab: one card per tool with its plan limits and tokens; its enum case is still `.agents`), `UsageRules.swift` (the order of those cards and when one folds, tested), `PanelServers.swift`, `PanelCleanup.swift`, `PanelSystem.swift`. `Store.swift` the state, `Collectors.swift`, `Usage.swift`, `PlanLimits.swift`, `SystemStats.swift` and `Proc.swift` read data, `Demo.swift` invents data for screenshots, `Snapshot.swift` renders PNGs, `Updater.swift` wraps Sparkle. `AppView.swift` and `AppWindow.swift` are the Dashbar window (sidebar and pages), `WorkspaceUsage.swift` what each workspace's processes use. `Accounts.swift` the extra Claude Code and Codex accounts, `StatusLineBridge.swift` and `PermissionBridge.swift` the opt-in Claude Code settings edits, `History.swift` and `HistoryView.swift` the History page, `Onboarding.swift` the first run, `Pricing.swift` the cost estimate, `Island.swift` (state and placement, tested), `IslandView.swift` and `IslandWindow.swift` the island at the notch. `OpenCode.swift` reads OpenCode's database (sessions, usage, live state, `UI.neutralTool`), `OpenCodeBridge.swift` is its opt-in plugin and Settings row, `DemoOpenCode.swift` its demo data. `CopilotCLI.swift` reads GitHub Copilot's session folders (the CLI's, and its VS Code agent's and Copilot app's, which share them) (live state, usage from shutdown records), `CopilotBridge.swift` is its opt-in hook and Settings section, `DemoCopilot.swift` its demo data. `ToolVisibility.swift` is the "Show in Dashbar" switch per tool (hidden set, applying it to readings, `ToolPresence`, the toggle row) |
+| `Sources/Dashbar/` | The app. The panel UI is split by area: `DashboardView.swift` (root, tab bar, header and bottom bar), `DesignTokens.swift` (`UI` colours and sizes), `Tiles.swift`, `Components.swift` (cards, chips, buttons and other shared building blocks), and one file per tab: `PanelOverview.swift` (Now card, widgets), `PanelPlanStrip.swift` (Overview's plan limits strip and clean-up line), `OverviewRules.swift` (what Overview shows and when, tested), `PanelWorkspaces.swift` (workspace rows, session lines, quick actions), `WorkspaceDetail.swift` (usage tiles, sparkbars, process list), `PanelAgents.swift` (the Usage tab: one card per tool with its plan limits and tokens; its enum case is still `.agents`), `UsageRules.swift` (the order of those cards and when one folds, tested), `PanelServers.swift`, `PanelCleanup.swift`, `PanelSystem.swift`. `Store.swift` the state, `Collectors.swift`, `Usage.swift`, `PlanLimits.swift`, `SystemStats.swift` and `Proc.swift` read data, `Demo.swift` invents data for screenshots, `Snapshot.swift` renders PNGs, `Updater.swift` wraps Sparkle. `AppView.swift` and `AppWindow.swift` are the Dashbar window (sidebar and pages), `WorkspaceUsage.swift` what each workspace's processes use. `Accounts.swift` the extra Claude Code and Codex accounts, `StatusLineBridge.swift` and `PermissionBridge.swift` the opt-in Claude Code settings edits, `History.swift` and `HistoryView.swift` the History page, `Onboarding.swift` the first run, `Pricing.swift` the cost estimate, `Island.swift` (state and placement, tested), `IslandView.swift` and `IslandWindow.swift` the island at the notch. `OpenCode.swift` reads OpenCode's database (sessions, usage, live state, `UI.neutralTool`), `OpenCodeBridge.swift` is its opt-in plugin and Settings row, `DemoOpenCode.swift` its demo data. `CopilotCLI.swift` reads GitHub Copilot's session folders (the CLI's, and its VS Code agent's and Copilot app's, which share them) (live state, usage from shutdown records), `CopilotBridge.swift` is its opt-in hook and Settings section, `DemoCopilot.swift` its demo data. `ToolVisibility.swift` is the "Show in Dashbar" switch per tool (hidden set, applying it to readings, `ToolPresence`, the toggle row). `GlobalShortcut.swift` holds `HotKeys` (every Carbon hot key, one handler dispatching by id) and the window's fixed ⌃⌥D; `JumpToAgent.swift` the jump shortcut: `JumpTarget` (which session, tested), `KeyCombo` (recording and showing a combination, tested) and `JumpShortcut` (saved as `jumpShortcut`, registered, its problems in words); `ShortcutRecorder.swift` the recorder row in Settings → General. `Diagnostics.swift` is Settings → About → Copy Diagnostics: a value of booleans, counts, dates, versions and Dashbar's own warnings, its Markdown (tested in `DiagnosticsTests`, which checks no path, email, name or session gets in), and the About section; add a line only after checking it can carry no project or folder name, session, account label, token, hostname or user name. |
 | `Sources/DashbarStatus/`, `Sources/dashbar-cli/` | The `dashbar` command-line tool (Foundation only). `DashbarStatus` holds the status file's schema (`StatusSnapshot`), its writer, and the tool's reading and printing (tested); `dashbar-cli` is its `main.swift`. The app's side is `Sources/Dashbar/CLIStatus.swift`, which rebuilds the file from the store when a value it uses changes (at most every 3 s, written only when the content differs), and `CommandLineToolSettings.swift`, the Integrations row. `build.sh` copies the tool to `Contents/Helpers/dashbar` and signs it before the app; the cask's `binary` stanza links it. Add a field to the file only after checking it carries no prompt, title, session id or sign-in, and list it in `CLIStatusTests.allowedKeys` |
-| `Sources/DashbarWidgetUI/`, `Sources/DashbarWidgets/` | The desktop widgets (spike). `DashbarWidgetUI` holds the views and what they show (`WidgetModel`, tested), shared with the app for `--snapshot --widget`; `DashbarWidgets` is the WidgetKit extension's `@main`. `build.sh` bundles it as `Contents/PlugIns/DashbarWidgets.appex` (bundle id `<app id>.widgets`, sandboxed) and signs it before the app. The app's side is `Sources/Dashbar/WidgetBridge.swift`: on each `CLIStatus` rebuild it saves `StatusSnapshot.forWidget()` (limits and agent counts only: no sessions, workspaces, folders or servers) to `Widget/status.json` in the App Group container `<team>.<app id>`, and reloads the widgets at most once a minute. Ad-hoc builds have no team, so no group and no widget data. See "Widgets" below |
+| `Sources/DashbarWidgetUI/`, `Sources/DashbarWidgets/` | The desktop widgets (spike). `DashbarWidgetUI` holds the views and what they show (`WidgetModel`, tested), shared with the app for `--snapshot --widget`; `DashbarWidgets` is the WidgetKit extension's `@main`. `build.sh` bundles it as `Contents/PlugIns/DashbarWidgets.appex` (bundle id `<app id>.widgets`, sandboxed) and signs it before the app. The app's side is `Sources/Dashbar/WidgetBridge.swift`: on each `CLIStatus` rebuild it saves `StatusSnapshot.forWidget()` (limits, agent counts, the tools switched off and today's totals per tool only: no sessions, workspaces, folders or servers) to `Widget/status.json` in the App Group container `<team>.<app id>`, and reloads the widgets at most once a minute. Ad-hoc builds have no team, so no group and no widget data. See "Widgets" below |
 | `Tests/DashbarTests/` | Swift Testing suites that run against throwaway log folders (`Fixtures.swift`) |
 | `build.sh` | Builds the app into `build/`, signs it, embeds Sparkle. A local build is `Dashbar Local.app`; `scripts/release.sh` (via `DASHBAR_HARDENED=1`) makes the real `Dashbar.app`. Flags: `--run`, `--install` |
 | `scripts/release.sh` | Signed, notarised, stapled DMG plus the Sparkle `appcast.xml` entry |
@@ -53,7 +53,12 @@ DASHBAR_DEMO_NO_LIMITS=1 Dashbar --snapshot out.png --demo # no plan limits from
 DASHBAR_DEMO_OPENCODE=1 Dashbar --snapshot out.png --demo  # adds a working OpenCode session and its Usage card (=waiting: it needs you); also shows its Integrations row
 DASHBAR_DEMO_COPILOT=1 Dashbar --snapshot out.png --demo   # adds a working GitHub Copilot session and its Usage card (=waiting: asking permission); also shows its Integrations section
 DASHBAR_DEMO_HIDDEN=copilot,codex Dashbar --snapshot out.png --demo  # those tools switched off (codex, google, opencode, copilot), in memory only
-Dashbar --snapshot out.png --demo --widget small|medium [--dark]   # one widget, transparent around it; docs/images/widget-*.png (the README's, and the reference for the site's HTML widgets) use DASHBAR_SNAPSHOT_SCALE=4 DASHBAR_DEMO_GOOGLE=1, from a copy outside build/ with PlugIns removed (see Widgets). (DASHBAR_WIDGET_STATE=nodata|notrunning,
+DASHBAR_DEMO_TOUCH=1 Dashbar --snapshot out.png --demo     # as on a Mac with a touch display (see Touch Macs), in memory only; also works with --settings notifications
+DASHBAR_DEMO_TOUCH=1 Dashbar --snapshot out.png --demo --settings notifications -islandEnabled NO  # the touch note under the island toggle (-key value is an argument default: never saved)
+Dashbar --snapshot out.png --demo --widget small|medium|codex|antigravity|opencode|copilot|usage [--dark]   # one widget (small is Claude's limits, medium the overview, usage tokens today), transparent around it; docs/images/widget-*.png (the README's, and the reference for the site's HTML widgets) use DASHBAR_SNAPSHOT_SCALE=4 DASHBAR_DEMO_GOOGLE=1, from a copy outside build/ with PlugIns removed (see Widgets). (DASHBAR_WIDGET_STATE=nodata|notrunning,
+                                                    # =hidden|unused for a tool's own widget with it switched off or never used,
+                                                    # DASHBAR_DEMO_HIDDEN=google,copilot for the medium ones, DASHBAR_WIDGET_LOCAL=1 for the Local marker,
+                                                    # DASHBAR_DEMO_OPENCODE=1 / DASHBAR_DEMO_COPILOT=1 for those tools' data,
                                                     # DASHBAR_WIDGET_TOOLS=1 for fewer rows, DASHBAR_DEMO_GOOGLE=weekly for two Antigravity groups)
 Dashbar --snapshot out.png --demo --menubar all     # the menu bar item: idle|working|needsyou|done|time|all, on light (--dark) bars
 Dashbar --snapshot x --demo --menubar working --onscreen   # that state in a real status item for 8s (prints its frame)
@@ -72,6 +77,7 @@ DASHBAR_ISLAND_STYLE=floating Dashbar --snapshot out.png --demo --island collaps
 Dashbar --snapshot x --demo --island permission --onscreen    # the real panel at the real notch for 8s (screencapture -R)
 Dashbar --snapshot x --demo --island live --onscreen          # the real controller: an agent finishes at 1s, folds away at 6s
 Dashbar --snapshot out.png --demo --onboarding [--dark]       # the first-run window, with invented folders
+DASHBAR_DEMO_JUMP_SHORTCUT=1 Dashbar --snapshot out.png --demo --settings general  # the jump shortcut set to ⌃⌥J (=taken: refused, =othercopy: the other copy has it too), in memory only
 Dashbar --snapshot out.png --demo --settings integrations [--dark]  # one Settings tab: general, notifications, menuBar, folders, accounts, integrations, about (DASHBAR_SETTINGS_HEIGHT=1200 to see a whole long tab)
 DASHBAR_DEMO_ACCOUNTS=2 DASHBAR_DEMO_PERMISSION=1 Dashbar --snapshot out.png --demo --settings integrations  # two accounts, the hook in one
 DASHBAR_DEMO_ACCOUNTS=missing Dashbar --snapshot out.png --demo --settings accounts  # a Work account whose folder is missing (warned, not read or counted)
@@ -84,8 +90,38 @@ Offline snapshots cannot draw native AppKit controls (segmented pickers, the sea
 yellow "no entry" placeholders. Crop them out or use `--hosted`. A snapshot run also writes `panelTab` into
 the real app's preferences, so reset it afterwards (`defaults write fun.dashbar.app panelTab overview`).
 
+## Touch Macs
+
+The MacBook Pro with the PROLED XDR display has a touch screen and a Dynamic Island instead of the notch. macOS has
+no API for the island, so `TouchDisplay.present` (`TouchDisplay.swift`) asks whether any screen's
+`NSScreen.touchCapabilities` (macOS 27) contains `.multiTouch`, or `DASHBAR_DEMO_TOUCH=1` is set. Nobody here has that
+hardware: the touch paths are checked only with the demo flag.
+
+- The island: a new install turns it on (`Onboarding.decideAtLaunch`), except on a touch Mac, where `islandEnabled` is
+  left unset (it reads as off) so Dashbar's island never sits on Apple's. A saved value is never changed, in either
+  direction (`IslandSettings.enabledAtLaunch`, tested). Settings → Notifications says why under the toggle while it's off.
+- The panel and the window set `\.touchFriendly` at their root. On, rows whose actions wait for a hover (Servers,
+  Clean-up) always show them, and `IconButton`, `ConfirmButton`, the prompt's Allow/Deny, the gear menu and the filter's
+  clear button get a 30-point hit area through `.touchTarget()`, with the drawn glyph unchanged. Off, every view must
+  stay pixel-identical: compare offline renders against a build of the previous commit when touching this.
+
 ## Widgets
 
+- The kinds (`WidgetStatus.Kind`), each a static configuration: a configurable widget needs App Intents, whose metadata
+  step only Xcode runs, so a choice of tool is a widget of its own instead. Small: `fun.dashbar.widget.limits` "Claude plan
+  limits", `.codex` "Codex plan limits", `.antigravity` "Antigravity plan limits" (its two tightest, named by quota group),
+  `.opencode` "OpenCode usage" (tokens today, estimated cost, top model), `.copilot` "GitHub Copilot usage" (tokens and
+  premium requests today, no cost). Medium: `.overview` "Plan limits and agents", `.usage` "Tokens today" (each tool that
+  shows and has tokens today, with the estimated cost where the Usage tab shows one). Every kind lists in the gallery for
+  everyone (chronod caches descriptors per version, so hiding one by what the user has would go stale); a widget for a
+  tool that's switched off, never used or idle today says so in words (`WidgetModel.message`), never a blank or a zero.
+  A new kind goes in `Kind.all` too, or the app never reloads it.
+- A tool switched off in Show in Dashbar is in none of the widget data: `CLIStatus.snapshot` leaves it out and names it in
+  `hidden`, and `forWidget()` drops it again (tested in `WidgetToolTests`).
+- A local build's extension has `DashbarLocalBuild` in its Info.plist (build.sh), so its widgets carry a "Local" pill and
+  their gallery descriptions end "From the local build." Offline renders leave it out unless `DASHBAR_WIDGET_LOCAL=1`.
+- Not now: a large widget listing workspaces. The widget data deliberately holds no project names, folders or sessions:
+  a desktop widget is visible to anyone near the screen. Keep it that way unless that decision is revisited.
 - The extension's executable must be linked with `-e _NSExtensionMain` (Package.swift, `DashbarWidgets` linkerSettings),
   as Xcode does for app extensions. Without it the `@main` WidgetBundle's own `main` runs, ExtensionFoundation traps in
   `_EXRunningExtension._shared` on every launch, and chronod logs "query failed - will try lazy reload later": the
@@ -93,7 +129,7 @@ the real app's preferences, so reset it afterwards (`defaults write fun.dashbar.
 - Crash reports: `~/Library/Logs/DiagnosticReports/DashbarWidgets-*.ips`.
 - chronod (which loads and refreshes widgets) logs through the unified log. Use `/usr/bin/log`, since zsh has a `log`
   builtin: `/usr/bin/log show --last 5m --info --style compact --predicate 'process == "chronod" AND eventMessage CONTAINS "dashbar"'`.
-  "Updating descriptors" and "query returned 2 widget descriptors" are good; "purging instead because we shouldn't cache it"
+  "Updating descriptors" and "query returned 7 widget descriptors" are good; "purging instead because we shouldn't cache it"
   appears for builds that aren't notarised.
 - `pluginkit -mAvvv -p com.apple.widgetkit-extension | grep -i dashbar -A3` shows which copy is registered. A rebuild in
   `build/` can take the registration from the installed copy: `lsregister -u "build/Dashbar Local.app"` gives it back.
@@ -219,6 +255,10 @@ images stay clean.
   gone from workspaces, Usage, History (Codex's and Antigravity's plan cards too), limits and alerts, notifications, the
   island, the menu bar, widgets and the status file. Plugins, hooks and status lines stay installed. Codex hidden also
   drops its Overview limits strip row and "other AI tools" chip.
+- The jump shortcut (`JumpToAgent.swift`) only brings an app forward, through `HostApp.open` as a session click does. It
+  never answers a permission prompt or types into a session. No shortcut by default; each copy registers only its own
+  saved one. Two processes can register the same Carbon hot key without an error (seen on macOS 27), so a clash with
+  the other copy is found by reading that copy's preferences, and one with another app can't be detected at all.
 - Clean-up only moves rebuildable folders (`node_modules`, `.next`, build output, DerivedData) to the Trash
   after confirmation. Never delete permanently.
 - Do not scan outside the user's chosen folders and the project's own folder for icons.

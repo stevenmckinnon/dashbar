@@ -35,7 +35,7 @@ struct DashbarApp: App {
         .menuBarExtraStyle(.window)
 
         Settings {
-            SettingsView()
+            SettingsView(store: store)
         }
         // The window keeps its width and can be dragged taller or shorter; each tab scrolls when it runs long.
         .windowResizability(.contentMinSize)
