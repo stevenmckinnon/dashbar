@@ -459,16 +459,22 @@ struct RankList: View {
 struct LimitBar: View {
     let limit: RateLimit
     let tint: Color
+    /// The countdown, the pace line and the mark follow the clock, not the reading: a limit can sit at the same percent
+    /// for hours, and nothing else would redraw the row (issue #3). Same 30-second tick as the Overview's plan strip.
     var body: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { ctx in row(now: ctx.date) }
+    }
+
+    private func row(now: Date) -> some View {
         let used = min(max(limit.usedPercent, 0), 100)
-        let pace = limit.pace()
+        let pace = limit.pace(now: now)
         // The even-pace mark only where there's a pace reading to go with it (never on a row whose caption is hidden).
-        let mark = limit.paceMark()
-        VStack(alignment: .leading, spacing: 2) {
+        let mark = limit.paceMark(now: now)
+        return VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline) {
                 Text(limit.label).font(.system(size: UI.Size.caption, weight: .medium))
                 if let r = limit.resetsAt {
-                    Text(Fmt.resets(r))
+                    Text(Fmt.resets(r, now: now))
                         .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
                 }
                 Spacer()

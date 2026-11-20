@@ -123,7 +123,13 @@ private struct WindowHistory: View {
     private var tint: Color { series.provider.tint }
     private var name: String { RateLimit.name(window: series.kind.length) }
 
+    /// Follows the clock, as `LimitBar` does: the countdown, pace line and burn-down's last point move while the reading
+    /// stays the same (issue #3).
     var body: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { ctx in content(now: ctx.date) }
+    }
+
+    private func content(now: Date) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 Text(name).font(.system(size: UI.Size.body, weight: .semibold))
@@ -133,13 +139,13 @@ private struct WindowHistory: View {
                     Text(Fmt.usedPercent(limit.usedPercent)).font(.system(size: UI.Size.caption, weight: .semibold).monospacedDigit())
                         .foregroundStyle(used >= PlanHistory.limitHit ? UI.textDanger : Color.primary)
                     if let r = limit.resetsAt {
-                        Text("· " + Fmt.resets(r))
+                        Text("· " + Fmt.resets(r, now: now))
                             .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
                     }
                 }
             }
-            burnDown
-            pastWindows
+            burnDown(now: now)
+            pastWindows(now: now)
         }
     }
 
@@ -151,10 +157,10 @@ private struct WindowHistory: View {
     }
 
     /// The window so far against the even pace (0% at the start, 100% at the reset), with where this rate leads.
-    @ViewBuilder private var burnDown: some View {
+    @ViewBuilder private func burnDown(now: Date) -> some View {
         if let span, limit != nil || !samples.isEmpty {
-            let points = burnPoints(span)
-            let pace = limit?.pace()
+            let points = burnPoints(span, now: now)
+            let pace = limit?.pace(now: now)
             Chart {
                 LineMark(x: .value("Time", span.start), y: .value("Used", 0), series: .value("Line", "pace"))
                     .foregroundStyle(Color.primary.opacity(0.35))
@@ -208,7 +214,7 @@ private struct WindowHistory: View {
             HStack(spacing: 10) {
                 if let pace {
                     Text(LimitBar.text(pace)).font(.system(size: UI.Size.caption)).foregroundStyle(LimitBar.color(pace))
-                } else if let expected = limit?.expectedPercent() {
+                } else if let expected = limit?.expectedPercent(now: now) {
                     Text("An even pace would be at \(Int(expected.rounded()))% by now")
                         .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
                 }
@@ -223,12 +229,12 @@ private struct WindowHistory: View {
     }
 
     /// The recorded readings, starting from 0% at the window's start, ending with the live reading.
-    private func burnPoints(_ span: (start: Date, end: Date)) -> [(Date, Double)] {
+    private func burnPoints(_ span: (start: Date, end: Date), now: Date) -> [(Date, Double)] {
         var points: [(Date, Double)] = [(span.start, 0)]
         for s in samples where s.at > span.start && s.at <= span.end { points.append((s.at, s.used)) }
         if let limit, let last = points.last {
-            let now = min(Date(), span.end)
-            if now > last.0 { points.append((now, min(max(limit.usedPercent, 0), 100))) }
+            let upTo = min(now, span.end)
+            if upTo > last.0 { points.append((upTo, min(max(limit.usedPercent, 0), 100))) }
         }
         return points
     }
@@ -248,8 +254,8 @@ private struct WindowHistory: View {
 
     // MARK: Past windows
 
-    @ViewBuilder private var pastWindows: some View {
-        let recent = past.filter { $0.end >= Date().addingTimeInterval(-30 * 86400) }
+    @ViewBuilder private func pastWindows(now: Date) -> some View {
+        let recent = past.filter { $0.end >= now.addingTimeInterval(-30 * 86400) }
         VStack(alignment: .leading, spacing: 6) {
             Text("Peak of each window, last 30 days")
                 .font(.system(size: UI.Size.caption, weight: .medium)).foregroundStyle(UI.textSecondary)
@@ -264,7 +270,7 @@ private struct WindowHistory: View {
                         .foregroundStyle(color(w))
                         .cornerRadius(1.5)
                 }
-                .chartXScale(domain: Date().addingTimeInterval(-30 * 86400)...Date())
+                .chartXScale(domain: now.addingTimeInterval(-30 * 86400)...now)
                 .chartYScale(domain: 0...100)
                 .chartYAxis {
                     AxisMarks(position: .trailing, values: [0, 50, 100]) { v in
@@ -273,7 +279,7 @@ private struct WindowHistory: View {
                     }
                 }
                 .chartXAxis {
-                    AxisMarks(values: Self.ticks(from: Date().addingTimeInterval(-30 * 86400), to: Date(), every: 7 * 86400)) { _ in
+                    AxisMarks(values: Self.ticks(from: now.addingTimeInterval(-30 * 86400), to: now, every: 7 * 86400)) { _ in
                         AxisValueLabel(format: .dateTime.day().month(.abbreviated)).font(.system(size: UI.Size.micro))
                     }
                 }
