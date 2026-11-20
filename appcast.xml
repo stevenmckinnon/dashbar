@@ -3,6 +3,16 @@
     <channel>
         <title>Dashbar</title>
         <item>
+            <title>0.11.1</title>
+            <pubDate>Fri, 20 Nov 2026 18:30:51 +0000</pubDate>
+            <sparkle:version>255</sparkle:version>
+            <sparkle:shortVersionString>0.11.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[- Plan limits on the Usage tab and the History page now count down with the clock. Before, a limit whose reading stayed at the same percent for hours kept showing an old "resets in" time and pace line until its reading changed. Thanks to Sally Hong for the detailed report.
+]]></description>
+            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.11.1/Dashbar-0.11.1.dmg" length="10745329" type="application/octet-stream" sparkle:edSignature="3whrso6+aXKm8TxUR78+qdhftTLa6yXgPTgnfaSB9yg62Wtj7TouqH5eBApWSeNfVUktuA/NJNxizU2sm1m9AQ=="/>
+        </item>
+        <item>
             <title>0.11.0</title>
             <pubDate>Tue, 17 Nov 2026 20:02:31 +0000</pubDate>
             <sparkle:version>250</sparkle:version>
@@ -25,16 +35,6 @@
 - A tool switched off in Show in Dashbar is left out of every widget, and its own widget says it's switched off instead of going blank.
 ]]></description>
             <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.10.2/Dashbar-0.10.2.dmg" length="10530753" type="application/octet-stream" sparkle:edSignature="1+ARJroC3AG/rxl8G8shqSxqkrCMG/OaeqwflJcGKmFVdnKxTuTGHV4uw3c3TCtuOMCGYO8hxacFr2J+J2vsCg=="/>
-        </item>
-        <item>
-            <title>0.10.1</title>
-            <pubDate>Mon, 16 Nov 2026 21:35:32 +0000</pubDate>
-            <sparkle:version>230</sparkle:version>
-            <sparkle:shortVersionString>0.10.1</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[- Desktop widgets no longer go blank after an update: Dashbar now restarts its widget when it launches as a new version.
-]]></description>
-            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.10.1/Dashbar-0.10.1.dmg" length="10181601" type="application/octet-stream" sparkle:edSignature="6rFL3tBLzPZgKegFgs0bUezpxnwjcetUyKMSoLP7adxeJVblCKngBMP+6prZcLH2YgzXAEAc8a5q2fCQ+wa0Cw=="/>
         </item>
     </channel>
 </rss>
