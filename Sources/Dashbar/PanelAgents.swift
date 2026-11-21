@@ -641,9 +641,10 @@ struct PaceKey: View {
 
 /// The key to the today's share tick on weekly bars. Shown beside the even-pace key when a bar draws it.
 struct TodayShareKey: View {
-    static let color = Color.primary.opacity(0.7)
-    /// Today's part of a weekly bar's fill.
-    static let todayOpacity = 0.45
+    /// Full text colour, so it reads apart from the even-pace mark's grey (`PaceKey.color`).
+    static let color = Color.primary
+    /// Today's part of a weekly bar's fill: lighter than the rest, still clear on the dark track.
+    static let todayOpacity = 0.5
     var body: some View {
         HStack(spacing: 4) {
             Capsule().fill(Self.color).frame(width: 2, height: 9)
