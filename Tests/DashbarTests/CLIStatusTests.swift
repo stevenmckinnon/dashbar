@@ -13,6 +13,8 @@ import DashbarStatus
         "tool", "account", "workspace", "folder", "state", "since", "subagents",
         "provider", "plan", "readAt", "stale", "problem",
         "label", "window", "windowSeconds", "usedPercent", "resetsAt", "pace", "runsOutAt",
+        // Weekly limits' share for today and what today has used, both percents.
+        "todayShare", "usedToday",
         "day", "tools", "input", "output", "cacheRead", "cacheWrite", "total",
         "port", "command", "title",
         // The widget's copy (`forWidget()`): how many agents there are (`total`) and how many are working.

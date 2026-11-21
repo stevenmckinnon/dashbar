@@ -194,6 +194,11 @@ struct PlanHistory: Codable, Equatable {
         return all
     }
 
+    /// Every reading of a series on record, oldest first.
+    func samples(of series: Series) -> [Sample] {
+        samples.filter { $0.series == series }.sorted { $0.at < $1.at }
+    }
+
     /// The readings of the window in progress for a series: its latest window, if it hasn't reset yet.
     func current(_ series: Series, now: Date = Date()) -> [Sample] {
         let mine = samples.filter { $0.series == series }.sorted { $0.at < $1.at }

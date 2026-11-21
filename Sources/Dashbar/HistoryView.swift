@@ -211,8 +211,16 @@ private struct WindowHistory: View {
             .frame(height: 110)
             .accessibilityLabel("\(name) so far")
             .accessibilityValue(limit.map { "\(Int($0.usedPercent.rounded())) percent used" } ?? "")
+            // A weekly window says today's share instead of the pace line, as its row on the Usage tab does.
+            let share = series.kind == .weekly ? limit.flatMap { TodayShare.compute($0, samples: samples, now: now) } : nil
             HStack(spacing: 10) {
-                if let pace {
+                if let share {
+                    Text(share.caption(pace: pace, now: now)).font(.system(size: UI.Size.caption))
+                        .foregroundStyle(pace.map(LimitBar.color) ?? UI.textSecondary)
+                        .lineLimit(1).minimumScaleFactor(0.85)
+                        .help(share.help)
+                        .accessibilityLabel(share.spoken + (pace.map { ", " + TodayShare.paceTail($0, now: now) } ?? ""))
+                } else if let pace {
                     Text(LimitBar.text(pace)).font(.system(size: UI.Size.caption)).foregroundStyle(LimitBar.color(pace))
                 } else if let expected = limit?.expectedPercent(now: now) {
                     Text("An even pace would be at \(Int(expected.rounded()))% by now")

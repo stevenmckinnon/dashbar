@@ -22,6 +22,7 @@ enum GoogleUsage {
 
 /// Antigravity's quota in its Usage card: each model group's windows, from its CLI's status line.
 struct AntigravityLimitsBlock: View {
+    @EnvironmentObject var store: Store
     let limits: AntigravityLimits?
     let connected: Bool
     /// "Antigravity · Google AI Pro" over the rows, when the card's title doesn't already say whose limits they are.
@@ -39,7 +40,7 @@ struct AntigravityLimitsBlock: View {
                 }
                 .font(.system(size: UI.Size.caption))
             } else if let limits, !limits.isEmpty {
-                LimitList(limits: limits.flattened, tint: UI.google)
+                LimitList(limits: limits.flattened, tint: UI.google, history: store.antigravityShareHistory)
                 if let fetched = limits.fetchedAt {
                     TimelineView(.periodic(from: .now, by: 30)) { ctx in
                         if let line = Self.ageLine(writtenAt: fetched, now: ctx.date) {

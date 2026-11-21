@@ -25,6 +25,7 @@ enum CLIStatus {
             store.$codexLimits.map { _ in () }.eraseToAnyPublisher(),
             store.$codexAccountLimits.map { _ in () }.eraseToAnyPublisher(),
             store.$antigravityLimits.map { _ in () }.eraseToAnyPublisher(),
+            store.$planHistory.map { _ in () }.eraseToAnyPublisher(),   // today's share is worked out from it
             store.$claude.map { _ in () }.eraseToAnyPublisher(),
             store.$codex.map { _ in () }.eraseToAnyPublisher(),
             store.$google.map { _ in () }.eraseToAnyPublisher(),
@@ -95,9 +96,20 @@ enum CLIStatus {
         return s.isBusy ? .working : .idle
     }
 
-    nonisolated static func limit(_ l: RateLimit, now: Date) -> StatusSnapshot.Limit {
-        StatusSnapshot.Limit(label: l.label, window: l.window.map(RateLimit.name(window:)), windowSeconds: l.window,
-                             usedPercent: l.usedPercent, resetsAt: l.resetsAt).withPace(now: now)
+    /// `samples` are its weekly series' readings, for today's share; nil for a limit without one.
+    nonisolated static func limit(_ l: RateLimit, samples: [PlanHistory.Sample]? = nil, now: Date) -> StatusSnapshot.Limit {
+        let share = samples.flatMap { TodayShare.compute(l, samples: $0, now: now) }
+        return StatusSnapshot.Limit(label: l.label, window: l.window.map(RateLimit.name(window:)), windowSeconds: l.window,
+                                    usedPercent: l.usedPercent, resetsAt: l.resetsAt,
+                                    todayShare: share.map { Self.tenth($0.share) }, usedToday: share.map { Self.tenth($0.usedToday) })
+            .withPace(now: now)
+    }
+
+    /// To a tenth of a percent, so the file doesn't change with every rounding wobble.
+    nonisolated static func tenth(_ v: Double) -> Double { (v * 10).rounded() / 10 }
+
+    private static func limits(_ list: [RateLimit], _ history: [String: [PlanHistory.Sample]], now: Date) -> [StatusSnapshot.Limit] {
+        list.map { limit($0, samples: history[$0.label], now: now) }
     }
 
     /// The same accounts, in the same order, as the Overview's plan strip: Claude, its other accounts, Codex, Antigravity.
@@ -106,23 +118,23 @@ enum CLIStatus {
         if showsClaudeLimits, let plan = store.claudePlan {
             out.append(.init(provider: "claude", account: store.claudePlanLabel, plan: plan.plan, readAt: plan.fetchedAt,
                              stale: plan.stale != nil, problem: plan.problem,
-                             limits: plan.problem == nil ? plan.limits.map { limit($0, now: now) } : []))
+                             limits: plan.problem == nil ? limits(plan.limits, store.shareHistory(plan.limits, provider: .claude, account: nil), now: now) : []))
         }
         for a in store.claudeAccountLimits where a.problem != nil || !a.limits.isEmpty {
             out.append(.init(provider: "claude", account: a.label, plan: a.plan, readAt: a.fetchedAt, problem: a.problem,
-                             limits: a.problem == nil ? a.limits.map { limit($0, now: now) } : []))
+                             limits: a.problem == nil ? limits(a.limits, store.shareHistory(claudeAccount: a), now: now) : []))
         }
         if !store.codexAccountLimits.isEmpty {
             for a in store.codexAccountLimits where !a.limits.isEmpty {
-                out.append(.init(provider: "codex", account: a.label, readAt: a.fetchedAt, limits: a.limits.map { limit($0, now: now) }))
+                out.append(.init(provider: "codex", account: a.label, readAt: a.fetchedAt, limits: limits(a.limits, store.shareHistory(codexAccount: a), now: now)))
             }
         } else if store.codex.found, !store.codexLimits.isEmpty {
             out.append(.init(provider: "codex", readAt: store.codexLimitsAt > .distantPast ? store.codexLimitsAt : nil,
-                             limits: store.codexLimits.map { limit($0, now: now) }))
+                             limits: limits(store.codexLimits, store.shareHistory(store.codexLimits, provider: .codex, account: nil), now: now)))
         }
         if let ag = store.antigravityLimits, ag.problem != nil || !ag.isEmpty {
             out.append(.init(provider: "antigravity", plan: ag.planTier, readAt: ag.fetchedAt, problem: ag.problem,
-                             limits: ag.problem == nil ? ag.flattened.map { limit($0, now: now) } : []))
+                             limits: ag.problem == nil ? limits(ag.flattened, store.antigravityShareHistory, now: now) : []))
         }
         return out
     }

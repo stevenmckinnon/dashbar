@@ -504,6 +504,17 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: alert.sentKey, content: content, trigger: nil))
     }
 
+    /// "Claude Weekly: you've used today's share". Its own toggle, off by default.
+    func todayShare(_ alert: TodayShareAlert) {
+        guard available, UserDefaults.standard.bool(forKey: TodayShareAlerts.settingKey) else { return }
+        let content = UNMutableNotificationContent()
+        content.title = alert.title
+        content.body = alert.body
+        content.sound = .default
+        content.userInfo = ["limits": true]
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: alert.claimKey, content: content, trigger: nil))
+    }
+
     /// "Claude 5-hour: it has reset", for a limit that was used up. Same toggle as the limit alerts.
     func limitReset(_ reset: LimitReset) {
         guard available, UserDefaults.standard.bool(forKey: Self.limitsKey) else { return }

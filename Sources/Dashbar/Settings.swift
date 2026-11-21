@@ -614,6 +614,7 @@ private struct NotificationSettings: View {
     @AppStorage(Notifier.defaultsKey) private var notify = true
     @AppStorage(Notifier.limitsKey) private var notifyLimits = true
     @AppStorage(Notifier.waitingKey) private var notifyWaiting = true
+    @AppStorage(TodayShareAlerts.settingKey) private var notifyTodayShare = false
     @AppStorage(IslandSettings.enabledKey) private var island = false
     @AppStorage(IslandSettings.positionKey) private var islandPosition = IslandPosition.automatic.rawValue
     @AppStorage(IslandSettings.expandOnFinishKey) private var islandFinish = true
@@ -630,7 +631,12 @@ private struct NotificationSettings: View {
                     .help("When Claude stops to ask for permission or an answer.")
                 Toggle("When a plan limit runs low or resets", isOn: $notifyLimits)
                     .help("At 80%, when it's on course to run out before it resets, when it's used up, and when a used-up limit resets. Once per window.")
-                NotificationPermissionNote(wanted: notify || notifyWaiting || notifyLimits)
+                Toggle(isOn: $notifyTodayShare) {
+                    Text("Today's share of weekly limits")
+                    Text("When a day uses its share, so you can ease off early")
+                }
+                .help("Once a day per weekly limit, when today's use reaches today's share: what was left at midnight, spread evenly over the days until it resets. Not after a runs-out or used-up alert, and not in the day's last hour.")
+                NotificationPermissionNote(wanted: notify || notifyWaiting || notifyLimits || notifyTodayShare)
             } header: {
                 Text("Notify")
             }
@@ -671,7 +677,7 @@ private struct NotificationSettings: View {
         }
         .formStyle(.grouped)
         // Turning a notification on is when macOS is asked, never at launch.
-        .onChange(of: [notify, notifyWaiting, notifyLimits]) { old, new in
+        .onChange(of: [notify, notifyWaiting, notifyLimits, notifyTodayShare]) { old, new in
             if zip(old, new).contains(where: { !$0 && $1 }) { NotificationPermission.shared.request() }
         }
     }

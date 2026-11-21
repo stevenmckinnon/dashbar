@@ -195,6 +195,8 @@ final class Store: ObservableObject {
     private var surfaces = SurfaceVisibility()
     /// Limit alerts already sent, so each fires once per window even across relaunches.
     private var sentLimitAlerts = LimitAlerts.prune(Set(UserDefaults.standard.stringArray(forKey: "limitAlertsSent") ?? []))
+    /// Today's share alerts already sent today ("Claude|Weekly|2026-11-21"), so each fires once per limit per day.
+    private var sentTodayShares = Set(UserDefaults.standard.stringArray(forKey: "todayShareSent") ?? [])
     /// Used-up windows waiting for their reset, kept across relaunches ("Claude|5-hour@<reset time>", nothing else).
     private var followedLimitResets = Set(UserDefaults.standard.stringArray(forKey: "limitResetsFollowed") ?? [])
     private var panelVisible: Bool { surfaces.anyVisible }
@@ -467,18 +469,19 @@ final class Store: ObservableObject {
     private func checkLimits() {
         guard !isDemo, !paused else { return }
         recordPlanHistory()
-        var readings: [(provider: String, limits: [RateLimit])] = [("Codex", codexLimits)]
+        var readings: [(provider: String, limits: [RateLimit], history: [String: [PlanHistory.Sample]])] =
+            [("Codex", codexLimits, shareHistory(codexLimits, provider: .codex, account: nil))]
         for other in codexAccountLimits.dropFirst() {   // the first is the default account's, `codexLimits`
-            readings.append(("Codex (\(other.label))", other.limits))
+            readings.append(("Codex (\(other.label))", other.limits, shareHistory(codexAccount: other)))
         }
         if settings.showsClaudeLimits, let plan = claudePlan, plan.problem == nil {
-            readings.append(("Claude", plan.limits))
+            readings.append(("Claude", plan.limits, shareHistory(plan.limits, provider: .claude, account: nil)))
         }
         for other in claudeAccountLimits where other.problem == nil {
-            readings.append(("Claude (\(other.label))", other.limits))
+            readings.append(("Claude (\(other.label))", other.limits, shareHistory(claudeAccount: other)))
         }
         if let ag = antigravityLimits, ag.problem == nil {
-            readings.append(("Antigravity", ag.flattened))
+            readings.append(("Antigravity", ag.flattened, antigravityShareHistory))
         }
 
         // A copy with these notifications off doesn't claim them, so it never silences one that has them on.
@@ -496,6 +499,8 @@ final class Store: ObservableObject {
             UserDefaults.standard.set(Array(sentLimitAlerts), forKey: "limitAlertsSent")
         }
 
+        checkTodayShares(readings)
+
         var resets: [LimitReset] = []
         var followed = followedLimitResets
         for reading in readings {
@@ -509,6 +514,80 @@ final class Store: ObservableObject {
             followedLimitResets = followed
             UserDefaults.standard.set(followed.sorted(), forKey: "limitResetsFollowed")
         }
+    }
+
+    /// "You've used today's share" of a weekly limit, once per limit per day, off unless turned on in Settings.
+    private func checkTodayShares(_ readings: [(provider: String, limits: [RateLimit], history: [String: [PlanHistory.Sample]])]) {
+        let now = Date()
+        let alerts = readings.flatMap { r in
+            TodayShareAlerts.check(provider: r.provider, limits: todayShares(r.limits, history: r.history, now: now),
+                                   sent: sentTodayShares, limitAlertsSent: sentLimitAlerts, now: now)
+        }
+        let pruned = TodayShareAlerts.prune(sentTodayShares, now: now)
+        guard !alerts.isEmpty || pruned != sentTodayShares else { return }
+        // As with the limit alerts, a copy with this off doesn't claim it, so it never silences one that has it on.
+        if UserDefaults.standard.bool(forKey: TodayShareAlerts.settingKey) {
+            TodayShareAlerts.deliver(alerts, claims: .default, now: now) { notifier.todayShare($0) }
+        }
+        sentTodayShares = pruned.union(alerts.map(\.key))
+        UserDefaults.standard.set(sentTodayShares.sorted(), forKey: "todayShareSent")
+    }
+
+    // MARK: Today's share
+
+    /// The plan-history readings behind each weekly limit that has a series of its own, by label: what its today's
+    /// share is worked out from. Limits without a series (Claude's per-model "Weekly · Opus") aren't in it, so they
+    /// keep their pace line.
+    func shareHistory(_ limits: [RateLimit], provider: PlanHistory.Provider, account: String?) -> [String: [PlanHistory.Sample]] {
+        var out: [String: [PlanHistory.Sample]] = [:]
+        for l in limits where PlanHistory.kind(of: l) == .weekly && TodayShare.applies(to: l) {
+            out[l.label] = planHistory.samples(of: PlanHistory.Series(provider, .weekly, account: account))
+        }
+        return out
+    }
+
+    /// Another Claude Code account's, keyed as its history is (`historyAccounts`).
+    func shareHistory(claudeAccount a: AccountLimits) -> [String: [PlanHistory.Sample]] {
+        shareHistory(a.limits, provider: .claude, account: AgentAccounts.hash(a.path))
+    }
+
+    /// A Codex account's. The default account (no key) is `codexLimits`' series.
+    func shareHistory(codexAccount a: AccountLimits) -> [String: [PlanHistory.Sample]] {
+        shareHistory(a.limits, provider: .codex, account: codexAccounts.first(where: { $0.path == a.path })?.key)
+    }
+
+    /// Antigravity's, by the labels its rows show (`AntigravityLimits.flattened`), each group its own series.
+    var antigravityShareHistory: [String: [PlanHistory.Sample]] {
+        guard let ag = antigravityLimits else { return [:] }
+        var out: [String: [PlanHistory.Sample]] = [:]
+        for group in ag.groups {
+            for l in group.limits where PlanHistory.kind(of: l) == .weekly && TodayShare.applies(to: l) {
+                out[ag.shownLabel(l, in: group)] = planHistory.samples(of: PlanHistory.Series(.antigravity, .weekly, account: AntigravityLimits.historyKey(group.key)))
+            }
+        }
+        return out
+    }
+
+    /// Every weekly row a tool's Usage card shows with a today's share, by label (accounts together), so the tab
+    /// knows which keys to show.
+    func shareHistory(for service: UsageRules.Service) -> [String: [PlanHistory.Sample]] {
+        switch service {
+        case .claude:
+            var out = claudePlan.map { shareHistory($0.limits, provider: .claude, account: nil) } ?? [:]
+            for a in claudeAccountLimits { out.merge(shareHistory(claudeAccount: a)) { a, _ in a } }
+            return out
+        case .codex:
+            var out = shareHistory(codexLimits, provider: .codex, account: nil)
+            for a in codexAccountLimits { out.merge(shareHistory(codexAccount: a)) { a, _ in a } }
+            return out
+        case .google: return antigravityShareHistory
+        case .opencode, .copilot: return [:]
+        }
+    }
+
+    /// Each limit with its today's share, where it has a series.
+    func todayShares(_ limits: [RateLimit], history: [String: [PlanHistory.Sample]], now: Date) -> [(limit: RateLimit, share: TodayShare?)] {
+        limits.map { l in (l, history[l.label].flatMap { TodayShare.compute(l, samples: $0, now: now) }) }
     }
 
     /// Adds the latest readings to the plan history, as of when each source took them. Kept limits from an earlier

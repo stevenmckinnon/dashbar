@@ -86,11 +86,17 @@ struct AntigravityLimits: Equatable {
     var flattened: [RateLimit] {
         groups.flatMap { g in
             g.limits.map { l in
-                groups.count > 1 && l.label != g.name
-                    ? RateLimit(label: "\(g.name) · \(l.label)", usedPercent: l.usedPercent, resetsAt: l.resetsAt, window: l.window, source: l.source)
+                let label = shownLabel(l, in: g)
+                return label != l.label
+                    ? RateLimit(label: label, usedPercent: l.usedPercent, resetsAt: l.resetsAt, window: l.window, source: l.source)
                     : l
             }
         }
+    }
+
+    /// A window's label in `flattened`.
+    func shownLabel(_ l: RateLimit, in g: Group) -> String {
+        groups.count > 1 && l.label != g.name ? "\(g.name) · \(l.label)" : l.label
     }
 
     /// The plan-history account a group's series is saved under: hex, like an account's key, so its file

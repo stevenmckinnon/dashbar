@@ -163,3 +163,61 @@ enum LimitResets {
         for reset in resets where claims.claim(reset.claimKey, window: LimitAlerts.claimWindow, now: now) { post(reset) }
     }
 }
+
+/// "Claude Weekly: you've used today's share", an earlier heads-up than "runs out", off by default.
+///
+/// Once per limit per day, when today's use reaches today's share (`TodayShare`). Not sent when a more urgent alert
+/// for the same window ("runs out", "used up") has already gone out, when the limit is used up, or in the last hour of
+/// the day, when easing off no longer helps and tomorrow's share is about to start.
+struct TodayShareAlert: Equatable {
+    /// "Claude|Weekly|2026-11-21": the limit and the local day.
+    let key: String
+    let title: String
+    let body: String
+    /// The same in every running copy of Dashbar, so only the first posts it. A hash: no provider or limit name.
+    var claimKey: String { "share-" + AgentAccounts.hash(key) }
+}
+
+enum TodayShareAlerts {
+    static let settingKey = "notifyOnTodayShare"
+    /// No alert this close to midnight.
+    static let quietBeforeMidnight: TimeInterval = 3600
+
+    /// `limits` pairs each limit with its today's share (nil where it has none). `sent` is what was already sent
+    /// (`TodayShareAlert.key`), `limitAlertsSent` the plan limit alerts' memory (`LimitAlert.sentKey`).
+    static func check(provider: String, limits: [(limit: RateLimit, share: TodayShare?)], sent: Set<String>,
+                      limitAlertsSent: Set<String>, now: Date = Date(), calendar: Calendar = .current) -> [TodayShareAlert] {
+        let day = dayKey(now, calendar: calendar)
+        guard let tomorrow = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)),
+              tomorrow.timeIntervalSince(now) > quietBeforeMidnight else { return [] }
+        return limits.compactMap { item in
+            guard let share = item.share, share.reached, share.share > 0, item.limit.usedPercent < 100,
+                  let resetsAt = item.limit.resetsAt, resetsAt > now else { return nil }
+            let key = "\(provider)|\(item.limit.label)|\(day)"
+            guard !sent.contains(key) else { return nil }
+            // A more urgent alert for this window already said more than this one would.
+            let window = "\(provider)|\(item.limit.label)|\(Int((resetsAt.timeIntervalSince1970 / LimitAlerts.bucket).rounded()))"
+            let urgent = [LimitAlert.Kind.runsOut, .usedUp].contains { limitAlertsSent.contains("\(window)#\($0.rawValue)") }
+            guard !urgent else { return nil }
+            return TodayShareAlert(key: key, title: "\(provider) \(item.limit.label)",
+                                   body: "You've used today's share (\(Int(share.share.rounded()))%). Going on is fine; tomorrow's share will be smaller.")
+        }
+    }
+
+    /// "2026-11-21" in the local calendar.
+    static func dayKey(_ date: Date, calendar: Calendar = .current) -> String {
+        let c = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+    }
+
+    /// Keeps only today's keys.
+    static func prune(_ sent: Set<String>, now: Date = Date(), calendar: Calendar = .current) -> Set<String> {
+        let day = dayKey(now, calendar: calendar)
+        return sent.filter { $0.hasSuffix("|" + day) }
+    }
+
+    /// Posts each alert once across every running copy of Dashbar.
+    static func deliver(_ alerts: [TodayShareAlert], claims: AnnouncementClaims, now: Date = Date(), post: (TodayShareAlert) -> Void) {
+        for alert in alerts where claims.claim(alert.claimKey, window: LimitAlerts.claimWindow, now: now) { post(alert) }
+    }
+}
