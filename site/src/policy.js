@@ -84,6 +84,7 @@ export const POLICY = {
         { list: [
           "usedashbar.com is a static site hosted by Cloudflare. Cloudflare may log visitors’ IP addresses for security, as [its privacy policy](https://www.cloudflare.com/privacypolicy/) explains.",
           "It counts visits with [Cloudflare Web Analytics](https://www.cloudflare.com/web-analytics/), which loads a small script from Cloudflare and uses no cookies. It shows me totals such as page views and referring sites, not individual visitors.",
+          "The footer shows a badge from [BuiltByIndies](https://builtbyindies.com), a directory that lists Dashbar. Its image loads from builtbyindies.com, so your browser asks their site for it, and they see your IP address as any site does.",
           "It sets no cookies, and has no other analytics, trackers or ads.",
           "Its typeface, Instrument Sans, is served from this site, not from Google Fonts.",
         ] },

@@ -68,6 +68,8 @@ const seo = {
       `<p><a href="${REPO}/releases/latest">Download</a> · <a href="${REPO}">Source on GitHub</a></p>`,
       // KittyLaunch's checker reads the page without running it, so the footer's badge is here too.
       `<p><a href="https://kittylaunch.com/p/dashbar?utm_source=badge" target="_blank" rel="noopener"><img src="/badges/kittylaunch-light.svg" width="120" height="120" alt="Dashbar, Verified by KittyLaunch" data-kittylaunch-badge="1" /></a></p>`,
+      // BuiltByIndies' checker also wants its badge in the HTML as served, exactly as they supplied it.
+      `<p><a href="https://builtbyindies.com/products/dashbar?utm_source=badge&utm_medium=embed&utm_campaign=live" target="_blank"><img src="https://builtbyindies.com/badge/2ee31575-bd93-420c-9393-5e02ddab5098.svg?theme=dark&count=0" alt="BuiltByIndies" height="60" /></a></p>`,
       `<p>For AI agents: this page is also at <a href="/index.md">/index.md</a> as Markdown, and <a href="/llms.txt">/llms.txt</a> lists the useful links.</p>`,
       `</div>`,
     ].join("\n");

@@ -26,13 +26,17 @@ export function Footer({ home = "" }) {
         <div className="who">
           <a className="brand" href={`${home}#top`}><Mark /> Dashbar</a>
           <p>{`${FOOTER.about} Made by `}<a href="https://steve.mn">Steve McKinnon</a>.</p>
-          {/* KittyLaunch's badge, copied here (docs/images/badges/) so the page asks nothing of another site. */}
-          <a className="badge" href="https://kittylaunch.com/p/dashbar?utm_source=badge" target="_blank" rel="noopener">
-            <picture>
-              <source srcSet="/badges/kittylaunch-dark.svg" media="(prefers-color-scheme: dark)" />
-              <img src="/badges/kittylaunch-light.svg" width="120" height="120" alt="Dashbar, Verified by KittyLaunch" data-kittylaunch-badge="1" />
-            </picture>
-          </a>
+          <div className="badges">
+            {/* KittyLaunch's badge, copied here (docs/images/badges/) so the page asks nothing of another site. */}
+            <a className="badge" href="https://kittylaunch.com/p/dashbar?utm_source=badge" target="_blank" rel="noopener">
+              <picture>
+                <source srcSet="/badges/kittylaunch-dark.svg" media="(prefers-color-scheme: dark)" />
+                <img src="/badges/kittylaunch-light.svg" width="120" height="120" alt="Dashbar, Verified by KittyLaunch" data-kittylaunch-badge="1" />
+              </picture>
+            </a>
+            {/* BuiltByIndies' badge, exactly as they supplied it: its image loads from their site (said on the privacy page). */}
+            <a href="https://builtbyindies.com/products/dashbar?utm_source=badge&utm_medium=embed&utm_campaign=live" target="_blank"><img src="https://builtbyindies.com/badge/2ee31575-bd93-420c-9393-5e02ddab5098.svg?theme=dark&count=0" alt="BuiltByIndies" height="60" /></a>
+          </div>
         </div>
         <ul className="links" aria-label={home ? "Homepage" : "On this page"}>
           <li><a href={`${home}#features`}>Features</a></li>
