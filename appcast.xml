@@ -3,6 +3,18 @@
     <channel>
         <title>Dashbar</title>
         <item>
+            <title>0.12.0</title>
+            <pubDate>Sat, 21 Nov 2026 17:55:09 +0000</pubDate>
+            <sparkle:version>266</sparkle:version>
+            <sparkle:shortVersionString>0.12.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[- Weekly plan limits now show today's share: what was left at midnight, spread over the days until the reset, so you can see how much you can use today and still last the week. On the Usage tab the bar draws today's use lighter, with a tick where today's share ends, and the line under it reads like "Today 6% of about 21%". The History page says the same under each weekly chart. 5-hour limits are unchanged.
+- A new notification, off by default (Settings → Notifications → Today's share of weekly limits), tells you once a day when a weekly limit has used today's share, so you can ease off early. Going on is fine; tomorrow's share is just smaller.
+- `dashbar status` adds today's share to weekly limits, and `dashbar status --json` has `todayShare` and `usedToday` for them. The dashbar-status skill tells agents to mention it before heavy work.
+]]></description>
+            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.12.0/Dashbar-0.12.0.dmg" length="10817904" type="application/octet-stream" sparkle:edSignature="T0jA99ZJ4eWT+ZH9GqHmhSYEk3uMUqlyD4iGG+cYfAJPDDfLpESkKM6DP1TZBCNbRonrF5l9eNBIF7mGJkilDg=="/>
+        </item>
+        <item>
             <title>0.11.1</title>
             <pubDate>Fri, 20 Nov 2026 18:30:51 +0000</pubDate>
             <sparkle:version>255</sparkle:version>
@@ -22,19 +34,6 @@
 - Settings → About has Copy Diagnostics: a short summary for a bug report (Dashbar's and macOS's versions, which tools and integrations Dashbar found, any format warnings, the widgets' state, how many extra accounts and where Claude's plan limits come from). It never includes project names, folders, sessions or account names, Show Diagnostics lets you read it before you copy, and nothing is sent.
 ]]></description>
             <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.11.0/Dashbar-0.11.0.dmg" length="10724830" type="application/octet-stream" sparkle:edSignature="8rJfM+jQ7Bsuv7Xh9ytPMheXd8S2qkhsId5u8CtOgs00DPP2iA2HG3KxISAacq39u38smPtu/b9kaQJEWwbADg=="/>
-        </item>
-        <item>
-            <title>0.10.2</title>
-            <pubDate>Tue, 17 Nov 2026 19:18:03 +0000</pubDate>
-            <sparkle:version>243</sparkle:version>
-            <sparkle:shortVersionString>0.10.2</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[- On a Mac with a touch display (the MacBook Pro with a Dynamic Island), Dashbar's island now starts off for new installs, so it stays out of the way of the Dynamic Island. Settings → Notifications says why, and you can turn it on anyway. A choice you've already made is kept.
-- On a touch display, the panel shows the open and stop buttons on servers and the Trash button on clean-up folders without waiting for a hover, and its small buttons are easier to tap. Nothing changes on other Macs.
-- New desktop widgets: small ones for Codex's and Antigravity's plan limits, OpenCode's and GitHub Copilot's tokens today, and a medium "Tokens today" with each tool's tokens and estimated cost. Add them from the widget gallery.
-- A tool switched off in Show in Dashbar is left out of every widget, and its own widget says it's switched off instead of going blank.
-]]></description>
-            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.10.2/Dashbar-0.10.2.dmg" length="10530753" type="application/octet-stream" sparkle:edSignature="1+ARJroC3AG/rxl8G8shqSxqkrCMG/OaeqwflJcGKmFVdnKxTuTGHV4uw3c3TCtuOMCGYO8hxacFr2J+J2vsCg=="/>
         </item>
     </channel>
 </rss>
