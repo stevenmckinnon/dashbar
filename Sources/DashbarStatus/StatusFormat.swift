@@ -191,6 +191,10 @@ public struct StatusFormat {
             default: break
             }
             if ranked.group.stale, let at = ranked.group.readAt { parts.append("kept from " + clock(at, withDay: true)) }
+            // Today's share holds for the day it was worked out on only.
+            if let share = l.todayShare, let today = l.usedToday, sameDay(snapshot.generatedAt, now) {
+                parts.append("today \(Self.percent(today)) of \(Self.percent(share))")
+            }
             return ("\(Self.owner(ranked.group.provider, account: ranked.group.account, in: snapshot)) \(l.label)", parts.joined(separator: " · "))
         }
         for (g, group) in snapshot.limits.enumerated() {
@@ -205,6 +209,12 @@ public struct StatusFormat {
             }
         }
         return rows
+    }
+
+    private func sameDay(_ a: Date, _ b: Date) -> Bool {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = timeZone
+        return cal.isDate(a, inSameDayAs: b)
     }
 
     /// A heading and its rows, the names padded to the widest in this section only.

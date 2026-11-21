@@ -117,7 +117,9 @@ Dashbar checks for updates itself (Settings → About → Check for Updates…).
   if any, with the same input, so it looks the same. It keeps a backup of the settings file (in
   `~/Library/Application Support/Dashbar/Backups`), and Remove puts your previous status line back exactly. No
   network, no Keychain. The reading is as fresh as your last Claude Code reply, and Dashbar says how old it is.
-  Each limit shows a tick for an even pace and a projection of when it would run out at the current rate.
+  Each limit shows a tick for an even pace and a projection of when it would run out at the current rate. Weekly
+  limits show today's share instead: what was left at midnight, spread over the days until the reset, and how much of it
+  today has used.
 - **The older, experimental way** (off by default, under Experimental in Integrations): read Claude Code's sign-in from the Keychain the
   way Claude Code does (with macOS's `security` tool, so macOS doesn't ask again each time Claude Code renews
   it) and call the same undocumented endpoint as Claude Code's `/usage`. It never refreshes or stores the
@@ -179,7 +181,8 @@ $ dashbar line
   tokens today are left out, and servers are listed one per process, as on the Servers tab.
 - `dashbar line`: one line for a status bar or prompt. Add `--ascii` where `⚠` and `·` don't draw (it prints
   `! 1 needs you | 1 working | Claude 5h 55%`). An arrow (`↑`, or `(!)`) after a limit means it's on course to run out.
-- `dashbar status --json`: the same status as JSON, with each limit's pace worked out when you ask.
+- `dashbar status --json`: the same status as JSON, with each limit's pace worked out when you ask, and for weekly
+  limits today's share (`todayShare`) and what today has used (`usedToday`).
 - `--local` reads a local build (Dashbar Local) instead of the release; without it, the release is read if it's
   running, otherwise the local build.
 

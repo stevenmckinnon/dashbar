@@ -28,6 +28,7 @@ If `dashbar` isn't found, Dashbar or its command isn't installed: carry on witho
 
 - `limits`: one group per account with plan limits. `provider` is `claude`, `codex` or `antigravity`; `account` names an extra account. `stale: true` means the reading is old (`readAt` says when); `problem` explains a reading that failed. Each entry in its `limits` has `label` ("5-hour", "Weekly"), `usedPercent`, `resetsAt` and `pace`. Some, like Claude's "Extra usage", have no window, reset time or pace: only the percentage.
 - `pace`, worked out when the command runs: `under` (plenty left at this rate), `on-pace` (lasts until it resets), `runs-out` (on course to run out before it resets, at `runsOutAt`) or `used-up`. It can be missing when there isn't enough of the window yet to tell.
+- `todayShare` and `usedToday`, on weekly limits only: how much (%) can be used today and still last until the reset, worked out from what was left at local midnight, and how much today has used so far. They hold for the day of `generatedAt`.
 - `sessions`: each agent session Dashbar sees, with `tool`, `workspace`, `folder`, `state` (`working`, `idle`, `needs-you` or `permission`), `since` and `subagents`. Your own session is usually in this list too, and there are no session ids to tell it apart.
 - `servers`: listening dev servers with `port`, `command`, `pid`, `workspace` and `folder`. Dashbar reads ports while its panel or window is open, so a server started since then can be missing.
 - `usageToday`: tokens per tool since midnight, with `cost` estimated at API list prices.
@@ -37,7 +38,7 @@ It never holds prompts, session titles, session ids or sign-ins.
 
 ## What to do with it
 
-- **Your limits.** Find the group for the tool you are (`claude` for Claude Code, `codex` for Codex). If a limit's `pace` is `runs-out` or `used-up`, or it is at 90% or more, tell the person before starting heavy work, with when it resets, and offer a lighter plan: fewer parallel workers, a smaller first step, or waiting for the reset. Don't refuse the work; it's their call.
+- **Your limits.** Find the group for the tool you are (`claude` for Claude Code, `codex` for Codex). If a limit's `pace` is `runs-out` or `used-up`, or it is at 90% or more, tell the person before starting heavy work, with when it resets, and offer a lighter plan: fewer parallel workers, a smaller first step, or waiting for the reset. Don't refuse the work; it's their call. If a weekly limit's `usedToday` is at or over its `todayShare`, mention that before heavy work too: going on is fine, it only leaves later days a smaller share.
 - **Stale or failed readings.** If `stale` is true or `problem` is set, say the figures may be out of date rather than relying on them.
 - **Dev servers.** If a server is already listening for this folder, use its port instead of starting another one. Ask before stopping a server you didn't start.
 - **Other agents.** If more than one session is `working` in your `folder`, one of them is probably you and the others are other agents: mention it before editing files there, since you may both change the same files. If one is `needs-you` or `permission`, you can tell the person another agent is waiting for them.

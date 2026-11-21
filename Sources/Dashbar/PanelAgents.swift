@@ -119,9 +119,15 @@ struct UsageTab: View {
         let digests = UsageRules.order(services.map { $0.digest(period) }, now: now)
         let ordered = digests.compactMap { d in services.first { $0.service == d.service } }
         let idle = Set(digests.filter(UsageRules.isIdle).map(\.service))
+        // Which ticks the bars draw: the even pace, or on weekly rows today's share.
+        let marks = ordered.filter { !idle.contains($0.service) }.flatMap { service in
+            let history = store.shareHistory(for: service.service)
+            return service.limits.map { l in (l, history[l.label].flatMap { TodayShare.compute(l, samples: $0, now: now) } != nil) }
+        }
         VStack(alignment: .leading, spacing: UI.gap) {
             controls(period: period, digests: digests,
-                     paceMark: ordered.filter { !idle.contains($0.service) }.flatMap(\.limits).contains { $0.paceMark(now: now) != nil })
+                     paceMark: marks.contains { !$0.1 && $0.0.paceMark(now: now) != nil },
+                     shareMark: marks.contains { $0.1 })
             if wide && ordered.count > 1 {
                 // Two columns when both fit at the panel's width or more; cards alternate so the first two sit side by side.
                 let left = ordered.enumerated().filter { $0.offset % 2 == 0 }.map(\.element)
@@ -144,7 +150,7 @@ struct UsageTab: View {
     }
 
     /// The period picker with the key to the meters' tick, and with two or more tools in use, their total.
-    private func controls(period: UsagePeriod, digests: [UsageRules.Digest], paceMark: Bool) -> some View {
+    private func controls(period: UsagePeriod, digests: [UsageRules.Digest], paceMark: Bool, shareMark: Bool) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 Picker("Period", selection: $periodRaw) {
@@ -157,6 +163,7 @@ struct UsageTab: View {
                 .help("The span every card below shows: today, the last 7 days or the last 14")
                 Spacer(minLength: 8)
                 if paceMark { PaceKey() }
+                if shareMark { TodayShareKey() }
             }
             if UsageRules.showsSummary(digests) {
                 let totals = UsageRules.totals(digests)
@@ -459,6 +466,8 @@ struct RankList: View {
 struct LimitBar: View {
     let limit: RateLimit
     let tint: Color
+    /// The weekly series' readings behind today's share (`Store.shareHistory`); nil for a row without one.
+    var samples: [PlanHistory.Sample]? = nil
     /// The countdown, the pace line and the mark follow the clock, not the reading: a limit can sit at the same percent
     /// for hours, and nothing else would redraw the row (issue #3). Same 30-second tick as the Overview's plan strip.
     var body: some View {
@@ -468,8 +477,11 @@ struct LimitBar: View {
     private func row(now: Date) -> some View {
         let used = min(max(limit.usedPercent, 0), 100)
         let pace = limit.pace(now: now)
+        // A weekly row shows today's share instead of the even pace: its tick and its caption.
+        let share = samples.flatMap { TodayShare.compute(limit, samples: $0, now: now) }
         // The even-pace mark only where there's a pace reading to go with it (never on a row whose caption is hidden).
-        let mark = limit.paceMark(now: now)
+        let mark = share == nil ? limit.paceMark(now: now) : nil
+        let fillState = Self.fillState(used: used, pace: pace)
         return VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline) {
                 Text(limit.label).font(.system(size: UI.Size.caption, weight: .medium))
@@ -487,28 +499,47 @@ struct LimitBar: View {
                 ZStack(alignment: .leading) {
                     Capsule().fill(UI.track).frame(height: 6)
                     // Drawn from the figure as shown, so "0% used" draws nothing and "1% used" a sliver.
-                    Capsule().fill(Self.fill(used: used, pace: pace, tint: tint))
-                        .frame(width: Meter.width(Self.shownFraction(limit.usedPercent), in: g.size.width, minimum: 3), height: 6)
-                    // Where usage would be if spread evenly over the window.
-                    if let mark {
-                        Capsule().fill(PaceKey.color)
+                    let width = Meter.width(Self.shownFraction(limit.usedPercent), in: g.size.width, minimum: 3)
+                    if let share, fillState == .normal, share.usedToday > 0 {
+                        // Up to midnight in the fill colour, today's part lighter. Amber or red draw whole, as before.
+                        ZStack(alignment: .leading) {
+                            Rectangle().fill(tint.opacity(TodayShareKey.todayOpacity))
+                            Rectangle().fill(tint).frame(width: min(width, g.size.width * share.startOfDay / 100))
+                        }
+                        .frame(width: width, height: 6)
+                        .clipShape(Capsule())
+                    } else {
+                        Capsule().fill(Self.fill(used: used, pace: pace, tint: tint))
+                            .frame(width: width, height: 6)
+                    }
+                    // Where usage would be if spread evenly over the window, or where today's share ends.
+                    if let at = share?.mark ?? mark {
+                        Capsule().fill(share == nil ? PaceKey.color : TodayShareKey.color)
                             .frame(width: 2, height: 10)
-                            .offset(x: min(g.size.width - 2, max(0, g.size.width * mark / 100 - 1)))
+                            .offset(x: min(g.size.width - 2, max(0, g.size.width * at / 100 - 1)))
                     }
                 }
                 .frame(maxHeight: .infinity)
             }
             .frame(height: 10)
-            if let pace {
+            if let share {
+                Text(share.caption(pace: pace, now: now))
+                    .font(.system(size: UI.Size.caption))
+                    .foregroundStyle(pace.map(Self.color) ?? UI.textSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            } else if let pace {
                 Text(Self.text(pace))
                     .font(.system(size: UI.Size.caption))
                     .foregroundStyle(Self.color(pace))
             }
         }
-        .help(([mark.map { "The mark shows where an even pace would be by now: \(Int($0.rounded()))% used." },
+        .help(([share?.help, mark.map { "The mark shows where an even pace would be by now: \(Int($0.rounded()))% used." },
                 Self.sourceNote(limit)] as [String?]).compactMap { $0 }.joined(separator: "\n"))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(limit.label) limit, \(Int(max(0, limit.usedPercent).rounded())) percent used" + (pace.map { ". " + Self.text($0) } ?? ""))
+        .accessibilityLabel("\(limit.label) limit, \(Int(max(0, limit.usedPercent).rounded())) percent used"
+                            + (share.map { ". " + $0.spoken + (pace.map { ", " + TodayShare.paceTail($0, now: now) } ?? "") }
+                               ?? pace.map { ". " + Self.text($0) } ?? ""))
         .accessibilityValue(mark.map { "Even pace would be \(Int($0.rounded())) percent by now" } ?? "")
         .accessibilityHint(Self.sourceNote(limit) ?? "")
     }
@@ -569,13 +600,15 @@ struct LimitBar: View {
 struct LimitList: View {
     let limits: [RateLimit]
     let tint: Color
+    /// Each weekly row's readings, by label, for its today's share (`Store.shareHistory`).
+    var history: [String: [PlanHistory.Sample]] = [:]
     @State private var expanded = false
 
     var body: some View {
         let fold = RateLimit.fold(limits)
         // Rows sit apart from each other while each pace caption stays tight under its own bar.
         VStack(alignment: .leading, spacing: 10) {
-            ForEach(expanded ? limits : fold.shown) { LimitBar(limit: $0, tint: tint) }
+            ForEach(expanded ? limits : fold.shown) { LimitBar(limit: $0, tint: tint, samples: history[$0.label]) }
             if !fold.folded.isEmpty {
                 Button { expanded.toggle() } label: {
                     HStack(spacing: 3) {
@@ -603,6 +636,23 @@ struct PaceKey: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("The tick on each bar marks an even pace")
         .help("The tick on a bar shows where usage would be by now if it were spread evenly until the reset.")
+    }
+}
+
+/// The key to the today's share tick on weekly bars. Shown beside the even-pace key when a bar draws it.
+struct TodayShareKey: View {
+    /// Full text colour, so it reads apart from the even-pace mark's grey (`PaceKey.color`).
+    static let color = Color.primary
+    /// Today's part of a weekly bar's fill: lighter than the rest, still clear on the dark track.
+    static let todayOpacity = 0.5
+    var body: some View {
+        HStack(spacing: 4) {
+            Capsule().fill(Self.color).frame(width: 2, height: 9)
+            Text("today's share").font(.system(size: UI.Size.micro)).foregroundStyle(UI.textSecondary)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("The tick on a weekly bar marks how far today's share goes")
+        .help("On a weekly bar, the tick shows how far today's share goes: what was left at midnight, spread evenly over the days until it resets. The lighter part of the fill is what today has used.")
     }
 }
 
@@ -640,10 +690,10 @@ struct ServiceLimits: View {
         case .codex:
             if !store.codexAccountLimits.isEmpty {
                 VStack(alignment: .leading, spacing: 16) {
-                    ForEach(store.codexAccountLimits) { CodexLimitsSection(label: $0.label, limits: $0.limits) }
+                    ForEach(store.codexAccountLimits) { CodexLimitsSection(label: $0.label, limits: $0.limits, history: store.shareHistory(codexAccount: $0)) }
                 }
             } else if store.codex.found {
-                CodexLimitsSection(label: nil, limits: store.codexLimits)
+                CodexLimitsSection(label: nil, limits: store.codexLimits, history: store.shareHistory(store.codexLimits, provider: .codex, account: nil))
             }
         case .google:
             // Only for someone with the Antigravity CLI's bridge added, or a reading it left.
@@ -737,7 +787,7 @@ struct ClaudeLimitsSection: View {
                 }
             }
         } else if let limits = store.claudePlan?.limits, !limits.isEmpty {
-            LimitList(limits: limits, tint: UI.claudeFill)
+            LimitList(limits: limits, tint: UI.claudeFill, history: store.shareHistory(limits, provider: .claude, account: nil))
             if let stale = store.claudePlan?.stale, let fetched = store.claudePlan?.fetchedAt {
                 // Worked out live, so "2m ago" keeps counting and the countdown says when it will refresh.
                 TimelineView(.periodic(from: .now, by: 1)) { ctx in
@@ -774,6 +824,7 @@ struct ClaudeLimitsSection: View {
 struct CodexLimitsSection: View {
     let label: String?
     let limits: [RateLimit]
+    var history: [String: [PlanHistory.Sample]] = [:]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -783,7 +834,7 @@ struct CodexLimitsSection: View {
                     .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                LimitList(limits: limits, tint: UI.codex)
+                LimitList(limits: limits, tint: UI.codex, history: history)
             }
         }
     }
@@ -791,6 +842,7 @@ struct CodexLimitsSection: View {
 
 /// Another Claude Code account's limits, from its own status line bridge (Settings → Accounts adds it).
 struct ClaudeAccountLimitsView: View {
+    @EnvironmentObject var store: Store
     let account: AccountLimits
 
     var body: some View {
@@ -803,7 +855,7 @@ struct ClaudeAccountLimitsView: View {
                 }
                 .font(.system(size: UI.Size.caption))
             } else if !account.limits.isEmpty {
-                LimitList(limits: account.limits, tint: UI.claudeFill)
+                LimitList(limits: account.limits, tint: UI.claudeFill, history: store.shareHistory(claudeAccount: account))
                 if let fetched = account.fetchedAt {
                     TimelineView(.periodic(from: .now, by: 30)) { ctx in
                         if let line = ClaudeStatusLine.ageLine(writtenAt: fetched, now: ctx.date) {

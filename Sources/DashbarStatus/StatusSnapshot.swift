@@ -154,9 +154,15 @@ public struct StatusSnapshot: Codable, Equatable, Sendable {
         /// As of `generatedAt`. The tool works it out again when it prints, since the pace moves with the clock.
         public var pace: Pace?
         public var runsOutAt: Date?
+        /// Weekly or longer limits only: how much can be used today (%) and still last until the reset, worked out
+        /// from what was left at local midnight on the day of `generatedAt`. Fixed for that day.
+        public var todayShare: Double?
+        /// Used since local midnight (%), on the day of `generatedAt`. Only alongside `todayShare`.
+        public var usedToday: Double?
 
         public init(label: String, window: String? = nil, windowSeconds: Double? = nil, usedPercent: Double,
-                    resetsAt: Date? = nil, pace: Pace? = nil, runsOutAt: Date? = nil) {
+                    resetsAt: Date? = nil, pace: Pace? = nil, runsOutAt: Date? = nil,
+                    todayShare: Double? = nil, usedToday: Double? = nil) {
             self.label = label
             self.window = window
             self.windowSeconds = windowSeconds
@@ -164,6 +170,8 @@ public struct StatusSnapshot: Codable, Equatable, Sendable {
             self.resetsAt = resetsAt
             self.pace = pace
             self.runsOutAt = runsOutAt
+            self.todayShare = todayShare
+            self.usedToday = usedToday
         }
     }
 

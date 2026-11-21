@@ -29,7 +29,7 @@ export const DOCS = {
         { list: [
           "`dashbar` or `dashbar status`: agents that need you, agents working and idle, every plan limit (the one closest to running out first, with its pace), today’s tokens and dev servers.",
           "`dashbar line`: one line for a status bar or prompt. Add `--ascii` where `⚠` and `·` don’t draw. An arrow (`↑`, or `(!)` with `--ascii`) after a limit means it’s on course to run out.",
-          "`dashbar status --json`: the same status as JSON, with each limit’s pace worked out when you ask.",
+          "`dashbar status --json`: the same status as JSON, with each limit’s pace worked out when you ask, and for weekly limits today’s share (`todayShare`) and what today has used (`usedToday`).",
           "`--local` reads a local build (Dashbar Local) instead of the release. Without it, the release is read if it’s running, otherwise the local build.",
           "`dashbar --help` and `dashbar --version`.",
         ] },

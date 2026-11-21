@@ -37,13 +37,16 @@ extension DemoData {
         store.codex.history = codex.history(now: now)
 
         // Plan windows, ending in the demo's current readings.
+        // Where each weekly window stood at midnight, for today's share: under it (Claude 6% used today), or with
+        // DASHBAR_DEMO_SHARE=over, past it.
+        let over = ProcessInfo.processInfo.environment["DASHBAR_DEMO_SHARE"] == "over"
         var history = PlanHistory()
         Self.simulate(&history, provider: .claude, now: now, days: millions, rng: &rng,
                       current5h: (55, now.addingTimeInterval(2.2 * 3600)), currentWeek: (38, now.addingTimeInterval(3.5 * 86400)),
-                      windowsPerDay: 3, peakScale: 0.62)
+                      windowsPerDay: 3, peakScale: 0.62, weekAtMidnight: over ? 12 : 32)
         Self.simulate(&history, provider: .codex, now: now, days: millions, rng: &rng,
                       current5h: (21, now.addingTimeInterval(3.4 * 3600)), currentWeek: (34, now.addingTimeInterval(4.1 * 86400)),
-                      windowsPerDay: 1, peakScale: 0.35)
+                      windowsPerDay: 1, peakScale: 0.35, weekAtMidnight: 30)
         // DASHBAR_DEMO_ACCOUNTS=2: the Work account's Claude windows, as their own series.
         for other in store.claudeAccountLimits {
             let five = other.limits.first { PlanHistory.kind(of: $0) == .fiveHour }, week = other.limits.first { PlanHistory.kind(of: $0) == .weekly }
@@ -86,7 +89,7 @@ extension DemoData {
     /// Readings every 10 minutes through each 5-hour window on busy days; the weekly window rises with them.
     private static func simulate(_ history: inout PlanHistory, provider: PlanHistory.Provider, now: Date, days: [Int],
                                  rng: inout DemoRandom, current5h: (Double, Date), currentWeek: (Double, Date),
-                                 windowsPerDay: Int, peakScale: Double, account: String? = nil) {
+                                 windowsPerDay: Int, peakScale: Double, account: String? = nil, weekAtMidnight: Double? = nil) {
         let cal = Calendar.current
         let today = cal.startOfDay(for: now)
         let fiveHours = PlanHistory.Kind.fiveHour.length, week = PlanHistory.Kind.weekly.length
@@ -127,7 +130,8 @@ extension DemoData {
             weekTarget[reset] = reset == currentWeek.1 ? 0 : min(100, (48 + 40 * rng.next() + (ws.count > 12 ? 12 : 0)) * (provider == .claude ? 1 : 0.55))
         }
         let currentWeekPast = (byWeek[currentWeek.1] ?? []).reduce(0) { $0 + $1.peak }
-        let currentWeekScale = currentWeek.0 / max(1, currentWeekPast + current5h.0)
+        // The current week's earlier windows (all before today) add up to `weekAtMidnight` when it's given.
+        let currentWeekScale = weekAtMidnight.map { $0 / max(1, currentWeekPast) } ?? currentWeek.0 / max(1, currentWeekPast + current5h.0)
 
         var weekUsed: [Date: Double] = [:]
         func run(start: Date, peak: Double, until end: Date, scale: Double, resetW: Date) {
