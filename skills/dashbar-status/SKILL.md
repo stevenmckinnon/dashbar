@@ -1,6 +1,6 @@
 ---
 name: dashbar-status
-description: Check Dashbar's status before heavy or parallel agent work, before starting a dev server, or before editing a folder: plan limits and their pace, which coding agents are working or waiting, and which dev servers are running. Use on a Mac where the dashbar command is installed.
+description: Check Dashbar's status before heavy or parallel agent work, before starting a dev server, or before editing a folder. It shows plan limits and their pace, which coding agents are working or waiting, and which dev servers are running. Use on a Mac where the dashbar command is installed.
 ---
 
 # Check Dashbar's status
