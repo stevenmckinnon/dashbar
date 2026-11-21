@@ -142,10 +142,62 @@ export function skillMd() {
   ].join("\n\n") + "\n";
 }
 
+const STATUS_SKILL_PATH = ".well-known/agent-skills/dashbar-status/SKILL.md";
+const STATUS_SKILL_DESCRIPTION = "Check Dashbar's status before heavy or parallel agent work, before starting a dev server, or before editing a folder: plan limits and their pace, which coding agents are working or waiting, and which dev servers are running. Use on a Mac where the dashbar command is installed.";
+
+/** An agent skill for using the dashbar command: when to check, what the JSON means, and what to do about it.
+ * Every field it names must exist in Sources/DashbarStatus/StatusSnapshot.swift. */
+export function statusSkillMd() {
+  return [
+    [
+      `---`,
+      `name: dashbar-status`,
+      `description: ${STATUS_SKILL_DESCRIPTION}`,
+      `---`,
+    ].join("\n"),
+    `# Check Dashbar's status`,
+    `[Dashbar](${SITE}) is a macOS menu bar app that watches the person's coding agents (Claude Code, Codex, Gemini CLI, Antigravity, OpenCode, GitHub Copilot), their plan limits and their local dev servers. Its \`dashbar\` command prints what the app knows. It's read-only and cheap: it reads a file the app keeps up to date and never reads agent logs itself.`,
+    `## When to check`,
+    [
+      `- **Before heavy or parallel work**: a large refactor, a long run, or starting several subagents or workers. Plan limits decide how much you can do before the person is cut off.`,
+      `- **Before starting a dev server**: one may already be running for this folder.`,
+      `- **Before editing files**: another agent may be working in the same folder.`,
+      `- When the person asks how much of their plan is left, or what their agents are doing.`,
+    ].join("\n"),
+    `Check at those moments, not in a loop. The app rewrites the status at most every 3 seconds.`,
+    `## Run it`,
+    `\`\`\`sh\ndashbar status --json\n\`\`\``,
+    `If \`dashbar\` isn't found, Dashbar or its command isn't installed: carry on without it, and don't install it unasked. Other exit codes: \`2\` Dashbar hasn't saved a status yet, \`3\` Dashbar isn't running, \`4\` the status file can't be read. In each case nothing on standard output is current, so say you couldn't check and carry on. Never treat a missing status as "no limits" or "nothing running".`,
+    `## What it holds`,
+    [
+      `- \`limits\`: one group per account with plan limits. \`provider\` is \`claude\`, \`codex\` or \`antigravity\`; \`account\` names an extra account. \`stale: true\` means the reading is old (\`readAt\` says when); \`problem\` explains a reading that failed. Each entry in its \`limits\` has \`label\` ("5-hour", "Weekly"), \`usedPercent\`, \`resetsAt\` and \`pace\`. Some, like Claude's "Extra usage", have no window, reset time or pace: only the percentage.`,
+      `- \`pace\`, worked out when the command runs: \`under\` (plenty left at this rate), \`on-pace\` (lasts until it resets), \`runs-out\` (on course to run out before it resets, at \`runsOutAt\`) or \`used-up\`. It can be missing when there isn't enough of the window yet to tell.`,
+      `- \`sessions\`: each agent session Dashbar sees, with \`tool\`, \`workspace\`, \`folder\`, \`state\` (\`working\`, \`idle\`, \`needs-you\` or \`permission\`), \`since\` and \`subagents\`. Your own session is usually in this list too, and there are no session ids to tell it apart.`,
+      `- \`servers\`: listening dev servers with \`port\`, \`command\`, \`pid\`, \`workspace\` and \`folder\`. Dashbar reads ports while its panel or window is open, so a server started since then can be missing.`,
+      `- \`usageToday\`: tokens per tool since midnight, with \`cost\` estimated at API list prices.`,
+      `- \`app.paused\`: the person has paused Dashbar, so figures may be old. \`hidden\` lists tools they've switched off in Dashbar; those tools are left out of everything.`,
+    ].join("\n"),
+    `It never holds prompts, session titles, session ids or sign-ins.`,
+    `## What to do with it`,
+    [
+      `- **Your limits.** Find the group for the tool you are (\`claude\` for Claude Code, \`codex\` for Codex). If a limit's \`pace\` is \`runs-out\` or \`used-up\`, or it is at 90% or more, tell the person before starting heavy work, with when it resets, and offer a lighter plan: fewer parallel workers, a smaller first step, or waiting for the reset. Don't refuse the work; it's their call.`,
+      `- **Stale or failed readings.** If \`stale\` is true or \`problem\` is set, say the figures may be out of date rather than relying on them.`,
+      `- **Dev servers.** If a server is already listening for this folder, use its port instead of starting another one. Ask before stopping a server you didn't start.`,
+      `- **Other agents.** If more than one session is \`working\` in your \`folder\`, one of them is probably you and the others are other agents: mention it before editing files there, since you may both change the same files. If one is \`needs-you\` or \`permission\`, you can tell the person another agent is waiting for them.`,
+    ].join("\n"),
+    `Only read: don't edit Dashbar's files, and don't read its caches or other agents' logs directly. The command is the interface.`,
+    `## More`,
+    [
+      `- The command, its other modes and the status file: ${SITE}docs.md`,
+      `- Installing Dashbar: ${SITE}${SKILL_PATH}`,
+    ].join("\n"),
+  ].join("\n\n") + "\n";
+}
+
 const sha256 = (text) => createHash("sha256").update(text, "utf8").digest("hex");
 
 /** The Agent Skills discovery index (v0.2.0), with the digest of the exact bytes published. */
-export function skillsIndex(skill) {
+export function skillsIndex(skill, statusSkill) {
   return JSON.stringify({
     $schema: "https://schemas.agentskills.io/discovery/0.2.0/schema.json",
     skills: [{
@@ -154,11 +206,17 @@ export function skillsIndex(skill) {
       description: "Install, update or uninstall Dashbar, the macOS menu bar app for Claude Code and Codex.",
       url: `/${SKILL_PATH}`,
       digest: `sha256:${sha256(skill)}`,
+    }, {
+      name: "dashbar-status",
+      type: "skill-md",
+      description: STATUS_SKILL_DESCRIPTION,
+      url: `/${STATUS_SKILL_PATH}`,
+      digest: `sha256:${sha256(statusSkill)}`,
     }],
   }, null, 2) + "\n";
 }
 
-/** The ARD capability manifest (ai-catalog.json). Its one entry is the skill above: Dashbar has no API or MCP server. */
+/** The ARD capability manifest (ai-catalog.json): the two skills above. Dashbar has no API or MCP server. */
 export function aiCatalog() {
   return JSON.stringify({
     specVersion: "1.0",
@@ -174,6 +232,18 @@ export function aiCatalog() {
         "menu bar app to see Claude Code and Codex sessions",
         "show my Claude Code plan limits in the macOS menu bar",
         "uninstall Dashbar",
+      ],
+    }, {
+      identifier: "urn:air:usedashbar.com:skill:dashbar-status",
+      displayName: "Check Dashbar's status",
+      type: "application/agent-skills+md",
+      url: `${SITE}${STATUS_SKILL_PATH}`,
+      description: STATUS_SKILL_DESCRIPTION,
+      representativeQueries: [
+        "check my Claude Code plan limits before starting work",
+        "how much of my Codex plan is left",
+        "is a dev server already running for this project",
+        "which coding agents are working right now",
       ],
     }],
   }, null, 2) + "\n";
@@ -202,6 +272,8 @@ export function llmsTxt(all) {
       `- [Homebrew cask](https://github.com/stevenmckinnon/homebrew-tap): \`${BREW}\``,
       `- [Install skill for agents](${SITE}${SKILL_PATH}): install, update and uninstall steps`,
     ].join("\n"),
+    `## For agents`,
+    `- [Status skill](${SITE}${STATUS_SKILL_PATH}): check plan limits, running agents and dev servers with \`dashbar status --json\` before heavy work`,
     `## Project`,
     [
       `- [Source on GitHub](${REPO})`,
@@ -237,4 +309,4 @@ export function sitemap() {
   ].join("\n") + "\n";
 }
 
-export { SKILL_PATH };
+export { SKILL_PATH, STATUS_SKILL_PATH };

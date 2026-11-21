@@ -130,6 +130,7 @@ const agentFiles = {
   generateBundle() {
     const all = agent.releases();
     const skill = agent.skillMd();
+    const statusSkill = agent.statusSkillMd();
     const files = {
       "index.md": agent.indexMd(all),
       "docs.md": agent.docsMarkdown(),
@@ -137,7 +138,8 @@ const agentFiles = {
       "llms-full.txt": agent.llmsFullTxt(all),
       "sitemap.xml": agent.sitemap(),
       [agent.SKILL_PATH]: skill,
-      ".well-known/agent-skills/index.json": agent.skillsIndex(skill),
+      [agent.STATUS_SKILL_PATH]: statusSkill,
+      ".well-known/agent-skills/index.json": agent.skillsIndex(skill, statusSkill),
       ".well-known/ai-catalog.json": agent.aiCatalog(),
     };
     for (const [fileName, source] of Object.entries(files)) this.emitFile({ type: "asset", fileName, source });
