@@ -603,7 +603,7 @@ private struct WorkspaceActions: View {
         GlassGroup {
         HStack(spacing: 6) {
             ForEach(HostApp.shortcuts(for: workspace, limit: 2), id: \.name) { host in
-                ActionButton(symbol: "bubble.left", title: host.name) { HostApp.open(host.bundle, root: workspace.root) }
+                ActionButton(symbol: "bubble.left", title: host.name) { HostApp.open(host, in: workspace) }
             }
             if let editor = Launcher.editor {
                 ActionButton(symbol: "curlybraces", title: "Open in \(editor.name)") {

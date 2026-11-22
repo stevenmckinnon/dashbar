@@ -325,8 +325,9 @@ enum HostApp {
     }
 
     /// Brings the session back: an editor opens the project (which picks out its window), any other app comes forward.
-    /// Without a host app, falls back to the chosen editor, then Finder.
-    static func open(_ bundle: String?, root: String) {
+    /// Without a host app, falls back to the chosen editor, then Finder. With a Claude Code `session` id, Orca, T3 Code
+    /// and the Claude app also open that session's own workspace or conversation (`OrcaJump`, `HostLinks`).
+    static func open(_ bundle: String?, root: String, session: String? = nil) {
         if let bundle, FileManager.default.fileExists(atPath: bundle) {
             let url = URL(fileURLWithPath: bundle)
             let id = Bundle(url: url)?.bundleIdentifier
@@ -337,6 +338,13 @@ enum HostApp {
                 let config = NSWorkspace.OpenConfiguration()
                 config.activates = true
                 NSWorkspace.shared.openApplication(at: url, configuration: config)
+                if let id, let session, HostLinks.handles(bundleID: id) {
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        guard let link = HostLinks.url(bundleID: id, session: session) else { return }
+                        // To this copy of the app, not whichever one claims the scheme.
+                        DispatchQueue.main.async { NSWorkspace.shared.open([link], withApplicationAt: url, configuration: config) }
+                    }
+                }
             }
         } else if let editor = Launcher.editor {
             Launcher.open(root, in: editor)
@@ -556,6 +564,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     private func userInfo(for s: LiveSession) -> [String: Any] {
         var info: [String: Any] = ["root": s.root]
         if let host = HostApp.find(for: s.pid) { info["hostApp"] = host }
+        if s.agent == .claude { info["session"] = s.id }
         return info
     }
 
@@ -622,7 +631,8 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
             DispatchQueue.main.async { [weak self] in self?.openLimits?() }
         } else if let root = response.notification.request.content.userInfo["root"] as? String {
             let host = response.notification.request.content.userInfo["hostApp"] as? String
-            DispatchQueue.main.async { HostApp.open(host, root: root) }
+            let session = response.notification.request.content.userInfo["session"] as? String
+            DispatchQueue.main.async { HostApp.open(host, root: root, session: session) }
         }
         completionHandler()
     }

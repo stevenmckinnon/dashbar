@@ -838,7 +838,7 @@ final class Store: ObservableObject {
         let session = sessions.first { $0.id == request.sessionId }
         answer(request, .terminal)
         let root = session?.root ?? (request.cwd.isEmpty ? homeDir.path : Fmt.root(fromCwd: request.cwd))
-        HostApp.open(session.flatMap { HostApp.info(for: $0)?.bundle }, root: root)
+        if let session { HostApp.open(session) } else { HostApp.open(nil, root: root) }
     }
 
     /// The jump shortcut: brings forward the app of the agent that has waited longest for you, else the one that finished

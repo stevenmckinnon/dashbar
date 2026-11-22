@@ -249,6 +249,12 @@ final class JumpShortcut: ObservableObject {
 extension HostApp {
     /// Brings a session's app forward, as clicking its row in the panel does.
     @MainActor static func open(_ session: LiveSession) {
-        open(info(for: session)?.bundle, root: session.root)
+        open(info(for: session)?.bundle, root: session.root, session: session.agent == .claude ? session.id : nil)
+    }
+
+    /// A workspace's host button: the most urgent of its sessions that runs in that app.
+    @MainActor static func open(_ host: Info, in workspace: Workspace) {
+        if let session = workspace.sessions.first(where: { info(for: $0) == host }) { open(session) }
+        else { open(host.bundle, root: workspace.root) }
     }
 }

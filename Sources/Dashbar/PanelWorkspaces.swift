@@ -234,7 +234,7 @@ struct OpenSession: ViewModifier {
     func body(content: Content) -> some View {
         let host = HostApp.info(for: session)
         let editor = Launcher.editor
-        Button { HostApp.open(host?.bundle, root: session.root) } label: {
+        Button { HostApp.open(session) } label: {
             content
                 .background(RoundedRectangle(cornerRadius: UI.innerRadius, style: .continuous)
                     .fill(Color.primary.opacity(hover ? UI.rowHover : 0))
@@ -244,13 +244,13 @@ struct OpenSession: ViewModifier {
         .buttonStyle(PressStyle())
         .onHover { hover = $0 }
         .contextMenu {
-            if let host { Button("Open in \(host.name)") { HostApp.open(host.bundle, root: session.root) } }
+            if let host { Button("Open in \(host.name)") { HostApp.open(session) } }
             if let editor { Button("Open folder in \(editor.name)") { Launcher.open(session.root, in: editor) } }
             Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: session.root)]) }
         }
         .accessibilityElement(children: .combine)
         .accessibilityHint(Self.hint(session))
-        .accessibilityAction(named: host.map { "Open in \($0.name)" } ?? "Open") { HostApp.open(host?.bundle, root: session.root) }
+        .accessibilityAction(named: host.map { "Open in \($0.name)" } ?? "Open") { HostApp.open(session) }
         .accessibilityAction(named: "Reveal in Finder") {
             NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: session.root)])
         }
@@ -372,7 +372,7 @@ struct QuickActions: View {
             // The app the agent runs in first (Orca, T3 Code, the Claude app…): that's where its conversation is.
             ForEach(hosts, id: \.name) { host in
                 ActionTile(symbol: "bubble.left", help: "Open in \(host.name)", title: labelled ? host.name : nil) {
-                    HostApp.open(host.bundle, root: workspace.root)
+                    HostApp.open(host, in: workspace)
                 }
             }
             if let editor = Launcher.editor {
