@@ -269,8 +269,9 @@ images stay clean.
   `Orca Agents.app` daemon, which `HostApp.resolvingDaemon` turns back into Orca.app.
 - T3 Code and the Claude app (`HostLinks.swift`): on the same click, and only then, off the main thread, Dashbar finds the
   link to that Claude Code session's conversation. T3: the one line of `~/.t3/userdata/environment-id`, and from
-  `statev2.sqlite` (opened `mode=ro`, never created) only `thread_id` from `provider_session_runtime` matched on the
-  resume cursor's `resume`, giving `t3code://threads/<environment>/<thread>`. Claude: the `local_*.json` file names under
+  `statev2.sqlite` (opened `mode=ro`, never created) only `thread_id`, matched on the provider thread's
+  `nativeThreadRef.nativeId` (`orchestration_v2_projection_provider_threads`) or, for threads T3 imported from its older
+  store, the resume cursor's `resume` (`provider_session_runtime`), giving `t3code://threads/<environment>/<thread>`. Claude: the `local_*.json` file names under
   `~/Library/Application Support/Claude/claude-code-sessions/` (two folders deep) and a byte match for
   `"cliSessionId":"<id>"` or `"lastAssistantCliSessionId":"<id>"`, never parsing or keeping the rest (it holds prompt
   suggestions), giving `claude://code/continue?session=<local id>`. Nothing is cached or kept. Neither link is documented:

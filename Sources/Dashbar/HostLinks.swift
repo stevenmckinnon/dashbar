@@ -7,7 +7,8 @@ import SQLite3
 ///
 /// - T3 Code: `t3code://threads/<environment>/<thread>`. The environment is the one line of
 ///   `~/.t3/userdata/environment-id`; the thread comes from T3's `statev2.sqlite`, opened read-only, selecting only
-///   `thread_id` from `provider_session_runtime` where the resume cursor's `resume` (Claude Code's session id) matches.
+///   `thread_id` where Claude Code's session id is the provider thread's `nativeThreadRef.nativeId`, or for threads T3
+///   imported from its older store, the resume cursor's `resume` (`t3Queries`).
 ///   Never titles, messages or any other column.
 /// - Claude (the Desktop app): `claude://code/continue?session=<local id>`. Each of its Code sessions is a
 ///   `local_<id>.json` under `~/Library/Application Support/Claude/claude-code-sessions/`, which holds Claude Code's
@@ -54,12 +55,21 @@ enum HostLinks {
         return URL(string: "t3code://threads/\(environment)/\(encoded)")
     }
 
-    /// The query, kept here so the test can check it selects nothing but the thread id.
-    static let t3Query = """
+    /// The queries, tried in order and kept here so the test can check they select nothing but the thread id. T3's
+    /// current threads name Claude Code's session as the provider thread's `nativeThreadRef.nativeId`; threads it
+    /// imported from its older store carry it as the resume cursor's `resume`.
+    static let t3Queries = [
+        """
+        SELECT thread_id FROM orchestration_v2_projection_provider_threads \
+        WHERE provider LIKE 'claude%' AND json_extract(payload_json, '$.nativeThreadRef.nativeId') = ?1 \
+        ORDER BY updated_at DESC LIMIT 1
+        """,
+        """
         SELECT thread_id FROM provider_session_runtime \
         WHERE provider_name LIKE 'claude%' AND json_extract(resume_cursor_json, '$.resume') = ?1 \
         ORDER BY last_seen_at DESC LIMIT 1
-        """
+        """,
+    ]
 
     static func t3Thread(database path: String, session: String) -> String? {
         guard FileManager.default.fileExists(atPath: path) else { return nil }
@@ -70,12 +80,15 @@ enum HostLinks {
               let db else { sqlite3_close_v2(db); return nil }
         defer { sqlite3_close_v2(db) }
         sqlite3_busy_timeout(db, 200)
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, t3Query, -1, &stmt, nil) == SQLITE_OK, let stmt else { return nil }
-        defer { sqlite3_finalize(stmt) }
-        sqlite3_bind_text(stmt, 1, session, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-        guard sqlite3_step(stmt) == SQLITE_ROW, let text = sqlite3_column_text(stmt, 0) else { return nil }
-        return String(cString: text)
+        for query in t3Queries {
+            var stmt: OpaquePointer?
+            // A table missing from this version of T3 fails to prepare: try the next.
+            guard sqlite3_prepare_v2(db, query, -1, &stmt, nil) == SQLITE_OK, let stmt else { sqlite3_finalize(stmt); continue }
+            defer { sqlite3_finalize(stmt) }
+            sqlite3_bind_text(stmt, 1, session, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            if sqlite3_step(stmt) == SQLITE_ROW, let text = sqlite3_column_text(stmt, 0) { return String(cString: text) }
+        }
+        return nil
     }
 
     // MARK: Claude (the Desktop app)

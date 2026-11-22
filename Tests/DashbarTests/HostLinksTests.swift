@@ -32,9 +32,12 @@ import SQLite3
         #expect(HostLinks.desktopURL(localID: "cse_123") == nil)
     }
 
-    @Test func theT3QuerySelectsOnlyTheThreadID() {
-        #expect(HostLinks.t3Query.hasPrefix("SELECT thread_id FROM provider_session_runtime WHERE"))
-        for column in ["title", "text", "payload", "runtime_payload_json"] { #expect(!HostLinks.t3Query.contains(column)) }
+    @Test func theT3QueriesSelectOnlyTheThreadID() {
+        for query in HostLinks.t3Queries {
+            #expect(query.hasPrefix("SELECT thread_id FROM "))
+            #expect(!query.contains("*"))
+            for column in ["title", "text", "runtime_payload_json", "messages"] { #expect(!query.contains(column)) }
+        }
     }
 
     func makeT3(_ home: URL, env: String = "36ebbf00-1111-2222-3333-444455556666", rows: [String]) throws {
@@ -47,7 +50,11 @@ import SQLite3
         #expect(sqlite3_exec(db, """
             CREATE TABLE provider_session_runtime (thread_id TEXT PRIMARY KEY, provider_name TEXT, adapter_key TEXT,
               runtime_mode TEXT, status TEXT, last_seen_at TEXT, resume_cursor_json TEXT, runtime_payload_json TEXT,
-              provider_instance_id TEXT); PRAGMA journal_mode=WAL;
+              provider_instance_id TEXT);
+            CREATE TABLE orchestration_v2_projection_provider_threads (provider_thread_id TEXT PRIMARY KEY, thread_id TEXT,
+              owner_node_id TEXT, provider TEXT, provider_session_id TEXT, status TEXT, first_run_ordinal INTEGER,
+              last_run_ordinal INTEGER, updated_at TEXT, payload_json TEXT, driver TEXT, provider_instance_id TEXT);
+            PRAGMA journal_mode=WAL;
             """, nil, nil, nil) == SQLITE_OK)
         for row in rows { #expect(sqlite3_exec(db, row, nil, nil, nil) == SQLITE_OK) }
     }
@@ -67,6 +74,22 @@ import SQLite3
         #expect(HostLinks.url(bundleID: HostLinks.t3BundleID, session: session, home: home.path)?.absoluteString
                 == "t3code://threads/36ebbf00-1111-2222-3333-444455556666/import%3Aclaude%3Anew")
         #expect(HostLinks.url(bundleID: HostLinks.t3BundleID, session: "aaaaaaaa-0000-0000-0000-000000000000", home: home.path) == nil)
+    }
+
+    @Test func t3FindsACurrentThreadByItsNativeID() throws {
+        let home = try tempHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        func row(_ pt: String, _ thread: String, _ provider: String, _ updated: String, _ native: String) -> String {
+            "INSERT INTO orchestration_v2_projection_provider_threads VALUES ('\(pt)', '\(thread)', '', '\(provider)', '', 'idle', 1, 1, '\(updated)', '{\"nativeThreadRef\":{\"nativeId\":\"\(native)\"},\"title\":\"private\"}', '', '')"
+        }
+        try makeT3(home, rows: [
+            row("p1", "922d794f-0000-0000-0000-000000000001", "claudeAgent", "2026-11-22T10:00:00Z", session),
+            row("p2", "codex-thread", "codex", "2026-11-22T11:00:00Z", session),
+            // an imported thread for the same session loses to the current one
+            "INSERT INTO provider_session_runtime VALUES ('import:claudeAgent:x', 'claudeAgent', '', '', '', '2026-11-22T12:00:00Z', '{\"resume\":\"\(session)\"}', '', '')",
+        ])
+        #expect(HostLinks.url(bundleID: HostLinks.t3BundleID, session: session, home: home.path)?.absoluteString
+                == "t3code://threads/36ebbf00-1111-2222-3333-444455556666/922d794f-0000-0000-0000-000000000001")
     }
 
     @Test func t3WithoutItsFilesOrAnUnknownSchemaGivesNoLink() throws {
