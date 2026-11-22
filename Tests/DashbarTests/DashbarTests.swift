@@ -404,6 +404,20 @@ private func session(id: String, root: String = "/dev/app", busy: Bool = false, 
         // under tmux: no app at all
         #expect(HostApp.nearest(in: ["/Users/me/.local/share/claude/versions/2.1.318", "/bin/zsh", "/opt/homebrew/bin/tmux"]) == nil)
     }
+
+    @Test func orcaTerminalPanesResolveToOrcaNotItsBackgroundDaemon() {
+        let daemon = "/Users/me/Library/Application Support/orca/daemon-host/macos/terminal-host-abc/app.noindex/Orca Agents.app/Contents/MacOS/Orca Agents"
+        let claude = "/Users/me/.local/bin/claude"
+        // a pane: claude, zsh, login, the daemon (which has no parent)
+        let here = FileManager.default.temporaryDirectory.path   // any folder that exists stands in for Orca.app
+        #expect(HostApp.nearest(in: [claude, "/bin/zsh", "/usr/bin/login", daemon], orcaApp: here) == here)
+        // Orca not installed: no host, so the editor fallback applies instead of opening the daemon
+        #expect(HostApp.nearest(in: [claude, "/bin/zsh", "/usr/bin/login", daemon], orcaApp: "/nonexistent/Orca.app") == nil)
+        // a chat session runs under Orca's own provider executable: Orca itself, untouched
+        #expect(HostApp.nearest(in: [claude, "/Applications/Orca.app/Contents/MacOS/orca-provider-exec", daemon]) == "/Applications/Orca.app")
+        // another app that happens to be called Orca Agents is left alone
+        #expect(HostApp.nearest(in: ["/Applications/Orca Agents.app/Contents/MacOS/Orca Agents"], orcaApp: here) == "/Applications/Orca Agents.app")
+    }
 }
 
 // MARK: - Reading the sign-in with the security tool

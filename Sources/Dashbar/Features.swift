@@ -304,8 +304,16 @@ enum HostApp {
     }
 
     /// The first app bundle in executable paths ordered from the process up to its oldest parent.
-    static func nearest(in chain: [String]) -> String? {
-        chain.lazy.compactMap(mainBundle(of:)).first
+    static func nearest(in chain: [String], orcaApp: String = "/Applications/Orca.app") -> String? {
+        chain.lazy.compactMap(mainBundle(of:)).first.flatMap { resolvingDaemon($0, orcaApp: orcaApp) }
+    }
+
+    /// Orca runs its terminal panes under a background daemon (`Orca Agents.app`, in its Application Support folder, with
+    /// no parent), so a session started in a pane has no Orca window above it. Clicking the daemon would open nothing
+    /// useful: send it to Orca itself, or to no host (the editor fallback) when Orca isn't installed.
+    static func resolvingDaemon(_ bundle: String, orcaApp: String) -> String? {
+        guard bundle.hasSuffix("/Orca Agents.app"), bundle.contains("/orca/daemon-host/") else { return bundle }
+        return FileManager.default.fileExists(atPath: orcaApp) ? orcaApp : nil
     }
 
     /// "/Applications/T3 Code (Beta).app/Contents/MacOS/T3 Code (Beta)" → "/Applications/T3 Code (Beta).app". Nil for
