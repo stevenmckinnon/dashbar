@@ -45,7 +45,7 @@ const AGENTS_REST = { wide: { x: 470, y: 410 }, compact: { x: 300, y: 400 } }
 
 export function AgentsDemo({ dark = false }: Props) {
   return (
-    <Frame height={452} compactHeight={430} initial={{ ask: false, done: false } as A} poster={{ ask: true, done: false } as A} script={agentsScript} cursor={{ at: 'rest', style: 'real' }} theme={dark ? 'dark' : 'light'}>
+    <Frame height={462} compactHeight={440} initial={{ ask: false, done: false } as A} poster={{ ask: true, done: false } as A} script={agentsScript} cursor={{ at: 'rest', style: 'real' }} theme={dark ? 'dark' : 'light'}>
       {(s: A, _r: any, layout: 'wide' | 'compact') => {
         const asking = s.ask && !s.done
         return (

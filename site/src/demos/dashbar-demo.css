@@ -266,6 +266,10 @@
   .dd-session {
     margin-top: 12px;
   }
+  /* The Now card's session line carries room for its hover fill, as the app's does (not the window's agent rows) */
+  .dd-session:not(.wd-agent) {
+    padding: 5px 0;
+  }
   .dd-claude {
     width: 24px;
     height: 24px;
@@ -344,7 +348,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    margin: 6px 0 0 34px;
+    margin: 2px 0 0 34px;
     font-size: 12px;
     font-weight: 500;
     color: var(--ss-success-text);
