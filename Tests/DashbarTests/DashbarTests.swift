@@ -405,6 +405,17 @@ private func session(id: String, root: String = "/dev/app", busy: Bool = false, 
         #expect(HostApp.nearest(in: ["/Users/me/.local/share/claude/versions/2.1.318", "/bin/zsh", "/opt/homebrew/bin/tmux"]) == nil)
     }
 
+    @Test func orcaOpensTheSessionsWorkspaceWithItsOwnCommand() {
+        let all: (String) -> Bool = { _ in true }
+        #expect(OrcaJump.command(bundleID: "com.stablyai.orca", bundle: "/Applications/Orca.app", root: "/Users/me/orca/workspaces/shop/main web", exists: all)
+                == OrcaJump.Command(executable: "/Applications/Orca.app/Contents/Resources/bin/orca",
+                                    arguments: ["worktree", "activate", "--worktree", "path:/Users/me/orca/workspaces/shop/main web", "--json"]))
+        // any other app, an Orca without the command, or a root that isn't a path: just bring the app forward
+        #expect(OrcaJump.command(bundleID: "com.t3tools.t3code", bundle: "/Applications/T3 Code.app", root: "/Users/me/x", exists: all) == nil)
+        #expect(OrcaJump.command(bundleID: "com.stablyai.orca", bundle: "/Applications/Orca.app", root: "/Users/me/x", exists: { _ in false }) == nil)
+        #expect(OrcaJump.command(bundleID: "com.stablyai.orca", bundle: "/Applications/Orca.app", root: "", exists: all) == nil)
+    }
+
     @Test func orcaTerminalPanesResolveToOrcaNotItsBackgroundDaemon() {
         let daemon = "/Users/me/Library/Application Support/orca/daemon-host/macos/terminal-host-abc/app.noindex/Orca Agents.app/Contents/MacOS/Orca Agents"
         let claude = "/Users/me/.local/bin/claude"

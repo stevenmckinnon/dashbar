@@ -261,6 +261,12 @@ images stay clean.
   never answers a permission prompt or types into a session. No shortcut by default; each copy registers only its own
   saved one. Two processes can register the same Carbon hot key without an error (seen on macOS 27), so a clash with
   the other copy is found by reading that copy's preferences, and one with another app can't be detected at all.
+- Orca (`OrcaJump` in `Features.swift`) is the only app whose command Dashbar runs: on a click that goes back to a session
+  in Orca, it runs the `orca` inside the Orca.app found above that session (never one from PATH) as exactly
+  `worktree activate --worktree path:<root> --json`, with only `PATH` and `HOME` in its environment, reads nothing back,
+  and stops it after 5 seconds; Orca is brought forward as before either way. Never on a timer or a notification arriving,
+  never any other subcommand, and never to send input to a session. A session in an Orca terminal pane runs under its
+  `Orca Agents.app` daemon, which `HostApp.resolvingDaemon` turns back into Orca.app.
 - Clean-up only moves rebuildable folders (`node_modules`, `.next`, build output, DerivedData) to the Trash
   after confirmation. Never delete permanently.
 - Do not scan outside the user's chosen folders and the project's own folder for icons.

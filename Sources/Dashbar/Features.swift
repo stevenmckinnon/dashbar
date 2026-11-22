@@ -333,6 +333,7 @@ enum HostApp {
             if let id, Launcher.editorCandidates.contains(where: { $0.id == id }) {
                 Launcher.open(root, in: Launcher.App(url: url, name: url.deletingPathExtension().lastPathComponent))
             } else {
+                if let id, let jump = OrcaJump.command(bundleID: id, bundle: bundle, root: root) { OrcaJump.run(jump) }
                 let config = NSWorkspace.OpenConfiguration()
                 config.activates = true
                 NSWorkspace.shared.openApplication(at: url, configuration: config)
@@ -342,6 +343,41 @@ enum HostApp {
         } else {
             Launcher.reveal(root)
         }
+    }
+}
+
+/// Orca opens the session's own workspace, not just its window: Dashbar runs the `orca` command inside the Orca app
+/// it found above the session (never one from PATH) with `worktree activate --worktree path:<root>`, only on a click,
+/// with a bare environment, reading nothing back, and stops it after 5 seconds. Orca still comes forward as before, so
+/// a folder Orca doesn't manage (or an Orca without the command) only lands on Orca as it was.
+enum OrcaJump {
+    static let bundleID = "com.stablyai.orca"
+
+    struct Command: Equatable {
+        let executable: String
+        let arguments: [String]
+    }
+
+    /// The command for a session in `root` whose host is `bundle`, or nil when the host isn't Orca or has no `orca`.
+    static func command(bundleID id: String, bundle: String, root: String,
+                        exists: (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }) -> Command? {
+        guard id == bundleID, root.hasPrefix("/") else { return nil }
+        let cli = URL(fileURLWithPath: bundle).appendingPathComponent("Contents/Resources/bin/orca").path
+        guard exists(cli) else { return nil }
+        return Command(executable: cli, arguments: ["worktree", "activate", "--worktree", "path:" + root, "--json"])
+    }
+
+    static func run(_ command: Command) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: command.executable)
+        process.arguments = command.arguments
+        // Only what a shell script needs to start: no ORCA_* (which would point it at another Orca) and nothing of Dashbar's.
+        process.environment = ["PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "HOME": NSHomeDirectory()]
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        do { try process.run() } catch { return }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 5) { if process.isRunning { process.terminate() } }
     }
 }
 
