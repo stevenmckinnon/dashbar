@@ -5,7 +5,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { FAQ } from "./src/faq.js";
-import { docsMd } from "./src/docs.js";
+import { docsMd, DOCS_PAGES } from "./src/docs.js";
 import { SITE, REPO, BREW, HERO, FEATURES_INTRO, FEATURES, WINDOW, WIDGETS, PACE, PRIVACY, INSTALL, FOOTER, plain, worksWithText, listOf } from "./src/content.js";
 
 const root = new URL("../", import.meta.url);
@@ -219,7 +219,8 @@ export function llmsTxt(all) {
     `## Docs`,
     [
       `- [Homepage as Markdown](${SITE}index.md): features, what it reads and sends, what’s new, the FAQ and how to install`,
-      `- [Docs](${SITE}docs.md): the dashbar command for tmux, shell prompts and scripts, and what each integration in Settings changes, saves and puts back`,
+      `- [Docs](${SITE}docs.md): every docs page in one Markdown file: the dashbar command for tmux, shell prompts and scripts, what each integration in Settings changes, saves and puts back, and what a click on a session opens`,
+      ...DOCS_PAGES.map((p) => `- [${p.title}](${SITE}docs/${p.slug}): ${p.summary}`),
       `- [Full text](${SITE}llms-full.txt): the homepage, the docs and the notes for every release`,
       `- [README](${REPO}/blob/main/README.md): features, settings, privacy and building from source`,
       `- [FAQ](${SITE}#faq): supported agents, Claude plan limits, widgets, privacy, updating and uninstalling`,
@@ -254,6 +255,7 @@ export function sitemap() {
   const urls = [
     ["", page],
     ["docs", ["site/docs.html", "site/src/docs.js", "site/src/faq.js"]],
+    ...DOCS_PAGES.map((p) => [`docs/${p.slug}`, ["site/docs.html", "site/src/docs.js", "site/src/faq.js"]]),
     ["privacy", ["site/privacy.html", "site/src/policy.js"]],
     ["llms.txt", ["site/agent-files.js", "site/src/content.js", "site/src/faq.js", "release-notes", "appcast.xml"]],
     ["llms-full.txt", ["site/agent-files.js", "site/src/content.js", "site/src/faq.js", "site/src/docs.js", "release-notes", "appcast.xml"]],

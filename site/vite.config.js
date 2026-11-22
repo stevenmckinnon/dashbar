@@ -5,7 +5,7 @@ import react from "@vitejs/plugin-react";
 import { FAQ } from "./src/faq.js";
 import { SITE, REPO, HERO, FEATURES, plain, worksWithText } from "./src/content.js";
 import { POLICY, policyHtml } from "./src/policy.js";
-import { DOCS, docsHtml } from "./src/docs.js";
+import { DOCS, DOCS_PAGES, docsHtml } from "./src/docs.js";
 import * as agent from "./agent-files.js";
 
 const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -105,20 +105,50 @@ const privacyPage = {
 
 // The docs (docs.html, from src/docs.js): the dashbar command and the integrations. Built like the privacy policy, with
 // its text in the HTML and a copy at docs/index.html so /docs/ works too.
+// Each docs page (DOCS_PAGES) is the same built docs.html with its own title, description, address and text,
+// written to docs/<slug>/index.html, so /docs/cli is a static file like the rest.
+const FALLBACK_START = "<!--docs-fallback-->";
+const FALLBACK_END = "<!--/docs-fallback-->";
 const docsPage = {
   name: "docs-page",
+  // The dev server serves /docs/<slug> from docs.html too.
+  configureServer(server) {
+    server.middlewares.use((req, _res, next) => {
+      if (/^\/docs(\/[a-z-]+)?\/?$/.test(req.url ?? "")) req.url = "/docs.html";
+      next();
+    });
+  },
   transformIndexHtml(html, ctx) {
     if (ctx.path !== "/docs.html") return html;
     return html
       .replaceAll("{{docs-description}}", esc(DOCS.description).replace(/"/g, "&quot;"))
       .replace("</head>", hideFallback)
-      .replace('<div id="root"></div>', () => `<div id="root">\n<div class="seo-fallback">\n${docsHtml()}\n</div>\n</div>`);
+      .replace('<div id="root"></div>', () => `<div id="root">\n<div class="seo-fallback">\n${FALLBACK_START}\n${docsHtml()}\n${FALLBACK_END}\n</div>\n</div>`);
   },
   writeBundle(options, bundle) {
     const page = bundle["docs.html"];
     if (!page) throw new Error("docs-page: docs.html missing from the build");
+    const source = String(page.source);
     mkdirSync(`${options.dir}/docs`, { recursive: true });
-    writeFileSync(`${options.dir}/docs/index.html`, page.source);
+    writeFileSync(`${options.dir}/docs/index.html`, source);
+    const description = esc(DOCS.description).replace(/"/g, "&quot;");
+    for (const p of DOCS_PAGES) {
+      const summary = esc(p.summary).replace(/"/g, "&quot;");
+      const url = `https://usedashbar.com/docs/${p.slug}`;
+      const start = source.indexOf(FALLBACK_START), end = source.indexOf(FALLBACK_END);
+      if (start < 0 || end < 0) throw new Error("docs-page: fallback markers missing");
+      const html = (source.slice(0, start + FALLBACK_START.length) + "\n" + docsHtml(p.slug) + "\n" + source.slice(end))
+        .replace("<title>Docs · Dashbar</title>", `<title>${esc(p.title)} · Dashbar docs</title>`)
+        .replaceAll(`content="${description}"`, `content="${summary}"`)
+        .replaceAll('href="https://usedashbar.com/docs"', `href="${url}"`)
+        .replaceAll('content="https://usedashbar.com/docs"', `content="${url}"`)
+        .replace('content="Dashbar docs"', `content="${esc(p.title)} · Dashbar docs"`);
+      if (!html.includes(`<title>${esc(p.title)}`) || !html.includes(url)) throw new Error(`docs-page: ${p.slug} head not rewritten`);
+      // docs/<slug>.html answers /docs/<slug> directly (as privacy.html does /privacy); the folder copy answers /docs/<slug>/.
+      writeFileSync(`${options.dir}/docs/${p.slug}.html`, html);
+      mkdirSync(`${options.dir}/docs/${p.slug}`, { recursive: true });
+      writeFileSync(`${options.dir}/docs/${p.slug}/index.html`, html);
+    }
   },
 };
 

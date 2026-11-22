@@ -17,7 +17,7 @@ if (!uninstall) throw new Error("docs.js: no FAQ entry faq-uninstall");
 export const DOCS = {
   title: "Docs",
   description: "How to use Dashbar’s dashbar command in tmux, shell prompts and scripts, and what each integration in Settings changes, saves and puts back.",
-  lede: "Dashbar works as soon as you open it: it reads what your agents already write on your Mac. This page covers the parts you set up yourself: the `dashbar` command for status bars and scripts, and the integrations in Settings that change another tool’s settings, what each one saves and how Remove puts things back.",
+  lede: "Dashbar works as soon as you open it: it reads what your agents already write on your Mac. These pages cover the parts you set up yourself: the `dashbar` command for status bars and scripts, and the integrations in Settings that change another tool’s settings, what each one saves and how Remove puts things back.",
   sections: [
     {
       id: "cli",
@@ -195,18 +195,52 @@ export const DOCS = {
   ],
 };
 
+/** The docs' pages: /docs is the overview, and each of these is /docs/<slug>, made of the sections it names. Every
+ * section is on exactly one page (checked below), so the Markdown copy, which has them all, stays complete. */
+export const DOCS_PAGES = [
+  { slug: "cli", title: "The dashbar command", summary: "Plan limits and agents in tmux, your shell prompt, Starship or Claude Code’s status line, for scripts and for your agents.",
+    sections: ["cli"] },
+  { slug: "integrations", title: "Integrations", summary: "What each Add button in Settings changes, what it saves and how Remove puts it back: Claude plan limits, permission prompts, Antigravity CLI, OpenCode and GitHub Copilot.",
+    sections: ["integrations", "claude-limits", "permissions", "antigravity", "opencode", "copilot"] },
+  { slug: "going-back", title: "Going back to a session", summary: "What a click opens in each app, from a terminal to Orca, T3 Code and the Claude app, and what Dashbar reads to do it.",
+    sections: ["go-back"] },
+  { slug: "settings", title: "Accounts, hiding tools and uninstalling", summary: "More than one Claude Code or Codex account, switching a tool off, and removing Dashbar cleanly.",
+    sections: ["accounts", "show", "remove"] },
+];
+
+{
+  const placed = DOCS_PAGES.flatMap((p) => p.sections);
+  const ids = DOCS.sections.map((s) => s.id);
+  const missing = ids.filter((id) => !placed.includes(id));
+  const unknown = placed.filter((id) => !ids.includes(id));
+  if (missing.length || unknown.length || new Set(placed).size !== placed.length)
+    throw new Error(`docs.js: every section on exactly one page (missing ${missing}, unknown ${unknown})`);
+}
+
+export const docsPage = (slug) => DOCS_PAGES.find((p) => p.slug === slug);
+export const docsPath = (slug) => (slug ? `/docs/${slug}` : "/docs");
+export const pageSections = (page) => page.sections.map((id) => DOCS.sections.find((s) => s.id === id));
+/** The page a section is on, for links to it from elsewhere. */
+export const pageOfSection = (id) => DOCS_PAGES.find((p) => p.sections.includes(id));
+
 /** The table of contents: [id, heading, parent]. */
 export const docsToc = () => DOCS.sections.map((s) => [s.id, s.heading, s.parent]);
 
 const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-/** The page's body as HTML, for docs.html before the page's script runs. */
-export function docsHtml() {
-  return [
+/** A page's body as HTML, for its file before the page's script runs: the overview without a slug. */
+export function docsHtml(slug) {
+  const page = slug ? docsPage(slug) : null;
+  if (!page) return [
     `<h1>${esc(DOCS.title)}</h1>`,
     `<p class="policy-lede">${richHtml(DOCS.lede)}</p>`,
-    ...DOCS.sections.map((s) => [
-      `<section id="${s.id}"><h2>${esc(s.heading)}</h2>`,
+    `<ul>${DOCS_PAGES.map((p) => `<li><a href="${docsPath(p.slug)}">${esc(p.title)}</a>: ${esc(p.summary)}</li>`).join("")}</ul>`,
+  ].join("\n");
+  return [
+    `<p><a href="/docs">Docs</a></p>`,
+    `<h1>${esc(page.title)}</h1>`,
+    ...pageSections(page).map((s) => [
+      s.heading === page.title ? `<section id="${s.id}">` : `<section id="${s.id}"><h2>${esc(s.heading)}</h2>`,
       ...s.blocks.map((b) => b.h3 ? `<h3>${esc(b.h3)}</h3>`
         : b.code ? `<pre><code>${esc(b.code)}</code></pre>`
         : b.facts ? `<dl class="docs-facts">${b.facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${richHtml(v)}</dd>`).join("")}</dl>`

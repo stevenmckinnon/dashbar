@@ -405,6 +405,24 @@ section[id], [id="top"] { scroll-margin-top: 88px; }
 }
 @media (min-width: 1100px) and (hover: hover) { .docs-side a:hover { color: var(--ink); } }
 
+/* The docs overview: one card per page */
+.docs .docs-cards { list-style: none; padding: 0; margin-top: 36px; display: grid; gap: 12px; }
+.docs-cards a { display: grid; gap: 4px; padding: 18px 20px; border-radius: 14px; background: var(--surface); color: var(--ink); text-decoration: none; }
+.docs-cards strong { font-size: var(--step-body); font-weight: 600; }
+.docs-cards span { color: var(--muted); font-size: var(--step-ui); line-height: 1.45; }
+@media (hover: hover) { .docs-cards a:hover { background: var(--surface-2); } }
+
+/* A page's way back to the overview, and on to the next page */
+.docs-crumb { margin-top: 0 !important; font-size: var(--step-ui); }
+.docs-crumb a { color: var(--muted); text-decoration: none; }
+@media (hover: hover) { .docs-crumb a:hover { color: var(--ink); } }
+.docs-crumb + h1 { margin-top: 8px; }
+.docs-pager { margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 16px; }
+.docs-pager a { display: grid; gap: 2px; color: var(--ink); text-decoration: none; font-weight: 600; max-width: 48%; }
+.docs-pager a[rel="next"] { margin-left: auto; text-align: right; }
+.docs-pager span { color: var(--muted); font-weight: 400; font-size: var(--step-ui); }
+@media (hover: hover) { .docs-pager a:hover { text-decoration: underline; text-underline-offset: 3px; } }
+
 /* An integration's own sections sit a little closer under Integrations */
 .docs .docs-sub { margin-top: 44px; }
 .docs .docs-sub h2 { font-size: var(--step-lead); }
