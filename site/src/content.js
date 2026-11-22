@@ -34,13 +34,16 @@ export const TOUR = {
 
 export const FEATURES_INTRO = "Everything an agent-heavy day throws at your Mac, in one small panel.";
 
+// Each card says what it is in a sentence or two; `more` links to the docs page with the detail.
 export const FEATURES = [
   { name: "Agents, and when they need you",
-    text: "Each Claude Code session by project: working, idle or waiting for you, for how long, and how full its context window is. Click one to go back to the app it runs in, and in Orca, T3 Code or the Claude app, straight to that session. Turn on permission prompts in Settings and a request shows up under its session with Allow once and Deny. The terminal still asks too, and Dashbar never answers by itself." },
+    text: "Every Claude Code session by project: working, idle or waiting for you, for how long, and how full its context window is. Click one to go straight back to it. Turn on permission prompts and you can answer Allow once or Deny from Dashbar, which never answers by itself.",
+    more: { href: "/docs/going-back", label: "What a click opens" } },
   { name: "Plan limits, with pace",
-    text: "Your 5-hour and weekly limits, with a mark for where an even pace would be and a projection of when you would run out at the current rate. Weekly limits show today’s share: what you can use today and still last until the reset. Each tool has its own card, and the one closest to running out comes first. Codex’s limits come from its own logs. Claude’s come from Claude Code’s status line: add Dashbar to it in Settings and your usage updates after each Claude Code reply, with no network request." },
+    text: "Your 5-hour and weekly limits, with where an even pace would be and when you would run out at the current rate. Weekly limits show today’s share, and the limit closest to running out comes first.",
+    more: { href: "/docs/integrations#claude-limits", label: "Setting up Claude’s limits" } },
   { name: "Usage and estimated cost",
-    text: "Tokens for Claude Code and Codex today, or over the last 7 or 14 days, by hour or by day, and what they would cost at public API list prices. One choice at the top sets the span for every card, and in the Dashbar window each card also lists its projects and models. The cost is a guide, not your bill, and Settings can hide it. History, in the Dashbar window, keeps 30 days of usage and how full each plan window got." },
+    text: "Tokens for Claude Code and Codex today, or over the last 7 or 14 days, and what they would cost at public API list prices: a guide, not your bill. History keeps 30 days." },
   { name: "Idle servers",
     text: "Dev servers grouped under the project that owns them. One that has been up for over an hour and is barely using the CPU is marked, and so is one an agent started." },
   { name: "System",
@@ -89,6 +92,14 @@ export const PRIVACY = {
     "If you add Dashbar to Claude Code’s status line: the plan usage Claude Code passes it after each reply. Dashbar changes only that one setting, keeps a backup, and puts your previous status line back when you remove it.",
     "If you turn on answering permission prompts: what Claude Code is about to ask you (the command, file or address), through a hook Dashbar adds to Claude Code’s settings. File contents and edits are left out, and nothing leaves your Mac.",
   ],
+  // The homepage shows this short version; /privacy and index.md list `reads` in full.
+  summary: [
+    "Your agents’ own session files and logs on your Mac, such as `~/.claude` and `~/.codex`, to show what each one is doing and how much it has used.",
+    "For your other tools, from Gemini CLI and OpenCode to T3 Code and the Claude app, only what it needs to show what’s running and how much it used. It keeps no titles or messages from them.",
+    "The listening ports and the processes behind them, and the folders you choose for clean-up.",
+    "With an integration you turn on, only what that tool passes it, such as your plan usage from Claude Code’s status line.",
+  ],
+  fullReads: "Everything it reads, file by file",
   sendsIntro: "Nothing, with two exceptions. The app has no account and no analytics.",
   sends: [
     "If you turn on the experimental way of reading Claude plan limits: one request to `api.anthropic.com` with Claude Code’s own sign-in. Dashbar never refreshes or stores that sign-in. The status line way sends nothing.",

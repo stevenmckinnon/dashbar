@@ -114,10 +114,10 @@ function NavBar() {
         <ul>
           <li><a href="#features">Features</a></li>
           <li><a href="#window">Window</a></li>
-          <li><a href="#pace">Pace</a></li>
+          <li className="nav-pace"><a href="#pace">Pace</a></li>
           <li><a href="#privacy">Privacy</a></li>
           <li><a href="#faq">FAQ</a></li>
-          <li className="nav-wide"><a href="/docs">Docs</a></li>
+          <li className="nav-docs"><a href="/docs">Docs</a></li>
           <li className="nav-star">
             <a className="btn small ghost" href={REPO}>
               <Star size={16} strokeWidth={1.75} aria-hidden="true" /><span className="label">Star on GitHub</span>
@@ -236,12 +236,12 @@ const DEMOS = {
   "Clean-up": CleanupDemo,
 };
 
-const ITEMS = FEATURES.map(({ name, text }) => {
+const ITEMS = FEATURES.map(({ name, text, more }) => {
   if (!DEMOS[name]) throw new Error(`No demo for the feature "${name}"`);
-  return { name, text, Demo: DEMOS[name] };
+  return { name, text, more, Demo: DEMOS[name] };
 });
 
-function Feature({ Demo, name, text }) {
+function Feature({ Demo, name, text, more }) {
   const dark = useDark();
   const [run, setRun] = useState(0);
   return (
@@ -249,6 +249,7 @@ function Feature({ Demo, name, text }) {
       <div className="feature-text">
         <h3>{name}</h3>
         <p><Inline text={text} /></p>
+        {more && <p className="feature-more"><a href={more.href}>{more.label}</a></p>}
         <button className="replay-pill" type="button" onClick={() => setRun((n) => n + 1)}>
           <RotateCw size={14} strokeWidth={2} aria-hidden="true" />Replay<span className="sr-only"> the {name.toLowerCase()} demo</span>
         </button>
@@ -266,11 +267,12 @@ function Feature({ Demo, name, text }) {
 // stack into six screens. Each demo that is shown still plays once and has its Replay pill.
 const DEMOS_ON_PHONES = 3;
 
-function Brief({ name, text }) {
+function Brief({ name, text, more }) {
   return (
     <article className="feature-brief">
       <h3>{name}</h3>
       <p><Inline text={text} /></p>
+      {more && <p className="feature-more"><a href={more.href}>{more.label}</a></p>}
     </article>
   );
 }
@@ -447,8 +449,9 @@ function Privacy() {
         <div className="reads">
           <h3>Reads</h3>
           <ul>
-            {PRIVACY.reads.map((item) => <li key={item}><Inline text={item} /></li>)}
+            {PRIVACY.summary.map((item) => <li key={item}><Inline text={item} /></li>)}
           </ul>
+          <p className="policy-link"><a href="/privacy#reads">{PRIVACY.fullReads}</a></p>
         </div>
         <div className="sends">
           <h3>Sends</h3>
