@@ -3,6 +3,19 @@
     <channel>
         <title>Dashbar</title>
         <item>
+            <title>0.12.1</title>
+            <pubDate>Sun, 22 Nov 2026 14:06:57 +0000</pubDate>
+            <sparkle:version>280</sparkle:version>
+            <sparkle:shortVersionString>0.12.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[- Going back to a session now opens the session itself, not just its app: in Orca, that session's workspace; in T3 Code, its thread; in the Claude app, its Code conversation. Click a session, a notification or the island, or press the jump shortcut. If an app doesn't take the link, it still comes forward as before.
+- Workspaces get a button for the app their agent runs in, such as Orca, T3 Code or the Claude app, beside the editor and terminal ones. In the panel's Now card it shows when the card has more than one session; with one, clicking the session does the same.
+- Sessions in Orca's terminal panes are now recognised as Orca's. Before, clicking one did nothing useful.
+- Small polish on the action tiles: the icons read as one size, and a session's hover highlight has room around its text.
+]]></description>
+            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.12.1/Dashbar-0.12.1.dmg" length="10860392" type="application/octet-stream" sparkle:edSignature="8DMQZzYU25Z6N79auU7Fte9YkVAGMJIQVrG6Jpfqp2/leIxT+bR3IP7XJseUe+1g90lzhWC/hangKEF5HOMBCg=="/>
+        </item>
+        <item>
             <title>0.12.0</title>
             <pubDate>Sat, 21 Nov 2026 17:55:09 +0000</pubDate>
             <sparkle:version>266</sparkle:version>
@@ -23,17 +36,6 @@
             <description sparkle:format="markdown"><![CDATA[- Plan limits on the Usage tab and the History page now count down with the clock. Before, a limit whose reading stayed at the same percent for hours kept showing an old "resets in" time and pace line until its reading changed. Thanks to Sally Hong for the detailed report.
 ]]></description>
             <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.11.1/Dashbar-0.11.1.dmg" length="10745329" type="application/octet-stream" sparkle:edSignature="3whrso6+aXKm8TxUR78+qdhftTLa6yXgPTgnfaSB9yg62Wtj7TouqH5eBApWSeNfVUktuA/NJNxizU2sm1m9AQ=="/>
-        </item>
-        <item>
-            <title>0.11.0</title>
-            <pubDate>Tue, 17 Nov 2026 20:02:31 +0000</pubDate>
-            <sparkle:version>250</sparkle:version>
-            <sparkle:shortVersionString>0.11.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[- A new keyboard shortcut jumps to the agent that needs you: it brings forward the app of the session that has waited longest for you, or, if none is waiting, the one that finished last. Set it in Settings → General (there's none until you pick one). Tools switched off in Show in Dashbar are skipped.
-- Settings → About has Copy Diagnostics: a short summary for a bug report (Dashbar's and macOS's versions, which tools and integrations Dashbar found, any format warnings, the widgets' state, how many extra accounts and where Claude's plan limits come from). It never includes project names, folders, sessions or account names, Show Diagnostics lets you read it before you copy, and nothing is sent.
-]]></description>
-            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.11.0/Dashbar-0.11.0.dmg" length="10724830" type="application/octet-stream" sparkle:edSignature="8rJfM+jQ7Bsuv7Xh9ytPMheXd8S2qkhsId5u8CtOgs00DPP2iA2HG3KxISAacq39u38smPtu/b9kaQJEWwbADg=="/>
         </item>
     </channel>
 </rss>
