@@ -238,7 +238,7 @@ struct OpenSession: ViewModifier {
             content
                 .background(RoundedRectangle(cornerRadius: UI.innerRadius, style: .continuous)
                     .fill(Color.primary.opacity(hover ? UI.rowHover : 0))
-                    .padding(.horizontal, -4))
+                    .padding(.horizontal, -6))   // past the text as far as it is from the card's edge
                 .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
@@ -360,11 +360,20 @@ struct QuickActions: View {
     var showDetails = true
     /// The Now card names each action under its icon, in the words the window's workspace page uses.
     var labelled = false
+    /// The Now card leaves the host button out when its one session line already names that app and opens it on a click.
+    var hostTile = true
     @Environment(\.openWorkspace) private var openWorkspace
     var body: some View {
+        let hosts = hostTile ? HostApp.shortcuts(for: workspace, limit: 1) : []
         HStack(spacing: 6) {
             if showDetails, let openWorkspace {
                 ActionTile(symbol: "chart.bar.xaxis", help: "Show in the Dashbar window") { openWorkspace(workspace.root) }
+            }
+            // The app the agent runs in first (Orca, T3 Code, the Claude app…): that's where its conversation is.
+            ForEach(hosts, id: \.name) { host in
+                ActionTile(symbol: "bubble.left", help: "Open in \(host.name)", title: labelled ? host.name : nil) {
+                    HostApp.open(host.bundle, root: workspace.root)
+                }
             }
             if let editor = Launcher.editor {
                 // "Open in VS Code" is the window's label, but it doesn't fit a quarter of the card; the editor's name
@@ -380,7 +389,9 @@ struct QuickActions: View {
             }
             ActionTile(symbol: "folder", help: "Reveal in Finder", title: labelled ? "Finder" : nil) { Launcher.reveal(workspace.root) }
             if let port = workspace.ports.first {
-                ActionTile(symbol: "safari", help: "Open localhost:" + String(port), title: labelled ? "localhost:" + String(port) : nil) {
+                // Five tiles leave no room for "localhost:3000"; the port alone still reads, and the tooltip says the rest.
+                let title = (hosts.isEmpty ? "localhost:" : ":") + String(port)
+                ActionTile(symbol: "safari", help: "Open localhost:" + String(port), title: labelled ? title : nil) {
                     Launcher.browse(port: port)
                 }
             } else {
@@ -394,6 +405,14 @@ struct QuickActions: View {
 }
 
 struct ActionTile: View {
+    /// Some symbols draw bigger and heavier than their neighbours at the same point size (the braces fill their whole
+    /// box, the copy icon is two pages): a little smaller, judged by eye, so a row of tiles reads as one size.
+    static func opticalScale(_ symbol: String) -> CGFloat {
+        switch symbol {
+        case "curlybraces", "doc.on.doc": return 0.88
+        default: return 1
+        }
+    }
     let symbol: String
     let help: String
     /// A short visible name under the icon; without one the tile is the icon alone, named by its tooltip.
@@ -403,7 +422,7 @@ struct ActionTile: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 3) {
-                Image(systemName: symbol).font(.system(size: UI.Size.body, weight: .medium))
+                Image(systemName: symbol).font(.system(size: UI.Size.body * Self.opticalScale(symbol), weight: .medium))
                     .frame(height: title == nil ? nil : 16)   // labelled tiles stay one height whatever the symbol
                 if let title {
                     Text(title).font(.system(size: UI.Size.micro, weight: .medium)).lineLimit(1).truncationMode(.middle)

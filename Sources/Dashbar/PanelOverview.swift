@@ -18,7 +18,7 @@ struct NowCard: View {
                 Spacer(minLength: 6)
                 StatusPill(workspace: workspace)
             }
-            VStack(spacing: 6) {
+            VStack(spacing: 2) {   // each line carries its own room for the hover fill
                 ForEach(workspace.sessions.prefix(2)) { s in
                     NowSessionLine(session: s, context: store.contexts[s.id],
                                    extra: s.id == workspace.sessions.first?.id ? max(0, workspace.sessions.count - 2) : 0)
@@ -30,8 +30,9 @@ struct NowCard: View {
                 }
             }
             ForEach(workspace.sessions.compactMap(store.permissionRequest(for:))) { PermissionPrompt(request: $0) }
-            // Labelled, and without the window button: tapping the title does that.
-            QuickActions(workspace: workspace, showDetails: false, labelled: true)
+            // Labelled, and without the window button: tapping the title does that. With one session, its line names
+            // the app it runs in and opens it, so the host button would only repeat it.
+            QuickActions(workspace: workspace, showDetails: false, labelled: true, hostTile: workspace.sessions.count > 1)
         }
         .padding(UI.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -122,6 +123,7 @@ struct NowSessionLine: View {
                 .accessibilityLabel(context.accessibilityText)
             }
         }
+        .padding(.vertical, 5)   // room above and below the text when the hover fill shows
         .modifier(OpenSession(session: session))
     }
 

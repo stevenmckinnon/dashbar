@@ -79,6 +79,28 @@ import Testing
 
 // MARK: - The host app's name
 
+@Suite struct HostShortcutTests {
+    let vscode = Launcher.App(url: URL(fileURLWithPath: "/Applications/Visual Studio Code.app"), name: "VS Code")
+    let ghostty = Launcher.App(url: URL(fileURLWithPath: "/Applications/Ghostty.app"), name: "Ghostty")
+    let orca = HostApp.Info(bundle: "/Applications/Orca.app", name: "Orca")
+
+    @Test func theAgentsAppGetsAButtonOnceAndTheChosenEditorAndTerminalDont() {
+        let code = HostApp.Info(bundle: "/Applications/Visual Studio Code.app", name: "Visual Studio Code")
+        let ghosttyHost = HostApp.Info(bundle: "/Applications/Ghostty.app/", name: "Ghostty")
+        let t3 = HostApp.Info(bundle: "/Applications/T3 Code (Beta).app", name: "T3 Code")
+        let hosts = [code, orca, ghosttyHost, orca, t3]
+        #expect(HostApp.shortcuts(hosts: hosts, excluding: [vscode, ghostty], limit: 2) == [orca, t3])
+        #expect(HostApp.shortcuts(hosts: hosts, excluding: [vscode, ghostty], limit: 1) == [orca])
+        #expect(HostApp.shortcuts(hosts: [code, ghosttyHost], excluding: [vscode, ghostty], limit: 2).isEmpty)
+    }
+
+    @Test func aHostWithNoAppToOpenGetsNoButton() {
+        // demo renders' invented hosts: the button would only open the editor again
+        let claude = HostApp.Info(bundle: nil, name: "Claude")
+        #expect(HostApp.shortcuts(hosts: [claude, orca], excluding: [vscode], limit: 2) == [orca])
+    }
+}
+
 @Suite struct HostAppNameTests {
     @Test func theBundleNameWithoutItsExtensionOrChannel() {
         #expect(HostApp.name(ofBundle: "/Applications/T3 Code (Beta).app") == "T3 Code")   // no release channel

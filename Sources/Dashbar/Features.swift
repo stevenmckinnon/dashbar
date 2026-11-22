@@ -374,6 +374,27 @@ extension HostApp {
         }
     }
 
+    /// The apps a workspace's agents run in that deserve a button of their own beside the editor and terminal ones
+    /// (Orca, T3 Code, the Claude app, a terminal other than the chosen one): each once, in the order given (the
+    /// workspace's sessions, most urgent first), leaving out any that's already the chosen editor or terminal, and
+    /// any with no app to open (demo renders' invented hosts, whose button would only open the editor again).
+    static func shortcuts(hosts: [Info], excluding apps: [Launcher.App], limit: Int) -> [Info] {
+        var out: [Info] = []
+        for host in hosts where host.bundle != nil && out.count < limit && !out.contains(where: { $0.name == host.name }) {
+            let isChosen = apps.contains { app in
+                app.name == host.name || host.bundle.map { URL(fileURLWithPath: $0).standardizedFileURL == app.url.standardizedFileURL } == true
+            }
+            if !isChosen { out.append(host) }
+        }
+        return out
+    }
+
+    /// The host buttons for a workspace, against the editor and terminal the quick actions already show.
+    @MainActor static func shortcuts(for workspace: Workspace, limit: Int) -> [Info] {
+        shortcuts(hosts: workspace.sessions.compactMap(info(for:)),
+                  excluding: [Launcher.editor, Launcher.terminal].compactMap { $0 }, limit: limit)
+    }
+
     @MainActor private static var cache: [String: Info?] = [:]
     @MainActor private static let antigravityApp: Info? = NSWorkspace.shared
         .urlForApplication(withBundleIdentifier: "com.google.antigravity").map { Info(bundle: $0.path, name: "Antigravity") }
