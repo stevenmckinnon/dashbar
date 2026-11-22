@@ -6,13 +6,12 @@
 // and puts back) and { table: { head: […], rows: [[…]…] } }. Text may use **bold**, `code` and [links](https://…).
 // A section with `parent` nests under that section in the page's contents.
 import { REPO } from "./content.js";
-import { FAQ } from "./faq.js";
 import { richHtml } from "./policy.js";
 
 export const DOCS_URL = "https://usedashbar.com/docs";
 
-const uninstall = FAQ.find((f) => f.id === "faq-uninstall");
-if (!uninstall) throw new Error("docs.js: no FAQ entry faq-uninstall");
+/** How to uninstall, on /docs/settings and in the install skill for agents (agent-files.js). */
+export const UNINSTALL = "If you added Dashbar to Claude Code’s or the Antigravity CLI’s status line, added it to OpenCode or GitHub Copilot, or turned on permission prompts, press Remove for each in Settings, under Integrations, first, so their settings go back to how they were. Then quit Dashbar and drag it to the Trash. With Homebrew, run `brew uninstall --cask dashbar`, and add `--zap` to remove its settings, data and caches too.";
 
 export const DOCS = {
   title: "Docs",
@@ -170,6 +169,38 @@ export const DOCS = {
       ],
     },
     {
+      id: "window",
+      heading: "The Dashbar window",
+      blocks: [
+        { text: "Press **⌃⌥D**, or the arrow at the top of the panel, to open the Dashbar window: the panel’s pages, History and every running workspace in a sidebar. A pin keeps it on top of other windows." },
+        { text: "A workspace’s page shows its uptime, CPU, memory and energy, its dev servers and agents, and the processes behind the numbers. It never starts anything. It acts only when you click: stopping a server, quitting a process after you confirm, or moving a workspace’s caches to the Trash." },
+      ],
+    },
+    {
+      id: "widgets",
+      heading: "Widgets",
+      blocks: [
+        { text: "Add them from the desktop: right-click it, choose **Edit Widgets** and look for Dashbar. There are seven." },
+        { table: { head: ["Size", "Shows"], rows: [
+          ["Small", "One tool each: Claude’s, Codex’s or Antigravity’s plan limits and when they reset, or OpenCode’s or GitHub Copilot’s tokens today."],
+          ["Medium", "Every tool’s limits with how many agents are working, or each tool’s tokens today with the estimated cost."],
+        ] } },
+        { text: "macOS refreshes them about every 15 minutes, sooner when Dashbar’s figures change, so they are not live. When Dashbar isn’t running they dim and say since when. A tool switched off in Show in Dashbar is left out, and its own widget says so." },
+        { text: "They read only the plan limits, agent counts and daily totals Dashbar saves for them, never project names, folders or sessions." },
+      ],
+    },
+    {
+      id: "shortcuts",
+      heading: "Keyboard shortcuts",
+      blocks: [
+        { table: { head: ["Shortcut", "What it does"], rows: [
+          ["`⌃⌥D`", "Opens the Dashbar window. You can turn it off in Settings → General."],
+          ["Your own", "Jumps to the agent that needs you: it brings forward the app of the session that has waited longest for you, or the one that finished last. It has no keys until you choose some in Settings → General."],
+        ] } },
+        { text: "Codex isn’t included in the jump, because Dashbar sees Codex’s processes rather than its sessions." },
+      ],
+    },
+    {
       id: "accounts",
       heading: "More than one account",
       blocks: [
@@ -188,7 +219,7 @@ export const DOCS = {
       id: "remove",
       heading: "Uninstalling cleanly",
       blocks: [
-        { text: uninstall.a.replace("brew uninstall --cask dashbar", "`brew uninstall --cask dashbar`").replace("--zap", "`--zap`") },
+        { text: UNINSTALL },
         { text: `What Dashbar reads and keeps on your Mac, folder by folder, is in the [privacy policy](/privacy). The source is [on GitHub](${REPO}).` },
       ],
     },
@@ -204,6 +235,8 @@ export const DOCS_PAGES = [
     sections: ["integrations", "claude-limits", "permissions", "antigravity", "opencode", "copilot"] },
   { slug: "going-back", title: "Going back to a session", summary: "What a click opens in each app, from a terminal to Orca, T3 Code and the Claude app, and what Dashbar reads to do it.",
     sections: ["go-back"] },
+  { slug: "window", title: "The window, widgets and shortcuts", summary: "Dashbar as a window with a page per workspace, its seven desktop widgets, and the two keyboard shortcuts.",
+    sections: ["window", "widgets", "shortcuts"] },
   { slug: "settings", title: "Accounts, hiding tools and uninstalling", summary: "More than one Claude Code or Codex account, switching a tool off, and removing Dashbar cleanly.",
     sections: ["accounts", "show", "remove"] },
 ];

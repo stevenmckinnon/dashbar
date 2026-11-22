@@ -5,7 +5,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { FAQ } from "./src/faq.js";
-import { docsMd, DOCS_PAGES } from "./src/docs.js";
+import { docsMd, DOCS_PAGES, UNINSTALL } from "./src/docs.js";
 import { SITE, REPO, BREW, HERO, FEATURES_INTRO, FEATURES, WINDOW, WIDGETS, PACE, PRIVACY, INSTALL, FOOTER, plain, worksWithText, listOf } from "./src/content.js";
 
 const root = new URL("../", import.meta.url);
@@ -132,7 +132,7 @@ export function skillMd() {
     `## Update`,
     answer("How do I update it?"),
     `## Uninstall`,
-    answer("How do I uninstall it?"),
+    UNINSTALL,
     `## More`,
     [
       `- What it does, what it reads and sends, and the FAQ: ${SITE}index.md`,
@@ -223,7 +223,7 @@ export function llmsTxt(all) {
       ...DOCS_PAGES.map((p) => `- [${p.title}](${SITE}docs/${p.slug}): ${p.summary}`),
       `- [Full text](${SITE}llms-full.txt): the homepage, the docs and the notes for every release`,
       `- [README](${REPO}/blob/main/README.md): features, settings, privacy and building from source`,
-      `- [FAQ](${SITE}#faq): supported agents, Claude plan limits, widgets, privacy, updating and uninstalling`,
+      `- [FAQ](${SITE}#faq): supported agents, Claude plan limits, privacy, approvals, cost, clean-up and updating`,
       `- [Privacy](${SITE}#privacy): every file it reads and the only two requests it can make`,
       `- [Privacy policy](${SITE}privacy): what the app and this website do with data, and who to contact`,
     ].join("\n"),

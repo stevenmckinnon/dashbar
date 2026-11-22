@@ -149,7 +149,7 @@ section[id], [id="top"] { scroll-margin-top: 88px; }
 .feature-text .replay-pill { margin-top: 24px; }
 .feature-text p { margin-top: 16px; max-width: 44ch; color: var(--muted); }
 .feature-text p.feature-more, .feature-brief p.feature-more { margin-top: 10px; }
-.feature-more a { color: var(--ink); text-underline-offset: 3px; }
+.feature-more a, .faq-more a { color: var(--ink); text-underline-offset: 3px; }
 .feature-text code { font-size: 0.82em; }
 /* As wide as the demo cards (the art bleeds 16px each side, to 592), and pushed to the page's right edge, where
    the hero and window demos end. */

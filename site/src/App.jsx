@@ -428,10 +428,11 @@ function Faq() {
     <section className="wrap faq" id="faq" aria-labelledby="faq-h">
       <h2 id="faq-h">Questions</h2>
       <div className="faq-list">
-        {FAQ.map(({ id, q, a }) => (
+        {FAQ.map(({ id, q, a, more }) => (
           <details key={id} id={id}>
             <summary>{q}</summary>
             <p>{a}</p>
+            {more && <p className="faq-more"><a href={more.href}>{more.label}</a></p>}
           </details>
         ))}
       </div>
