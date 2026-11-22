@@ -270,7 +270,7 @@ export function docsHtml(slug) {
     `<ul>${DOCS_PAGES.map((p) => `<li><a href="${docsPath(p.slug)}">${esc(p.title)}</a>: ${esc(p.summary)}</li>`).join("")}</ul>`,
   ].join("\n");
   return [
-    `<p><a href="/docs">Docs</a></p>`,
+    `<p><a href="/docs">‹ All docs</a></p>`,
     `<h1>${esc(page.title)}</h1>`,
     ...pageSections(page).map((s) => [
       s.heading === page.title ? `<section id="${s.id}">` : `<section id="${s.id}"><h2>${esc(s.heading)}</h2>`,

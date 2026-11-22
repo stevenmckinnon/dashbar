@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Mark, Footer, Rich } from "./Chrome";
 import { DOCS, DOCS_PAGES, docsPage, docsPath, pageSections, pageOfSection } from "./docs";
 
@@ -82,6 +83,7 @@ function Overview() {
             <a href={docsPath(p.slug)}>
               <strong>{p.title}</strong>
               <span>{p.summary}</span>
+              <ChevronRight className="docs-card-arrow" size={20} strokeWidth={1.75} aria-hidden="true" />
             </a>
           </li>
         ))}
@@ -98,7 +100,7 @@ function Page({ page }) {
   const subs = pageSections(page).filter((s) => s.heading !== page.title);
   return (
     <>
-      <p className="docs-crumb"><a href="/docs">Docs</a></p>
+      <p className="docs-crumb"><a href="/docs"><ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />All docs</a></p>
       <h1>{page.title}</h1>
       {subs.length > 1 && (
         <nav className="docs-toc" aria-label="On this page">
