@@ -392,6 +392,43 @@ section[id], [id="top"] { scroll-margin-top: 88px; }
 .docs-toc a { display: block; padding: 6px 14px; border-radius: 999px; background: var(--surface); color: var(--ink); text-decoration: none; font-size: var(--step-ui); }
 @media (hover: hover) { .docs-toc a:hover { background: var(--surface-2); } }
 
+/* Docs: the contents beside the page on wide screens, where the pills give way to it */
+.docs-side { display: none; }
+@media (min-width: 1100px) {
+  .docs-layout { display: grid; grid-template-columns: minmax(0, 68ch) 220px; justify-content: space-between; gap: 64px; }
+  .docs .docs-toc { display: none; }
+  .docs-side { display: block; position: sticky; top: 96px; align-self: start; max-height: calc(100vh - 128px); overflow-y: auto; padding-top: 8px; }
+  .docs-side ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .docs-side ul ul { margin: 2px 0 6px; padding-left: 12px; }
+  .docs-side a { display: block; padding: 5px 0; color: var(--muted); text-decoration: none; font-size: var(--step-ui); line-height: 1.3; }
+  .docs-side a[aria-current] { color: var(--ink); font-weight: 600; }
+}
+@media (min-width: 1100px) and (hover: hover) { .docs-side a:hover { color: var(--ink); } }
+
+/* An integration's own sections sit a little closer under Integrations */
+.docs .docs-sub { margin-top: 44px; }
+.docs .docs-sub h2 { font-size: var(--step-lead); }
+
+/* What an integration changes, saves and puts back: label, then what */
+.docs-facts { margin-top: 16px; padding: 14px 18px; background: var(--surface); border-radius: 12px; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 10px 20px; }
+.docs-facts dt { font-weight: 600; }
+.docs-facts dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
+@media (max-width: 560px) { .docs-facts { grid-template-columns: minmax(0, 1fr); gap: 2px; } .docs-facts dd + dt { margin-top: 10px; } }
+
+.docs-table { margin-top: 16px; overflow-x: auto; }
+.docs-table table { width: 100%; border-collapse: collapse; font-size: var(--step-ui); line-height: 1.45; }
+.docs-table th { text-align: left; font-weight: 600; color: var(--muted); padding: 0 16px 8px 0; border-bottom: 1px solid var(--line); }
+.docs-table td { vertical-align: top; padding: 10px 16px 10px 0; border-bottom: 1px solid var(--line); }
+.docs-table table:not(:has(th:nth-child(3))) td:first-child { white-space: nowrap; }   /* a command or code beside what it does */
+.docs-table table:has(th:nth-child(3)) td:first-child { width: 26%; }
+/* On a phone each row stacks: what it is in bold, then the rest beneath */
+@media (max-width: 560px) {
+  .docs-table thead { display: none; }
+  .docs-table tr { display: block; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .docs-table td { display: block; padding: 2px 0; border: 0; width: auto !important; }
+  .docs-table td:first-child { white-space: normal !important; font-weight: 600; }
+}
+
 /* ---------- The launch film ---------- */
 .tour { display: grid; grid-template-columns: repeat(12, 1fr); gap: var(--gap); padding-block: var(--section); }
 .tour-film { grid-column: 1 / -1; min-width: 0; margin-top: 64px; }

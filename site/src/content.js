@@ -36,7 +36,7 @@ export const FEATURES_INTRO = "Everything an agent-heavy day throws at your Mac,
 
 export const FEATURES = [
   { name: "Agents, and when they need you",
-    text: "Each Claude Code session by project: working, idle or waiting for you, for how long, and how full its context window is. Click one to go back to the app it runs in. Turn on permission prompts in Settings and a request shows up under its session with Allow once and Deny. The terminal still asks too, and Dashbar never answers by itself." },
+    text: "Each Claude Code session by project: working, idle or waiting for you, for how long, and how full its context window is. Click one to go back to the app it runs in, and in Orca, T3 Code or the Claude app, straight to that session. Turn on permission prompts in Settings and a request shows up under its session with Allow once and Deny. The terminal still asks too, and Dashbar never answers by itself." },
   { name: "Plan limits, with pace",
     text: "Your 5-hour and weekly limits, with a mark for where an even pace would be and a projection of when you would run out at the current rate. Weekly limits show today’s share: what you can use today and still last until the reset. Each tool has its own card, and the one closest to running out comes first. Codex’s limits come from its own logs. Claude’s come from Claude Code’s status line: add Dashbar to it in Settings and your usage updates after each Claude Code reply, with no network request." },
   { name: "Usage and estimated cost",
@@ -83,6 +83,7 @@ export const PRIVACY = {
     "If you use Google’s agents: Gemini CLI’s chat logs in `~/.gemini/tmp`, and only the status columns of the Antigravity app’s conversation list, opened read-only. If you add Dashbar to the Antigravity CLI’s status line, its plan quota and each session’s folder, model, token totals and state. Never titles, transcripts or your Google sign-in.",
     "If you use OpenCode: from its database, `~/.local/share/opencode/opencode.db`, opened read-only, only session ids, folders and times, and each reply’s model, token counts and cost. Never titles, prompts or replies. If you add Dashbar’s plugin to OpenCode, each session’s state (working, idle or waiting for you) and folder.",
     "If you use GitHub Copilot, in the terminal or as VS Code’s agent: from each session’s folder in `~/.copilot/session-state`, the project folder, the type of each event to tell working, idle or asking permission, and the model and token counts of each reply. Never prompts, replies, tool arguments or results. If you add Dashbar’s hook to Copilot, each session’s state and folder.",
+    "When you click to go back to a session: in T3 Code, its environment id and, from its database opened read-only, only the id of that session’s thread; in the Claude app, the names of its Code session files and which one holds that session’s id. For Orca, Dashbar runs Orca’s own `orca` command to open the session’s workspace. Never titles, messages or prompts, and nothing is kept.",
     "The listening ports on your Mac and the processes behind them, through the system’s own process API",
     "The folders you choose, to size the caches in clean-up",
     "If you add Dashbar to Claude Code’s status line: the plan usage Claude Code passes it after each reply. Dashbar changes only that one setting, keeps a backup, and puts your previous status line back when you remove it.",
@@ -115,7 +116,7 @@ export const SEND_TO_MAC = {
 
 export const FOOTER = {
   about: "A menu bar app for your coding agents.",
-  independence: "Dashbar is an independent project, not affiliated with or endorsed by Anthropic, OpenAI, Google, Anomaly or GitHub.",
+  independence: "Dashbar is an independent project, not affiliated with or endorsed by Anthropic, OpenAI, Google, Anomaly, GitHub or the makers of T3 Code and Orca.",
 };
 
 /** The text without Markdown marks, for meta tags and structured data. */

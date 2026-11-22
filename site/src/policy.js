@@ -12,8 +12,8 @@ const GITHUB_PRIVACY = "https://docs.github.com/en/site-policy/privacy-policies/
 export const POLICY = {
   title: "Privacy policy",
   description: "What Dashbar, the Mac menu bar app, and its website do with your data: the app sends nothing about you, has no analytics and no account.",
-  updated: "2026-11-16",
-  updatedText: "16 November 2026",
+  updated: "2026-11-22",
+  updatedText: "22 November 2026",
   lede: "Dashbar runs on your Mac and collects nothing about you. This page sets out what the app reads and keeps on your Mac, the only two requests it can make, and what happens when you download it, visit this website or send an email.",
   sections: [
     {
