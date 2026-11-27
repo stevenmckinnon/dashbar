@@ -3,6 +3,18 @@
     <channel>
         <title>Dashbar</title>
         <item>
+            <title>0.13.0</title>
+            <pubDate>Fri, 27 Nov 2026 11:14:46 +0000</pubDate>
+            <sparkle:version>284</sparkle:version>
+            <sparkle:shortVersionString>0.13.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[- Codex sessions now show in their workspaces as working or idle, with the project, how long, and a notification when a long turn finishes. They count in the menu bar, the island, the jump shortcut and `dashbar status`. Dashbar reads only the folder and when each turn starts and ends, never your messages. Codex doesn't record when it's waiting for you, so a session asking for approval still reads as working.
+- Claude's weekly Fable limit now shows with your other plan limits, when your account has one.
+- Extra usage now shows what you've spent of your monthly cap, such as "£10.80 of £40.00", beside the percentage.
+]]></description>
+            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.13.0/Dashbar-0.13.0.dmg" length="10966596" type="application/octet-stream" sparkle:edSignature="bKNao03kafc3hwbQHkMb02uCbuq0B+H9ul8gEJJ+27CCENYZ0n8pG1wbifNYylbTTCkJD0zfz+6Xe6mVLrZjAg=="/>
+        </item>
+        <item>
             <title>0.12.1</title>
             <pubDate>Sun, 22 Nov 2026 14:06:57 +0000</pubDate>
             <sparkle:version>280</sparkle:version>
@@ -26,16 +38,6 @@
 - `dashbar status` adds today's share to weekly limits, and `dashbar status --json` has `todayShare` and `usedToday` for them. The dashbar-status skill tells agents to mention it before heavy work.
 ]]></description>
             <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.12.0/Dashbar-0.12.0.dmg" length="10817904" type="application/octet-stream" sparkle:edSignature="T0jA99ZJ4eWT+ZH9GqHmhSYEk3uMUqlyD4iGG+cYfAJPDDfLpESkKM6DP1TZBCNbRonrF5l9eNBIF7mGJkilDg=="/>
-        </item>
-        <item>
-            <title>0.11.1</title>
-            <pubDate>Fri, 20 Nov 2026 18:30:51 +0000</pubDate>
-            <sparkle:version>255</sparkle:version>
-            <sparkle:shortVersionString>0.11.1</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[- Plan limits on the Usage tab and the History page now count down with the clock. Before, a limit whose reading stayed at the same percent for hours kept showing an old "resets in" time and pace line until its reading changed. Thanks to Sally Hong for the detailed report.
-]]></description>
-            <enclosure url="https://github.com/stevenmckinnon/dashbar/releases/download/v0.11.1/Dashbar-0.11.1.dmg" length="10745329" type="application/octet-stream" sparkle:edSignature="3whrso6+aXKm8TxUR78+qdhftTLa6yXgPTgnfaSB9yg62Wtj7TouqH5eBApWSeNfVUktuA/NJNxizU2sm1m9AQ=="/>
         </item>
     </channel>
 </rss>
