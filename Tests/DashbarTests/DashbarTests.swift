@@ -862,7 +862,7 @@ private func session(id: String, root: String = "/dev/app", busy: Bool = false, 
         // The list wins over the older top-level field for the same limit.
         let fable = limits[3]
         #expect(fable.usedPercent == 3)
-        #expect(fable.window == 7 * 86400)
+        #expect(fable.window == TimeInterval(7 * 86400))
         #expect(fable.resetsAt == Date.fromISO("2026-11-29T00:00:00Z"))
         // A numeric reset is epoch seconds.
         #expect(limits[2].resetsAt == Date(timeIntervalSince1970: 1_796_083_200))
@@ -872,7 +872,7 @@ private func session(id: String, root: String = "/dev/app", busy: Bool = false, 
         for key in ["seven_day_fable", "fable_weekly", "fable_seven_day"] {
             let limits = ClaudePlanLimits.parse(Data(#"{"\#(key)": {"utilization": 12, "resets_at": "2026-11-29T00:00:00Z"}}"#.utf8))
             #expect(limits.map(\.label) == ["Weekly · Fable"])
-            #expect(limits.first?.window == 7 * 86400)
+            #expect(limits.first?.window == TimeInterval(7 * 86400))
         }
     }
 

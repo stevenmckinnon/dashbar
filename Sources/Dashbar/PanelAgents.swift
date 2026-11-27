@@ -541,12 +541,21 @@ struct LimitBar: View {
         .help(([share?.help, mark.map { "The mark shows where an even pace would be by now: \(Int($0.rounded()))% used." },
                 Self.sourceNote(limit)] as [String?]).compactMap { $0 }.joined(separator: "\n"))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(limit.label) limit, \(Int(max(0, limit.usedPercent).rounded())) percent used"
-                            + (limit.credits.map { ", " + $0.text } ?? "")
-                            + (share.map { ". " + $0.spoken + (pace.map { ", " + TodayShare.paceTail($0, now: now) } ?? "") }
-                               ?? pace.map { ". " + Self.text($0) } ?? ""))
+        .accessibilityLabel(spokenLabel(share: share, pace: pace, now: now))
         .accessibilityValue(mark.map { "Even pace would be \(Int($0.rounded())) percent by now" } ?? "")
         .accessibilityHint(Self.sourceNote(limit) ?? "")
+    }
+
+    private func spokenLabel(share: TodayShare?, pace: RateLimit.Pace?, now: Date) -> String {
+        var label = "\(limit.label) limit, \(Int(max(0, limit.usedPercent).rounded())) percent used"
+        if let credits = limit.credits { label += ", " + credits.text }
+        if let share {
+            label += ". " + share.spoken
+            if let pace { label += ", " + TodayShare.paceTail(pace, now: now) }
+        } else if let pace {
+            label += ". " + Self.text(pace)
+        }
+        return label
     }
 
     /// The share the fill draws: the percentage as the row prints it, so the bar and the figure agree.
