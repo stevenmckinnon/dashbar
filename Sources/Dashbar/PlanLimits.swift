@@ -351,24 +351,111 @@ enum ClaudePlanLimits {
     // MARK: Response
 
     /// Reads every window in the response that has a utilization, e.g. `five_hour`, `seven_day`,
-    /// `seven_day_opus`. Utilization is a percentage; reset times are ISO 8601.
+    /// `seven_day_opus`, plus per-model weekly limits from the newer `limits` list (Fable) and extra usage
+    /// with its amounts (`spend`, else `extra_usage`). Utilization is a percentage; reset times are ISO 8601.
+    /// Each label appears once: where two fields describe the same limit, the newer form wins.
     static func parse(_ data: Data) -> [RateLimit] {
         guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [] }
         let order = ["five_hour": 0, "seven_day": 1, "seven_day_sonnet": 2, "seven_day_opus": 3]
-        return obj.compactMap { key, value -> (Int, RateLimit)? in
-            guard let window = value as? [String: Any],
+        var found: [(Int, RateLimit)] = scopedWeekly(obj["limits"]).map { (order[$0.key] ?? 4, $0.limit) }
+        found += obj.compactMap { key, value -> (Int, RateLimit)? in
+            guard !creditKeys.contains(key), let window = value as? [String: Any],
                   let used = (window["utilization"] as? NSNumber)?.doubleValue else { return nil }
-            let reset = (window["resets_at"] as? String).flatMap(Date.fromISO)
-            return (order[key] ?? 9, RateLimit(label: label(for: key), usedPercent: used, resetsAt: reset, window: Self.window(for: key)))
+            let reset = resetDate(window["resets_at"])
+            let rank = order[key] ?? (fableKeys.contains(key) ? 4 : 9)
+            return (rank, RateLimit(label: label(for: key), usedPercent: used, resetsAt: reset, window: Self.window(for: key)))
         }
-        .sorted { ($0.0, $0.1.label) < ($1.0, $1.1.label) }
-        .map(\.1)
+        if let extra = extraUsage(obj) { found.append((10, extra)) }
+        var seen = Set<String>()
+        return found
+            .filter { seen.insert($0.1.label).inserted }
+            .sorted { ($0.0, $0.1.label) < ($1.0, $1.1.label) }
+            .map(\.1)
     }
 
-    /// Window length by key: "five_hour" and "seven_day…". Unknown windows get no pace.
+    /// The fields that carry extra usage, read by `extraUsage` rather than as plain windows.
+    static let creditKeys: Set<String> = ["extra_usage", "spend"]
+    /// The top-level names Fable's weekly limit has had, before the `limits` list.
+    static let fableKeys: Set<String> = ["seven_day_fable", "fable_weekly", "fable_seven_day"]
+
+    /// Per-model weekly limits from the `limits` list: `{"kind": "weekly_scoped", "percent": 12,
+    /// "resets_at": "…", "scope": {"model": {"display_name": "Fable"}}}`. Other kinds are left alone: their
+    /// windows aren't known. The key is the matching top-level name, for ordering ("seven_day_opus").
+    static func scopedWeekly(_ value: Any?) -> [(key: String, limit: RateLimit)] {
+        guard let entries = value as? [[String: Any]] else { return [] }
+        return entries.compactMap { entry -> (key: String, limit: RateLimit)? in
+            guard entry["kind"] as? String == "weekly_scoped",
+                  let used = (entry["percent"] as? NSNumber)?.doubleValue, used.isFinite,
+                  let name = ((entry["scope"] as? [String: Any])?["model"] as? [String: Any])?["display_name"] as? String,
+                  !name.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
+            let model = name.trimmingCharacters(in: .whitespaces)
+            let limit = RateLimit(label: RateLimit.name(window: 7 * 86400) + " · " + model, usedPercent: used,
+                                  resetsAt: resetDate(entry["resets_at"]), window: 7 * 86400)
+            return ("seven_day_" + model.lowercased(), limit)
+        }
+    }
+
+    /// A reset time as ISO 8601, or as epoch seconds or milliseconds (the `limits` list hasn't promised which).
+    static func resetDate(_ value: Any?) -> Date? {
+        if let s = value as? String {
+            if let n = Double(s.trimmingCharacters(in: .whitespaces)) { return epoch(n) }
+            return Date.fromISO(s)
+        }
+        return (value as? NSNumber).flatMap { epoch($0.doubleValue) }
+    }
+
+    private static func epoch(_ n: Double) -> Date? {
+        guard n.isFinite, n > 0 else { return nil }
+        return Date(timeIntervalSince1970: n > 10_000_000_000 ? n / 1000 : n)
+    }
+
+    /// Extra usage, the monthly spending cap past the plan's own limits, with what's spent of it.
+    /// `spend` is the newer form (amounts in minor units with their `exponent` and `currency`); older responses
+    /// have `extra_usage` (`used_credits` and `monthly_limit` in minor units, `decimal_places`). Turned off, or
+    /// with neither an amount nor a percentage, there's no row.
+    static func extraUsage(_ obj: [String: Any]) -> RateLimit? {
+        let name = Self.label(for: "extra_usage")
+        if let spend = obj["spend"] as? [String: Any], spend["enabled"] as? Bool != false {
+            let used = money(spend["used"] as? [String: Any])
+            let cap = money(spend["limit"] as? [String: Any]) ?? money((spend["cap"] as? [String: Any])?["money"] as? [String: Any])
+            if let cap, cap.amount > 0 {
+                let percent = (spend["percent"] as? NSNumber)?.doubleValue ?? used.map { $0.amount / cap.amount * 100 }
+                if let percent, percent.isFinite {
+                    let credits = RateLimit.Credits(spent: used?.amount, limit: cap.amount, currency: used?.currency ?? cap.currency)
+                    return RateLimit(label: name, usedPercent: min(max(percent, 0), 100), resetsAt: nil, credits: credits)
+                }
+            }
+        }
+        guard let extra = obj["extra_usage"] as? [String: Any], extra["is_enabled"] as? Bool != false else { return nil }
+        let places = (extra["decimal_places"] as? NSNumber)?.intValue ?? 2
+        let currency = (extra["currency"] as? String).flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
+        let cap = money(minor: extra["monthly_limit"], exponent: places, currency: currency)
+        let used = money(minor: extra["used_credits"], exponent: places, currency: currency)
+        // Amounts first: `utilization` has been seen as a 0–1 fraction as well as a percentage.
+        let percent: Double?
+        if let cap, cap.amount > 0, let used { percent = used.amount / cap.amount * 100 }
+        else { percent = (extra["utilization"] as? NSNumber)?.doubleValue }
+        guard let percent, percent.isFinite else { return nil }
+        let credits = cap.flatMap { $0.amount > 0 ? RateLimit.Credits(spent: used?.amount, limit: $0.amount, currency: currency) : nil }
+        return RateLimit(label: name, usedPercent: min(max(percent, 0), 100), resetsAt: nil, credits: credits)
+    }
+
+    /// `{"amount_minor": 1080, "exponent": 2, "currency": "GBP"}` as 10.80 GBP. An exponent outside 0–6 is refused.
+    static func money(_ value: [String: Any]?) -> (amount: Double, currency: String?)? {
+        guard let value else { return nil }
+        return money(minor: value["amount_minor"], exponent: (value["exponent"] as? NSNumber)?.intValue ?? 2,
+                     currency: (value["currency"] as? String).flatMap { $0.isEmpty ? nil : $0 })
+    }
+
+    static func money(minor: Any?, exponent: Int, currency: String?) -> (amount: Double, currency: String?)? {
+        guard let minor = (minor as? NSNumber)?.doubleValue, minor.isFinite, (0...6).contains(exponent) else { return nil }
+        return (minor / pow(10, Double(exponent)), currency)
+    }
+
+    /// Window length by key: "five_hour" and "seven_day…", and Fable's other names. Unknown windows get no pace.
     static func window(for key: String) -> TimeInterval? {
         if key == "five_hour" { return 5 * 3600 }
-        if key.hasPrefix("seven_day") { return 7 * 86400 }
+        if key.hasPrefix("seven_day") || fableKeys.contains(key) { return 7 * 86400 }
         return nil
     }
 
@@ -432,6 +519,7 @@ enum ClaudePlanLimits {
         case "five_hour", "seven_day": return RateLimit.name(window: window(for: key)!)
         case "seven_day_opus": return RateLimit.name(window: 7 * 86400) + " · Opus"
         case "seven_day_sonnet": return RateLimit.name(window: 7 * 86400) + " · Sonnet"
+        case _ where fableKeys.contains(key): return RateLimit.name(window: 7 * 86400) + " · Fable"
         default:
             let words = key.replacingOccurrences(of: "_", with: " ")
             return words.prefix(1).uppercased() + words.dropFirst()   // "extra_usage" -> "Extra usage"

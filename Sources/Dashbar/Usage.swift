@@ -478,6 +478,23 @@ struct RateLimit: Identifiable, Codable, Equatable {
     var window: TimeInterval? = nil
     /// The provider's own name for the limit ("gemini-argon-wtu-weekly"), when `label` was made from it, for the tooltip.
     var source: String? = nil
+    /// The money behind a spending cap (Claude's extra usage), shown beside its name: "£10.80 of £40.00".
+    var credits: Credits? = nil
+
+    struct Credits: Codable, Equatable {
+        /// Spent so far, in the currency's major unit (10.80, not 1080). Nil when only the cap was reported.
+        var spent: Double?
+        var limit: Double
+        /// ISO 4217 code ("GBP"). Nil when unreported: amounts then show without a symbol rather than a guessed one.
+        var currency: String?
+
+        var text: String {
+            func amount(_ v: Double) -> String {
+                currency.map { v.formatted(.currency(code: $0)) } ?? String(format: "%.2f", v)
+            }
+            return spent.map { amount($0) + " of " + amount(limit) } ?? amount(limit) + " a month"
+        }
+    }
 }
 
 extension RateLimit {

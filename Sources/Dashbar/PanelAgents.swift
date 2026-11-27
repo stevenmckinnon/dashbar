@@ -488,6 +488,10 @@ struct LimitBar: View {
                 if let r = limit.resetsAt {
                     Text(Fmt.resets(r, now: now))
                         .font(.system(size: UI.Size.caption)).foregroundStyle(UI.textSecondary)
+                } else if let credits = limit.credits {
+                    Text(credits.text)
+                        .font(.system(size: UI.Size.caption).monospacedDigit()).foregroundStyle(UI.textSecondary)
+                        .lineLimit(1)
                 }
                 Spacer()
                 Text(Fmt.usedPercent(limit.usedPercent))
@@ -538,6 +542,7 @@ struct LimitBar: View {
                 Self.sourceNote(limit)] as [String?]).compactMap { $0 }.joined(separator: "\n"))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(limit.label) limit, \(Int(max(0, limit.usedPercent).rounded())) percent used"
+                            + (limit.credits.map { ", " + $0.text } ?? "")
                             + (share.map { ". " + $0.spoken + (pace.map { ", " + TodayShare.paceTail($0, now: now) } ?? "") }
                                ?? pace.map { ". " + Self.text($0) } ?? ""))
         .accessibilityValue(mark.map { "Even pace would be \(Int($0.rounded())) percent by now" } ?? "")

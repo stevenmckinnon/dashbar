@@ -340,7 +340,8 @@ enum DemoData {
         store.claudePlan = ClaudePlanLimits.Result(limits: [
             RateLimit(label: "5-hour", usedPercent: 0, resetsAt: now.addingTimeInterval(4.9 * 3600), window: 5 * 3600),
             RateLimit(label: "Weekly", usedPercent: 0, resetsAt: now.addingTimeInterval(6.9 * 86400), window: 7 * 86400),
-            RateLimit(label: "Extra usage", usedPercent: 27, resetsAt: nil, window: nil),
+            RateLimit(label: "Extra usage", usedPercent: 27, resetsAt: nil, window: nil,
+                      credits: RateLimit.Credits(spent: 10.80, limit: 40, currency: "USD")),
         ], plan: "Max 5x")
         store.codexLimits = [
             RateLimit(label: "5-hour", usedPercent: 0, resetsAt: now.addingTimeInterval(4.95 * 3600), window: 5 * 3600),

@@ -843,6 +843,90 @@ private func session(id: String, root: String = "/dev/app", busy: Bool = false, 
         #expect(limits[2].resetsAt == nil)
     }
 
+    @Test func readsPerModelWeeklyLimitsFromTheLimitsList() {
+        let json = """
+        {"five_hour": {"utilization": 10, "resets_at": "2026-11-27T15:00:00Z"},
+         "seven_day": {"utilization": 6, "resets_at": "2026-11-29T00:00:00Z"},
+         "seven_day_fable": {"utilization": 99, "resets_at": null},
+         "limits": [
+           {"kind": "weekly_scoped", "percent": 3, "resets_at": "2026-11-29T00:00:00Z",
+            "scope": {"model": {"display_name": "Fable"}}},
+           {"kind": "weekly_scoped", "percent": 1, "resets_at": 1796083200,
+            "scope": {"model": {"display_name": " Opus "}}},
+           {"kind": "something_new", "percent": 50, "scope": {"model": {"display_name": "Haiku"}}},
+           {"kind": "weekly_scoped", "percent": 7, "scope": {"model": null}}
+         ]}
+        """
+        let limits = ClaudePlanLimits.parse(Data(json.utf8))
+        #expect(limits.map(\.label) == ["5-hour", "Weekly", "Weekly · Opus", "Weekly · Fable"])
+        // The list wins over the older top-level field for the same limit.
+        let fable = limits[3]
+        #expect(fable.usedPercent == 3)
+        #expect(fable.window == 7 * 86400)
+        #expect(fable.resetsAt == Date.fromISO("2026-11-29T00:00:00Z"))
+        // A numeric reset is epoch seconds.
+        #expect(limits[2].resetsAt == Date(timeIntervalSince1970: 1_796_083_200))
+    }
+
+    @Test func fableUnderItsOlderTopLevelNames() {
+        for key in ["seven_day_fable", "fable_weekly", "fable_seven_day"] {
+            let limits = ClaudePlanLimits.parse(Data(#"{"\#(key)": {"utilization": 12, "resets_at": "2026-11-29T00:00:00Z"}}"#.utf8))
+            #expect(limits.map(\.label) == ["Weekly · Fable"])
+            #expect(limits.first?.window == 7 * 86400)
+        }
+    }
+
+    @Test func epochResetsInSecondsOrMilliseconds() {
+        #expect(ClaudePlanLimits.resetDate(1_796_083_200) == Date(timeIntervalSince1970: 1_796_083_200))
+        #expect(ClaudePlanLimits.resetDate(1_796_083_200_000) == Date(timeIntervalSince1970: 1_796_083_200))
+        #expect(ClaudePlanLimits.resetDate("1796083200") == Date(timeIntervalSince1970: 1_796_083_200))
+        #expect(ClaudePlanLimits.resetDate(nil) == nil)
+        #expect(ClaudePlanLimits.resetDate("soon") == nil)
+    }
+
+    @Test func extraUsageFromSpendCarriesItsAmounts() {
+        let json = """
+        {"five_hour": {"utilization": 10, "resets_at": null},
+         "spend": {"used": {"amount_minor": 1080, "currency": "GBP", "exponent": 2},
+                   "limit": {"amount_minor": 4000, "currency": "GBP", "exponent": 2},
+                   "percent": 27, "enabled": true},
+         "extra_usage": {"is_enabled": true, "monthly_limit": 9999, "used_credits": 1, "utilization": 0.01}}
+        """
+        let limits = ClaudePlanLimits.parse(Data(json.utf8))
+        #expect(limits.map(\.label) == ["5-hour", "Extra usage"])
+        let extra = limits[1]
+        #expect(extra.usedPercent == 27)
+        #expect(extra.window == nil && extra.resetsAt == nil)
+        #expect(extra.credits == RateLimit.Credits(spent: 10.8, limit: 40, currency: "GBP"))
+    }
+
+    @Test func extraUsageFromTheOlderFieldWorksOutThePercentFromAmounts() {
+        // utilization as a fraction would read as 0.27%; the amounts say 27%.
+        let json = #"{"extra_usage": {"is_enabled": true, "monthly_limit": 4000, "used_credits": 1080, "utilization": 0.27, "currency": "USD"}}"#
+        let extra = ClaudePlanLimits.parse(Data(json.utf8)).first
+        #expect(extra?.label == "Extra usage")
+        #expect(abs((extra?.usedPercent ?? 0) - 27) < 0.001)
+        #expect(extra?.credits == RateLimit.Credits(spent: 10.8, limit: 40, currency: "USD"))
+        // Without amounts, the percentage is used as before, with no money to show.
+        let plain = ClaudePlanLimits.parse(Data(#"{"extra_usage": {"utilization": 27}}"#.utf8)).first
+        #expect(plain?.usedPercent == 27)
+        #expect(plain?.credits == nil)
+    }
+
+    @Test func extraUsageTurnedOffHasNoRow() {
+        #expect(ClaudePlanLimits.parse(Data(#"{"extra_usage": {"is_enabled": false, "monthly_limit": 4000, "used_credits": 0, "utilization": 0}}"#.utf8)).isEmpty)
+        #expect(ClaudePlanLimits.parse(Data(#"{"spend": {"enabled": false, "limit": {"amount_minor": 4000}, "percent": 0}}"#.utf8)).isEmpty)
+        // A spend with only a balance falls back to extra_usage.
+        let json = #"{"spend": {"balance": {"amount_minor": 500}}, "extra_usage": {"is_enabled": true, "utilization": 40}}"#
+        #expect(ClaudePlanLimits.parse(Data(json.utf8)).map(\.usedPercent) == [40])
+    }
+
+    @Test func creditsWording() {
+        #expect(RateLimit.Credits(spent: 10.8, limit: 40, currency: nil).text == "10.80 of 40.00")
+        #expect(RateLimit.Credits(spent: nil, limit: 40, currency: nil).text == "40.00 a month")
+        #expect(RateLimit.Credits(spent: 10.8, limit: 40, currency: "USD").text.contains("10.80"))
+    }
+
     @Test func unrecognisedResponsesYieldNothingRatherThanGarbage() {
         #expect(ClaudePlanLimits.parse(Data("[]".utf8)).isEmpty)
         #expect(ClaudePlanLimits.parse(Data("not json".utf8)).isEmpty)
