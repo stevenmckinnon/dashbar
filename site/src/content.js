@@ -81,7 +81,7 @@ export const PRIVACY = {
   heading: "What it reads and sends",
   reads: [
     "Claude Code’s session files and transcripts: `~/.claude/sessions` and `~/.claude/projects`",
-    "Codex’s session logs: `~/.codex/sessions`",
+    "Codex’s session logs: `~/.codex/sessions`, for usage and plan limits, and for each open session its folder and when turns start and end. To find open sessions it lists the files running `codex` processes have open.",
     "The same folders for any other Claude Code or Codex account you add in Settings",
     "If you use Google’s agents: Gemini CLI’s chat logs in `~/.gemini/tmp`, and only the status columns of the Antigravity app’s conversation list, opened read-only. If you add Dashbar to the Antigravity CLI’s status line, its plan quota and each session’s folder, model, token totals and state. Never titles, transcripts or your Google sign-in.",
     "If you use OpenCode: from its database, `~/.local/share/opencode/opencode.db`, opened read-only, only session ids, folders and times, and each reply’s model, token counts and cost. Never titles, prompts or replies. If you add Dashbar’s plugin to OpenCode, each session’s state (working, idle or waiting for you) and folder.",

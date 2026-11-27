@@ -197,7 +197,7 @@ export const DOCS = {
           ["`⌃⌥D`", "Opens the Dashbar window. You can turn it off in Settings → General."],
           ["Your own", "Jumps to the agent that needs you: it brings forward the app of the session that has waited longest for you, or the one that finished last. It has no keys until you choose some in Settings → General."],
         ] } },
-        { text: "Codex isn’t included in the jump, because Dashbar sees Codex’s processes rather than its sessions." },
+        { text: "Codex sessions count once they finish. Dashbar can’t yet tell when Codex is waiting for you." },
       ],
     },
     {

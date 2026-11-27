@@ -28,6 +28,7 @@ extension SessionAgent {
     var hideableTool: HideableTool? {
         switch self {
         case .claude: return nil
+        case .codex: return .codex
         case .geminiCLI, .antigravityCLI, .antigravity: return .google
         case .opencode: return .opencode
         case .copilot: return .copilot
@@ -108,6 +109,7 @@ extension Worker.LiveResult {
         var r = self
         r.sessions = v.filter(sessions)
         if !v.shows(.google) { r.googleWarning = nil }
+        if !v.shows(.codex) { r.codexSessionsWarning = nil }
         r.agents = agents.map { v.filter($0) }
         if let usage = workspaceUsage {
             // Workspaces only a hidden tool had are gone; so is what was sampled for them.

@@ -34,6 +34,7 @@ enum CLIStatus {
             store.$listeners.map { _ in () }.eraseToAnyPublisher(),
             store.$paused.map { _ in () }.eraseToAnyPublisher(),
             store.$sessionsWarning.map { _ in () }.eraseToAnyPublisher(),
+            store.$codexSessionsWarning.map { _ in () }.eraseToAnyPublisher(),
             // A tool switched off or on, even one with nothing showing, so the widgets can say it's off.
             AppSettings.shared.$visibility.map { _ in () }.eraseToAnyPublisher(),
         ]
@@ -83,6 +84,7 @@ enum CLIStatus {
     nonisolated static func toolID(_ agent: SessionAgent) -> String {
         switch agent {
         case .claude: return "claude"
+        case .codex: return "codex"
         case .geminiCLI: return "gemini-cli"
         case .antigravityCLI: return "antigravity-cli"
         case .antigravity: return "antigravity"

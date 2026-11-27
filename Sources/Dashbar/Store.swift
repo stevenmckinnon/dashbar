@@ -18,6 +18,8 @@ final class Store: ObservableObject {
     @Published var antigravityLimits: AntigravityLimits?
     /// A Google format Dashbar no longer reads (the Antigravity app's conversations).
     @Published var googleWarning: String?
+    /// Codex's live sessions couldn't be read (`CodexSessions`).
+    @Published var codexSessionsWarning: String?
     /// opencode's usage from its session database (`OpenCode.swift`). Not found for someone who doesn't use it.
     @Published var opencode = UsageSummary.empty
     /// GitHub Copilot CLI's usage from its session logs' shutdown records (`CopilotCLI.swift`), with premium requests.
@@ -144,7 +146,7 @@ final class Store: ObservableObject {
 
     /// A log or session format Dashbar can no longer read. Shown instead of quietly reporting nothing.
     var formatWarning: String? {
-        claude.warning ?? codex.warning ?? sessionsWarning ?? subagentsWarning ?? google.warning ?? googleWarning ?? opencode.warning
+        claude.warning ?? codex.warning ?? sessionsWarning ?? codexSessionsWarning ?? subagentsWarning ?? google.warning ?? googleWarning ?? opencode.warning
             ?? copilot.summary.warning
     }
 
@@ -374,6 +376,7 @@ final class Store: ObservableObject {
         update(\.sessions, v.filter(sessions))
         update(\.otherAgents, v.filter(otherAgents))
         if !v.shows(.codex) {
+            update(\.codexSessionsWarning, nil)
             update(\.codex, .empty)
             update(\.codexLimits, [])
             update(\.codexAccountUsage, [])
@@ -880,6 +883,7 @@ final class Store: ObservableObject {
         update(\.subagents, r.subagents.bySession)
         update(\.subagentsWarning, r.subagents.warning)
         update(\.googleWarning, r.googleWarning)
+        update(\.codexSessionsWarning, r.codexSessionsWarning)
         update(\.contexts, r.contexts)
         if let a = r.agents { update(\.otherAgents, a) }
         if let sys = r.system {
@@ -937,6 +941,7 @@ final class Worker: @unchecked Sendable {
         var sessionsWarning: String?
         var subagents = SubagentReader.Reading()
         var googleWarning: String?
+        var codexSessionsWarning: String?
         var contexts: [String: ContextInfo] = [:]
         var agents: [AgentProcess]?
         var system: SystemSnapshot?
@@ -981,6 +986,8 @@ final class Worker: @unchecked Sendable {
     private var claudeScanners: [String: ClaudeUsageScanner] = [:]
     private var codexScanners: [String: CodexUsageScanner] = [:]
     private let contextReader = ContextReader()
+    /// Codex's live sessions (live queue only).
+    private let codexCollector = CodexCollector()
     private let subagentReader = SubagentReader()
     /// Google's agents' live sessions (live queue only), and their usage (usage queue only, created at first use).
     private let googleCollector = GoogleCollector()
@@ -1033,13 +1040,15 @@ final class Worker: @unchecked Sendable {
     private var currentVisibility: ToolVisibility { accountsLock.withLock { visibility } }
 
     /// Every tool's live sessions beyond Claude Code's. A hidden tool's collector isn't called, so none of its files are read.
-    static func otherSessions(_ v: ToolVisibility, google: () -> GoogleLive, opencode: () -> [LiveSession],
-                              copilot: () -> [LiveSession]) -> (sessions: [LiveSession], googleWarning: String?) {
+    static func otherSessions(_ v: ToolVisibility, codex: () -> CodexSessions.Reading = { .init() }, google: () -> GoogleLive,
+                              opencode: () -> [LiveSession], copilot: () -> [LiveSession])
+        -> (sessions: [LiveSession], googleWarning: String?, codexWarning: String?) {
+        let c = v.shows(.codex) ? codex() : .init()
         let g = v.shows(.google) ? google() : GoogleLive()
-        var out = g.sessions
+        var out = c.sessions + g.sessions
         if v.shows(.opencode) { out += opencode() }
         if v.shows(.copilot) { out += copilot() }
-        return (out, g.warning)
+        return (out, g.warning, c.warning)
     }
 
     private func collectLive(_ req: LiveRequest) {
@@ -1052,11 +1061,13 @@ final class Worker: @unchecked Sendable {
         // Claude Code sessions only: Google's agents and opencode have no subagent transcripts.
         r.subagents = subagentReader.read(reading.sessions, transcript: { self.contextReader.transcript(for: $0) }, detail: req.panel)
         let v = currentVisibility
-        let others = Self.otherSessions(v, google: { googleCollector.read() }, opencode: { openCodeCollector.read() },
+        let codexAccounts = accounts.codex
+        let others = Self.otherSessions(v, codex: { codexCollector.read(accounts: codexAccounts) }, google: { googleCollector.read() }, opencode: { openCodeCollector.read() },
                                         copilot: { copilotCollector.read() })
         r.sessions = others.sessions.isEmpty ? reading.sessions
             : (reading.sessions + others.sessions).sorted { ($0.urgency, $1.since) < ($1.urgency, $0.since) }
         r.googleWarning = others.googleWarning
+        r.codexSessionsWarning = others.codexWarning
         if req.system { r.system = sampler.sample() }
         if req.servers {
             var listeners = Listeners.read()
@@ -1066,7 +1077,9 @@ final class Worker: @unchecked Sendable {
             lastListeners = listeners
         }
         if req.panel {
-            r.agents = v.filter(AgentProcesses.read())
+            // Codex's chip gives way to its sessions once they're listed, so it never shows twice.
+            let listed = r.sessions.contains { $0.agent == .codex }
+            r.agents = v.filter(AgentProcesses.read()).filter { !(listed && $0.name == "Codex") }
             r.topApps = sampler.topApps()
             let workspaces = Workspace.build(sessions: r.sessions,
                                              servers: lastListeners.filter { $0.isDev && $0.root != nil && !$0.isDocker })

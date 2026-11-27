@@ -7,12 +7,13 @@ import AppKit
 /// opencode and GitHub Copilot CLI, each read from what that tool already keeps on this Mac (see `GeminiCLI`,
 /// `AntigravityStatusLine`, `AntigravityApp`, `OpenCode`, `CopilotCLI`).
 enum SessionAgent: String, Equatable, CaseIterable {
-    case claude, geminiCLI, antigravityCLI, antigravity, opencode, copilot
+    case claude, codex, geminiCLI, antigravityCLI, antigravity, opencode, copilot
 
     /// "Claude", "Gemini CLI", "Antigravity CLI", "Antigravity": the subject of "… is working".
     var name: String {
         switch self {
         case .claude: return "Claude"
+        case .codex: return "Codex"
         case .geminiCLI: return "Gemini CLI"
         case .antigravityCLI: return "Antigravity CLI"
         case .antigravity: return "Antigravity"
@@ -27,6 +28,7 @@ enum SessionAgent: String, Equatable, CaseIterable {
     var symbol: String {
         switch self {
         case .claude: return "asterisk"
+        case .codex: return "chevron.left.forwardslash.chevron.right"
         case .opencode: return UI.openCodeSymbol
         case .copilot: return UI.copilotSymbol
         default: return UI.googleSymbol
@@ -36,6 +38,7 @@ enum SessionAgent: String, Equatable, CaseIterable {
     var tint: Color {
         switch self {
         case .claude: return UI.claude
+        case .codex: return UI.codex
         case .opencode, .copilot: return UI.neutralTool
         default: return UI.google
         }

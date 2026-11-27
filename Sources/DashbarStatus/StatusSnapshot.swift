@@ -81,7 +81,7 @@ public struct StatusSnapshot: Codable, Equatable, Sendable {
     }
 
     public struct Session: Codable, Equatable, Sendable {
-        /// "claude", "gemini-cli", "antigravity-cli", "antigravity", "opencode" or "copilot".
+        /// "claude", "codex", "gemini-cli", "antigravity-cli", "antigravity", "opencode" or "copilot".
         public var tool: String
         /// The account's name, only while the app reads more than one account of this tool.
         public var account: String?

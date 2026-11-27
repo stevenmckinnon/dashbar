@@ -111,6 +111,26 @@ enum Proc {
         return args.isEmpty ? nil : args.joined(separator: " ")
     }
 
+    /// Paths of the files this process has open (vnodes only; sockets and pipes have none).
+    static func openFiles(_ pid: pid_t) -> [String] {
+        let bytes = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, nil, 0)
+        guard bytes > 0 else { return [] }
+        let stride = MemoryLayout<proc_fdinfo>.stride
+        var fds = [proc_fdinfo](repeating: proc_fdinfo(), count: Int(bytes) / stride + 16)
+        let got = fds.withUnsafeMutableBytes { proc_pidinfo(pid, PROC_PIDLISTFDS, 0, $0.baseAddress, Int32($0.count)) }
+        guard got > 0 else { return [] }
+        return fds.prefix(Int(got) / stride).compactMap { fd in
+            guard fd.proc_fdtype == UInt32(PROX_FDTYPE_VNODE) else { return nil }
+            var info = vnode_fdinfowithpath()
+            let size = Int32(MemoryLayout<vnode_fdinfowithpath>.size)
+            guard proc_pidfdinfo(pid, fd.proc_fd, PROC_PIDFDVNODEPATHINFO, &info, size) == size else { return nil }
+            let path = withUnsafeBytes(of: &info.pvip.vip_path) { raw in
+                String(cString: raw.bindMemory(to: CChar.self).baseAddress!)
+            }
+            return path.isEmpty ? nil : path
+        }
+    }
+
     struct ListeningSocket: Equatable {
         let port: Int
         /// "*" for any address, otherwise the bound address ("127.0.0.1", "[::1]").

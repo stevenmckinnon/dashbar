@@ -221,7 +221,7 @@ extension Diagnostics {
         func found(_ tool: Tool) -> Bool {
             switch tool {
             case .claude: return store.claude.found || sessions.contains(.claude)
-            case .codex: return c.present.contains(.codex) || store.codex.found
+            case .codex: return c.present.contains(.codex) || store.codex.found || sessions.contains(.codex)
             case .geminiCLI: return c.geminiPresent || google.contains(.geminiCLI)
             case .antigravity: return c.antigravityPresent || !google.isDisjoint(with: [.antigravityCLI, .antigravity])
             case .opencode: return c.present.contains(.opencode) || store.opencode.found || sessions.contains(.opencode)
@@ -241,6 +241,7 @@ extension Diagnostics {
         add(.claude, store.sessionsWarning)
         add(.claude, store.subagentsWarning)
         add(.codex, store.codex.warning)
+        add(.codex, store.codexSessionsWarning)
         add(.geminiCLI, store.google.warning)
         add(store.googleWarning == AntigravityApp.formatWarning ? .antigravity : .geminiCLI, store.googleWarning)
         add(.opencode, store.opencode.warning)
